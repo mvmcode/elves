@@ -223,9 +223,9 @@ You are building **MINIONS** — a Tauri v2 desktop app (macOS first) that provi
 
 6. **Playful personality layer.** Agents have funny names, animated avatars, and personality-driven status messages. This is a product feature, not decoration — it drives virality through screenshots and sharing.
 
-### Reference: The Full Product Plan
+### Reference: The Vision Document
 
-The complete product plan is in `MINIONS-product-plan.md` at the project root. Read it for:
+The complete architectural vision is in `VISION.md` at the project root. Read it for:
 - Full data model and SQLite schema
 - Directory structure (`~/.minions/`)
 - UI screen-by-screen breakdown

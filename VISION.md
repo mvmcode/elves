@@ -23,7 +23,7 @@ MINIONS is a Tauri-based macOS desktop app that turns Claude Code and OpenAI Cod
 
 ---
 
-## 2. The Personality — What Makes It Viral
+## 2. The Personality — What Makes It Fun
 
 ### 2.1 Every Minion Has Character
 
@@ -944,7 +944,7 @@ Step 8: POST-SESSION
     - Useful for comparing runtimes or approaches
 ```
 
-### Phase 7: Distribution & Virality (Week 7-8)
+### Phase 7: Distribution & Sharing (Week 7-8)
 **Goal: Ship it, make it shareable**
 
 ```
@@ -1107,25 +1107,7 @@ minions/
 
 ---
 
-## 12. What Doesn't Exist Today (Our Moat)
-
-| Feature | 1Code | Conductor | opcode | OpenClaw | Codex App | **MINIONS** |
-|---|---|---|---|---|---|---|
-| Visual multi-agent theater | ❌ | ❌ | ❌ | ❌ | Partial | ✅ |
-| Auto-team (no ceremony) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Claude Code + Codex together | ✅ | Partial | ❌ | ❌ | ❌ | ✅ |
-| Persistent cross-session memory | ❌ | ❌ | ❌ | Partial | ❌ | ✅ |
-| Interoperable projects | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| General purpose (not just coding) | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ |
-| Funny/viral personality | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Visual skill/plan/memory editors | ❌ | ❌ | ❌ | ❌ | Partial | ✅ |
-| Task dependency graph | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Session replay | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ |
-| Shareable GIF/replay export | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-
----
-
-## 13. Name & Branding Notes
+## 12. Name & Branding Notes
 
 - **Domain:** minions.dev (check availability)
 - **GitHub:** github.com/minions-dev/minions (or similar)
@@ -1136,7 +1118,7 @@ minions/
 
 ---
 
-## 14. Success Metrics for v1.0
+## 13. Success Metrics for v1.0
 
 - [ ] macOS .dmg ships and installs cleanly
 - [ ] Detects Claude Code + Codex on first launch
@@ -1151,5 +1133,4 @@ minions/
 
 ---
 
-*Built with 🍌 by Mani & Raghavan*
-*The minions approve this plan.*
+*Built with 🍌 by the MINIONS contributors.*
