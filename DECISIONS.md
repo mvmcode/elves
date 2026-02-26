@@ -117,3 +117,49 @@
 **Options:** Shell orchestrates all panels, create a SessionView wrapper component, use React context for panel visibility
 **Decision:** Shell.tsx directly orchestrates all Phase 3 panels based on store state (isPlanPreview, activeSession, thinkingStream)
 **Rationale:** Shell already manages the top-level layout. Adding another wrapper creates unnecessary indirection. The store state is the single source of truth for which panels to show: isPlanPreview → PlanPreview card, activeSession with team plan → TaskGraph + ThinkingPanel, session completed → celebration banner. This keeps rendering logic colocated with layout.
+
+---
+
+## Phase 4: Persistent Memory — Decisions
+
+## 2026-02-26 — Heuristic Memory Extraction (not LLM-based yet)
+**Context:** After sessions complete, ELVES needs to extract memories (context, decisions, learnings, preferences) from the event stream
+**Options:** Claude Haiku API call (as spec suggests), local heuristic extraction, hybrid
+**Decision:** Start with heuristic extraction (keyword matching on events, categorization by event type)
+**Rationale:** Consistent with the Phase 3 analyzer decision — avoid API dependency, instant results, no network needed. The extraction interface returns Vec<MemoryRow> regardless of implementation, so swapping in an LLM call later is a one-function change. Events already have structured type/payload fields that map well to memory categories.
+
+## 2026-02-26 — Memory Relevance Decay Formula
+**Context:** Old memories should fade, frequently-used memories should stay relevant
+**Options:** Linear decay, exponential decay, step function, no decay
+**Decision:** Exponential decay: `score *= 0.995^days_since_access`. Boost on access: `score = min(score + 0.1, 1.0)`. Pinned memories exempt from decay.
+**Rationale:** Exponential decay is smooth and predictable: a memory unused for 30 days drops to ~0.86, 90 days to ~0.64, 180 days to ~0.41. This keeps recent memories prominent while old memories slowly fade rather than abruptly disappearing. The 0.1 access boost means a memory used twice in a week effectively resets to high relevance.
+
+## 2026-02-26 — Sidebar View Navigation (not React Router)
+**Context:** Memory Explorer and Settings need to be accessible as views alongside the main session workshop
+**Options:** React Router, custom view state in Zustand, conditional rendering in Shell
+**Decision:** AppView type ('session' | 'memory' | 'settings') in the UI Zustand store, sidebar buttons switch views, Shell renders conditionally
+**Rationale:** ELVES is a single-window desktop app with three views — React Router adds complexity (URL routing, history) with no benefit. A simple string state switch is sufficient. The sidebar buttons are always visible, and Shell conditionally renders the active view's content area. No URL routing needed for a Tauri app.
+
+## 2026-02-26 — Memory Store Tags as JSON String
+**Context:** The memory table stores tags as a JSON string (TEXT column), but the frontend could parse them
+**Options:** Store as JSON string and parse on render, store as parsed array, use separate tags table
+**Decision:** MemoryEntry.tags is a string (JSON array) matching the raw DB value. Frontend parses with JSON.parse() when needed for display.
+**Rationale:** Keeps the Rust→Frontend serialization boundary simple — no transformation needed. The tags column is searched via FTS5 (text matching), not by array operations. Parsing happens at the display layer only.
+
+## 2026-02-26 — useMemoryActions Hook as IPC Bridge
+**Context:** MemoryExplorer and MemorySettings components need to call Tauri IPC for CRUD, search, pin, and clear operations
+**Options:** Inline IPC calls in Shell.tsx, create a dedicated hook, create a context provider
+**Decision:** Created `useMemoryActions` hook that returns IPC-connected callbacks for all memory operations. Shell.tsx passes these callbacks as props to MemoryExplorer and MemorySettings.
+**Rationale:** Keeps Shell.tsx focused on layout/routing while the hook owns the IPC integration. The hook also handles loading memories when the active project changes. A context provider would add unnecessary indirection for what is essentially a prop-drilling bridge.
+
+## 2026-02-26 — Pre-task Context Building and Post-session Extraction in useTeamSession
+**Context:** Memory needs to be injected before tasks and extracted after sessions
+**Options:** Separate hooks for pre/post lifecycle, integrate into useTeamSession, backend-only automation
+**Decision:** Pre-task: call `buildProjectContext` in `analyzeAndDeploy` (fire-and-forget, boosts relevance). Post-session: call `extractSessionMemories` in `completeSession` if `autoLearn` is enabled.
+**Rationale:** useTeamSession already owns the full task lifecycle (analyze → deploy → complete). Adding pre/post hooks here avoids creating another hook or lifecycle manager. The pre-task call is fire-and-forget because the actual context injection into agent prompts will happen in a future phase when we wire the context string into CLAUDE.md generation. For now, calling it triggers relevance boosting for frequently-used memories.
+
+## 2026-02-26 — Memory Decay on App Startup (not Per-request)
+**Context:** When to run the exponential relevance decay on memory scores
+**Options:** On every query, on app startup, on a timer, on session end
+**Decision:** Run `decayMemories()` once on app initialization in `useInitialize`. Fire-and-forget — does not block startup.
+**Rationale:** Decay is a batch operation that adjusts all non-pinned memory scores based on time elapsed. Running once on startup is sufficient for a desktop app that gets restarted regularly. Per-query decay adds latency to every memory read. Timer-based adds complexity with no benefit for the typical usage pattern.

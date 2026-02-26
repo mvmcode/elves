@@ -1,13 +1,13 @@
-/* App initialization hook — detects runtimes and loads projects on first mount. */
+/* App initialization hook — detects runtimes, loads projects, and runs memory decay on first mount. */
 
 import { useEffect } from "react";
 import { useAppStore } from "@/stores/app";
 import { useProjectStore } from "@/stores/project";
-import { detectRuntimes, listProjects } from "@/lib/tauri";
+import { detectRuntimes, listProjects, decayMemories } from "@/lib/tauri";
 
 /**
- * Runs once on app mount to detect runtimes and load projects from the database.
- * Sets loading state while initialization is in progress.
+ * Runs once on app mount to detect runtimes, load projects from the database,
+ * and apply memory relevance decay. Sets loading state while initialization is in progress.
  */
 export function useInitialize(): void {
   const setRuntimes = useAppStore((s) => s.setRuntimes);
@@ -23,6 +23,11 @@ export function useInitialize(): void {
         ]);
         setRuntimes(runtimes);
         setProjects(projects);
+
+        /* Run memory relevance decay on startup — fades old unused memories */
+        decayMemories().catch((error: unknown) => {
+          console.error("Memory decay failed:", error);
+        });
       } catch (error) {
         console.error("Initialization failed:", error);
       } finally {
