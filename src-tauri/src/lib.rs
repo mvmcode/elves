@@ -30,6 +30,17 @@ pub fn run() {
             commands::tasks::analyze_task,
             commands::tasks::start_team_task,
             commands::tasks::stop_team_task,
+            commands::memory::list_memories,
+            commands::memory::create_memory,
+            commands::memory::update_memory,
+            commands::memory::delete_memory,
+            commands::memory::pin_memory,
+            commands::memory::unpin_memory,
+            commands::memory::search_memories,
+            commands::memory::decay_memories,
+            commands::memory::get_memory_count,
+            commands::memory::extract_session_memories,
+            commands::memory::build_project_context,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");

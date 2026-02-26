@@ -154,22 +154,29 @@ ELVES uses Tauri v2: a Rust backend handles compute-heavy work (process manageme
 The key architectural insight is the **Unified Agent Protocol**. Both Claude Code and Codex emit different event formats. ELVES normalizes everything into a single typed stream (`ElfEvent`) that the frontend subscribes to. The frontend never imports anything runtime-specific — switching from Claude Code to Codex is invisible to the UI layer.
 
 ```
-┌─────────────────────────────────────────────┐
-│              React Frontend                  │
-│   (Workshop, Activity Feed, Memory Explorer) │
-└──────────────────┬──────────────────────────┘
-                   │ Tauri IPC
-┌──────────────────┴──────────────────────────┐
-│              Rust Backend                    │
-│  ┌──────────┐ ┌────────┐ ┌──────────────┐  │
-│  │ Process  │ │ SQLite │ │ File Watcher │  │
-│  │ Manager  │ │ Store  │ │              │  │
-│  └────┬─────┘ └────────┘ └──────────────┘  │
-│       │                                      │
-│  ┌────┴──────────────────────────────────┐  │
-│  │    Unified Agent Protocol Adapter      │  │
-│  └────┬──────────────────────┬───────────┘  │
-└───────┼──────────────────────┼──────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                    React Frontend                         │
+│  ┌─────────────┐ ┌──────────────┐ ┌──────────────────┐  │
+│  │  Workshop   │ │   Memory     │ │    Settings      │  │
+│  │  (Theater,  │ │   Explorer   │ │  (Memory config, │  │
+│  │  Plan, Feed)│ │   (FTS5)     │ │   decay, export) │  │
+│  └──────┬──────┘ └──────┬───────┘ └────────┬─────────┘  │
+│         └───────────┬───┘                   │            │
+│                     │ Tauri IPC             │            │
+└─────────────────────┼───────────────────────┘            │
+┌─────────────────────┴────────────────────────────────────┘
+│                    Rust Backend                            │
+│  ┌──────────┐ ┌────────────────┐ ┌───────────────────┐   │
+│  │ Process  │ │ SQLite (WAL)   │ │ Memory Engine     │   │
+│  │ Manager  │ │ Projects, Elves│ │ Context Builder   │   │
+│  │          │ │ Sessions, Events│ │ Heuristic Extract │   │
+│  │          │ │ Memory + FTS5  │ │ Relevance Decay   │   │
+│  └────┬─────┘ └────────────────┘ └───────────────────┘   │
+│       │                                                    │
+│  ┌────┴──────────────────────────┐ ┌──────────────────┐  │
+│  │ Unified Agent Protocol Adapter │ │ Task Analyzer    │  │
+│  └────┬──────────────────────┬───┘ │ (solo vs. team)  │  │
+└───────┼──────────────────────┼─────┴──────────────────┘──┘
         │                      │
   ┌─────┴───────┐       ┌─────┴────────┐
   │ Claude Code │       │  Codex CLI   │
@@ -231,22 +238,22 @@ npx tsc --noEmit
 elves/
 ├── src/                         # React frontend
 │   ├── components/
-│   │   ├── shared/              # Button, Card, Input, Panel, Badge, etc.
+│   │   ├── shared/              # Button, Card, Input, Panel, Badge, EmptyState, DeployButton
 │   │   ├── layout/              # Shell, Sidebar, TaskBar, TopBar
-│   │   ├── theater/             # ElfWorkshop, ElfCard, TaskGraph
-│   │   ├── feed/                # ActivityFeed, EventRow
+│   │   ├── theater/             # ElfTheater, ElfCard, PlanPreview, TaskGraph, ThinkingPanel
+│   │   ├── feed/                # ActivityFeed
 │   │   ├── memory/              # MemoryExplorer, MemoryCard
-│   │   └── editors/             # SkillEditor, PlanEditor, McpManager
-│   ├── stores/                  # Zustand stores (app, project, ui)
-│   ├── types/                   # TypeScript type definitions
-│   ├── hooks/                   # React hooks
-│   └── lib/                     # Utilities, Tauri IPC wrappers
+│   │   └── settings/            # MemorySettings
+│   ├── stores/                  # Zustand stores (app, project, session, ui, memory, settings)
+│   ├── types/                   # TypeScript type definitions (elf, session, project, memory, runtime)
+│   ├── hooks/                   # useInitialize, useSession, useTeamSession, useMemoryActions
+│   └── lib/                     # elf-names, Tauri IPC wrappers
 │
 ├── src-tauri/                   # Rust backend
 │   └── src/
-│       ├── agents/              # Runtime detection, adapters
-│       ├── commands/            # Tauri IPC command handlers
-│       └── db/                  # SQLite schema, migrations, CRUD
+│       ├── agents/              # Runtime detection, adapters, task analyzer, context builder, memory extractor
+│       ├── commands/            # Tauri IPC handlers (agents, projects, sessions, tasks, memory)
+│       └── db/                  # SQLite schema, migrations, CRUD (projects, sessions, elves, events, memory)
 │
 ├── assets/logo/                 # ELVES wordmark and logo assets
 ├── CLAUDE.md                    # Engineering standards
@@ -259,7 +266,10 @@ elves/
 - **Neo-brutalist components**: 3px black borders, hard drop shadows (`box-shadow: 6px 6px 0px 0px #000`), no border-radius by default, bold saturated colors
 - **Tailwind v4**: Design tokens defined via `@theme` in CSS, not a config file
 - **Tauri IPC**: `tauri::command` for request/response, `app.emit()` for streaming events
-- **Zustand stores**: Separate stores per domain to prevent unnecessary re-renders
+- **Zustand stores**: Separate stores per domain (app, project, session, ui, memory, settings) to prevent unnecessary re-renders
+- **Persistent memory**: SQLite + FTS5 full-text search. Relevance decays exponentially (`score *= 0.995^days`), boosted on access. Pinned memories exempt from decay.
+- **Pre/post-task hooks**: Before each task, project context is built from relevant memories. After completion, heuristic extraction pulls decisions, learnings, and context from the event stream.
+- **View routing**: Simple `AppView` string union type in Zustand (session/memory/settings) — no React Router needed for a single-window desktop app
 
 ---
 
@@ -267,8 +277,8 @@ elves/
 
 - [x] **Phase 1: Foundation** — Tauri v2 scaffold, design system, SQLite backend, runtime detection
 - [x] **Phase 2: Single Elf Mode** — ElfCard, ActivityFeed, live streaming, session management
-- [ ] **Phase 3: Multi-Elf Teams** — Auto-team decomposition, plan editor, Elf Workshop
-- [ ] **Phase 4: Memory & Intelligence** — Persistent memory, auto-learning, context injection
+- [x] **Phase 3: Multi-Elf Teams** — Task analyzer, plan preview, team deployment, task graph, thinking panel
+- [x] **Phase 4: Memory & Intelligence** — Persistent memory with FTS5, auto-learning, context injection, memory explorer, settings
 - [ ] **Phase 5: Visual Editors & Polish** — Skills editor, MCP manager, avatar animations, sound design
 - [ ] **Phase 6: Codex Full Support** — Multi-agent Codex, runtime switching, task templates
 - [ ] **Phase 7: Distribution** — Signed .dmg, auto-updater, Homebrew cask, landing page at elves.dev

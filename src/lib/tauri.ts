@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import type { RuntimeInfo } from "@/types/runtime";
 import type { Project } from "@/types/project";
 import type { Session, TaskPlan } from "@/types/session";
+import type { MemoryEntry, ExtractionResult } from "@/types/memory";
 
 /** Detect available AI runtimes (Claude Code, Codex) on the system */
 export async function detectRuntimes(): Promise<RuntimeInfo> {
@@ -63,6 +64,73 @@ export async function startTeamTask(
 /** Stop a team task. Kills all agent processes for the session. */
 export async function stopTeamTask(sessionId: string): Promise<boolean> {
   return invoke<boolean>("stop_team_task", { sessionId });
+}
+
+/* ── Memory commands ───────────────────────────────────────────── */
+
+/** List memories for a project with optional filtering. */
+export async function listMemories(
+  projectId: string,
+  category?: string,
+  sortBy?: string,
+): Promise<MemoryEntry[]> {
+  return invoke<MemoryEntry[]>("list_memories", { projectId, category, sortBy });
+}
+
+/** Create a new memory entry. */
+export async function createMemory(
+  projectId: string,
+  category: string,
+  content: string,
+  source?: string,
+  tags?: string,
+): Promise<MemoryEntry> {
+  return invoke<MemoryEntry>("create_memory", { projectId, category, content, source, tags });
+}
+
+/** Update a memory entry's content. */
+export async function updateMemory(id: number, content: string): Promise<boolean> {
+  return invoke<boolean>("update_memory", { id, content });
+}
+
+/** Delete a memory entry. */
+export async function deleteMemory(id: number): Promise<boolean> {
+  return invoke<boolean>("delete_memory", { id });
+}
+
+/** Pin a memory (sets relevance to 1.0, never decays). */
+export async function pinMemory(id: number): Promise<boolean> {
+  return invoke<boolean>("pin_memory", { id });
+}
+
+/** Unpin a memory. */
+export async function unpinMemory(id: number): Promise<boolean> {
+  return invoke<boolean>("unpin_memory", { id });
+}
+
+/** Full-text search memories. */
+export async function searchMemories(projectId: string, query: string): Promise<MemoryEntry[]> {
+  return invoke<MemoryEntry[]>("search_memories", { projectId, query });
+}
+
+/** Run relevance decay on all non-pinned memories. Returns count decayed. */
+export async function decayMemories(): Promise<number> {
+  return invoke<number>("decay_memories");
+}
+
+/** Build a markdown context block from relevant memories for a project. */
+export async function buildProjectContext(projectId: string): Promise<string> {
+  return invoke<string>("build_project_context", { projectId });
+}
+
+/** Extract memories from a completed session. Returns extraction result with memories and summary. */
+export async function extractSessionMemories(sessionId: string): Promise<ExtractionResult> {
+  return invoke<ExtractionResult>("extract_session_memories", { sessionId });
+}
+
+/** Get memory count for a project. */
+export async function getMemoryCount(projectId: string): Promise<number> {
+  return invoke<number>("get_memory_count", { projectId });
 }
 
 /** Subscribe to a Tauri event. Returns an unsubscribe function. */

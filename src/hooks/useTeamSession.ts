@@ -10,7 +10,10 @@ import {
   startTeamTask as invokeStartTeamTask,
   stopTask as invokeStopTask,
   stopTeamTask as invokeStopTeamTask,
+  buildProjectContext,
+  extractSessionMemories,
 } from "@/lib/tauri";
+import { useSettingsStore } from "@/stores/settings";
 import { generateElf, getStatusMessage } from "@/lib/elf-names";
 import type { Runtime, ElfStatus } from "@/types/elf";
 import type { TaskPlan } from "@/types/session";
@@ -45,6 +48,7 @@ export function useTeamSession(): {
   const acceptPlan = useSessionStore((s) => s.acceptPlan);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const runtimes = useAppStore((s) => s.runtimes);
+  const autoLearn = useSettingsStore((s) => s.autoLearn);
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /** Clean up sleep timer on unmount */
@@ -80,13 +84,20 @@ export function useTeamSession(): {
         funnyStatus: `${leadName} declares victory!`,
       });
 
+      /* Post-session: extract memories if auto-learn is enabled */
+      if (autoLearn && activeSession) {
+        extractSessionMemories(activeSession.id).catch((error: unknown) => {
+          console.error("Failed to extract session memories:", error);
+        });
+      }
+
       endSession("Task completed successfully");
 
       sleepTimerRef.current = setTimeout(() => {
         updateAllElfStatus("sleeping");
       }, SLEEP_DELAY_MS);
     },
-    [updateAllElfStatus, addEvent, endSession, getDefaultRuntime],
+    [updateAllElfStatus, addEvent, endSession, getDefaultRuntime, autoLearn, activeSession],
   );
 
   /**
@@ -100,6 +111,11 @@ export function useTeamSession(): {
       }
 
       try {
+        /* Pre-task: build context from project memories (boosts relevance for used memories) */
+        buildProjectContext(activeProjectId).catch((error: unknown) => {
+          console.error("Failed to build project context:", error);
+        });
+
         const plan = await invokeAnalyzeTask(task, activeProjectId);
 
         if (plan.complexity === "solo") {

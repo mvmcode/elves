@@ -1,6 +1,7 @@
 /* Project sidebar — lists projects and provides navigation to global settings. */
 
 import { useProjectStore } from "@/stores/project";
+import { useUiStore } from "@/stores/ui";
 import { Badge } from "@/components/shared/Badge";
 import { EmptyState } from "@/components/shared/EmptyState";
 
@@ -12,6 +13,8 @@ export function Sidebar(): React.JSX.Element {
   const projects = useProjectStore((s) => s.projects);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const setActiveProject = useProjectStore((s) => s.setActiveProject);
+  const activeView = useUiStore((s) => s.activeView);
+  const setActiveView = useUiStore((s) => s.setActiveView);
 
   return (
     <aside className="no-select flex w-64 shrink-0 flex-col border-r-[3px] border-border bg-white">
@@ -49,10 +52,47 @@ export function Sidebar(): React.JSX.Element {
         )}
       </div>
 
+      {/* Navigation */}
+      <div className="border-t-[3px] border-border p-2">
+        <button
+          onClick={() => setActiveView("session")}
+          className={[
+            "mb-1 w-full border-[2px] p-2 text-left font-body text-sm font-bold transition-all duration-100",
+            activeView === "session"
+              ? "border-border bg-elf-gold shadow-brutal-sm"
+              : "border-transparent hover:border-border hover:bg-elf-gold-light",
+          ].join(" ")}
+        >
+          Workshop
+        </button>
+        <button
+          onClick={() => setActiveView("memory")}
+          className={[
+            "mb-1 w-full border-[2px] p-2 text-left font-body text-sm font-bold transition-all duration-100",
+            activeView === "memory"
+              ? "border-border bg-elf-gold shadow-brutal-sm"
+              : "border-transparent hover:border-border hover:bg-elf-gold-light",
+          ].join(" ")}
+        >
+          Memory
+        </button>
+        <button
+          onClick={() => setActiveView("settings")}
+          className={[
+            "w-full border-[2px] p-2 text-left font-body text-sm font-bold transition-all duration-100",
+            activeView === "settings"
+              ? "border-border bg-elf-gold shadow-brutal-sm"
+              : "border-transparent hover:border-border hover:bg-elf-gold-light",
+          ].join(" ")}
+        >
+          Settings
+        </button>
+      </div>
+
       {/* Bottom section */}
       <div className="border-t-[3px] border-border p-3">
         <p className="font-mono text-xs text-text-light/40">
-          Built with cookies 🍪
+          Built with cookies
         </p>
       </div>
     </aside>
