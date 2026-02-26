@@ -5,11 +5,11 @@ import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/project";
 import { useAppStore } from "@/stores/app";
 import { startTask as invokeStartTask, stopTask as invokeStopTask } from "@/lib/tauri";
-import { generateMinion, getStatusMessage } from "@/lib/minion-names";
-import type { Runtime, MinionStatus } from "@/types/minion";
+import { generateElf, getStatusMessage } from "@/lib/elf-names";
+import type { Runtime, ElfStatus } from "@/types/elf";
 
 /**
- * Provides task lifecycle actions: deploy a new task and stop a running task.
+ * Provides task lifecycle actions: summon a new task and stop a running task.
  * Manages the bridge between Tauri IPC commands and the frontend session store.
  */
 export function useSession(): {
@@ -20,7 +20,7 @@ export function useSession(): {
   const activeSession = useSessionStore((s) => s.activeSession);
   const startSession = useSessionStore((s) => s.startSession);
   const endSession = useSessionStore((s) => s.endSession);
-  const addMinion = useSessionStore((s) => s.addMinion);
+  const addElf = useSessionStore((s) => s.addElf);
   const addEvent = useSessionStore((s) => s.addEvent);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const runtimes = useAppStore((s) => s.runtimes);
@@ -51,10 +51,10 @@ export function useSession(): {
           runtime,
         });
 
-        /* Generate a personality for the minion and add to store */
-        const personality = generateMinion();
-        addMinion({
-          id: `minion-${sessionId}`,
+        /* Generate a personality for the elf and add to store */
+        const personality = generateElf();
+        addElf({
+          id: `elf-${sessionId}`,
           sessionId,
           name: personality.name,
           role: null,
@@ -65,7 +65,7 @@ export function useSession(): {
           status: "spawning",
           spawnedAt: Date.now(),
           finishedAt: null,
-          parentMinionId: null,
+          parentElfId: null,
           toolsUsed: [],
         });
 
@@ -73,23 +73,23 @@ export function useSession(): {
         addEvent({
           id: `event-spawn-${Date.now()}`,
           timestamp: Date.now(),
-          minionId: `minion-${sessionId}`,
-          minionName: personality.name,
+          elfId: `elf-${sessionId}`,
+          elfName: personality.name,
           runtime,
           type: "spawn",
           payload: { role: null },
           funnyStatus: getStatusMessage(personality.name, "spawning"),
         });
 
-        /* Simulate the minion transitioning to "working" after a brief delay */
+        /* Simulate the elf transitioning to "working" after a brief delay */
         setTimeout(() => {
-          useSessionStore.getState().updateMinionStatus(`minion-${sessionId}`, "working" as MinionStatus);
+          useSessionStore.getState().updateElfStatus(`elf-${sessionId}`, "working" as ElfStatus);
           const workingStatus = getStatusMessage(personality.name, "working");
           useSessionStore.getState().addEvent({
             id: `event-working-${Date.now()}`,
             timestamp: Date.now(),
-            minionId: `minion-${sessionId}`,
-            minionName: personality.name,
+            elfId: `elf-${sessionId}`,
+            elfName: personality.name,
             runtime,
             type: "thinking",
             payload: { text: workingStatus },
@@ -100,7 +100,7 @@ export function useSession(): {
         console.error("Failed to start task:", error);
       }
     },
-    [activeProjectId, runtimes, startSession, addMinion, addEvent],
+    [activeProjectId, runtimes, startSession, addElf, addEvent],
   );
 
   const stopSession = useCallback(async (): Promise<void> => {

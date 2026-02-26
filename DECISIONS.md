@@ -1,10 +1,10 @@
-# DECISIONS.md — MINIONS Architectural Decision Log
+# DECISIONS.md — ELVES Architectural Decision Log
 
 ## 2026-02-26 — Project Scaffolding Choices
-**Context:** Initializing the MINIONS desktop app from scratch
+**Context:** Initializing the ELVES desktop app from scratch
 **Options:** create-tauri-app v2, manual setup, Tauri v1
 **Decision:** Used create-tauri-app v2 with React+TypeScript template, then customized
-**Rationale:** Tauri v2 gives us the latest IPC model, multi-window support, and mobile targets (future). The React+TS template provides a working Vite build pipeline out of the box. We customized the scaffold to rename from "minions-scaffold" to "minions", add all required deps, and apply strict TypeScript config.
+**Rationale:** Tauri v2 gives us the latest IPC model, multi-window support, and mobile targets (future). The React+TS template provides a working Vite build pipeline out of the box. We customized the scaffold to rename from the template to "elves", add all required deps, and apply strict TypeScript config.
 
 ## 2026-02-26 — Tailwind CSS v4 (not v3)
 **Context:** Styling framework for the frontend
@@ -67,7 +67,13 @@
 **Rationale:** Simple ownership model — one process per session. The Mutex ensures thread-safe access from Tauri command handlers. kill() reaps zombies with wait(). kill_all() is called on shutdown. If we need multiple processes per session (multi-agent), we extend to HashMap<String, Vec<Child>>.
 
 ## 2026-02-26 — Frontend Personality Assignment (not Backend)
-**Context:** Where to assign minion names, avatars, and personality quirks
+**Context:** Where to assign elf names, avatars, and personality quirks
 **Options:** Backend generates personality in Rust, frontend generates via TypeScript
-**Decision:** Frontend generates personality via generateMinion() and sends to store; backend stores a placeholder
-**Rationale:** The personality engine uses randomization and session-scoped deduplication that's simpler to manage in the reactive frontend layer. The backend creates a minion DB row with placeholder name/avatar, and the frontend overrides with the personality-enriched version. This keeps the Rust backend focused on data persistence and process management.
+**Decision:** Frontend generates personality via generateElf() and sends to store; backend stores a placeholder
+**Rationale:** The personality engine uses randomization and session-scoped deduplication that's simpler to manage in the reactive frontend layer. The backend creates an elf DB row with placeholder name/avatar, and the frontend overrides with the personality-enriched version. This keeps the Rust backend focused on data persistence and process management.
+
+## 2026-02-26 — Rebrand from MINIONS to ELVES
+**Context:** "Minions" poses a potential copyright issue (Illumination/Universal). Need a full rebrand.
+**Options:** Elves, Sprites, Gnomes, Imps, Pixies
+**Decision:** Rebrand to ELVES — all code, types, UI strings, database tables, file names, logos, docs
+**Rationale:** "Elves" fits the same playful personality archetype while being generic enough to avoid trademark issues. The workshop/crafting metaphor (elves making things) maps perfectly to AI agents building code. Key mappings: minion→elf, MinionEvent→ElfEvent, banana→cookie, deploy→summon, ~/.minions/→~/.elves/, minion-yellow→elf-gold. Complete rename across ~693 occurrences in 48 files.

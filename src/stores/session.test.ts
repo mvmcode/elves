@@ -2,40 +2,40 @@
 
 import { describe, expect, it, beforeEach } from "vitest";
 import { useSessionStore } from "./session";
-import type { Minion, MinionEvent } from "@/types/minion";
+import type { Elf, ElfEvent } from "@/types/elf";
 
 /** Reset store state between tests */
 function resetStore(): void {
   useSessionStore.getState().clearSession();
 }
 
-/** Factory for a minimal valid Minion */
-function createTestMinion(overrides: Partial<Minion> = {}): Minion {
+/** Factory for a minimal valid Elf */
+function createTestElf(overrides: Partial<Elf> = {}): Elf {
   return {
-    id: "minion-1",
+    id: "elf-1",
     sessionId: "session-1",
-    name: "Kevin",
+    name: "Spark",
     role: "engineer",
-    avatar: "🔬",
+    avatar: "⚡",
     color: "#FF6B6B",
-    quirk: "Narrates everything in third person",
+    quirk: "Leaves glitter on every file they touch",
     runtime: "claude-code",
     status: "spawning",
     spawnedAt: Date.now(),
     finishedAt: null,
-    parentMinionId: null,
+    parentElfId: null,
     toolsUsed: [],
     ...overrides,
   };
 }
 
-/** Factory for a minimal valid MinionEvent */
-function createTestEvent(overrides: Partial<MinionEvent> = {}): MinionEvent {
+/** Factory for a minimal valid ElfEvent */
+function createTestEvent(overrides: Partial<ElfEvent> = {}): ElfEvent {
   return {
     id: "event-1",
     timestamp: Date.now(),
-    minionId: "minion-1",
-    minionName: "Kevin",
+    elfId: "elf-1",
+    elfName: "Spark",
     runtime: "claude-code",
     type: "output",
     payload: { text: "Hello world" },
@@ -53,7 +53,7 @@ describe("useSessionStore", () => {
       const state = useSessionStore.getState();
       expect(state.activeSession).toBeNull();
       expect(state.events).toEqual([]);
-      expect(state.minions).toEqual([]);
+      expect(state.elves).toEqual([]);
     });
   });
 
@@ -76,18 +76,18 @@ describe("useSessionStore", () => {
       expect(state.activeSession!.startedAt).toBeGreaterThan(0);
     });
 
-    it("clears previous events and minions when starting a new session", () => {
+    it("clears previous events and elves when starting a new session", () => {
       const store = useSessionStore.getState();
       store.startSession({ id: "s1", projectId: "p1", task: "task 1", runtime: "claude-code" });
       store.addEvent(createTestEvent());
-      store.addMinion(createTestMinion());
+      store.addElf(createTestElf());
 
       store.startSession({ id: "s2", projectId: "p1", task: "task 2", runtime: "codex" });
 
       const state = useSessionStore.getState();
       expect(state.activeSession!.id).toBe("s2");
       expect(state.events).toEqual([]);
-      expect(state.minions).toEqual([]);
+      expect(state.elves).toEqual([]);
     });
   });
 
@@ -154,65 +154,65 @@ describe("useSessionStore", () => {
     });
   });
 
-  describe("addMinion", () => {
-    it("adds a minion to the list", () => {
+  describe("addElf", () => {
+    it("adds an elf to the list", () => {
       useSessionStore.getState().startSession({
         id: "s1", projectId: "p1", task: "task", runtime: "claude-code",
       });
 
-      const minion = createTestMinion({ id: "m1" });
-      useSessionStore.getState().addMinion(minion);
+      const elf = createTestElf({ id: "e1" });
+      useSessionStore.getState().addElf(elf);
 
-      expect(useSessionStore.getState().minions).toHaveLength(1);
-      expect(useSessionStore.getState().minions[0]!.id).toBe("m1");
+      expect(useSessionStore.getState().elves).toHaveLength(1);
+      expect(useSessionStore.getState().elves[0]!.id).toBe("e1");
     });
 
-    it("supports multiple minions", () => {
+    it("supports multiple elves", () => {
       useSessionStore.getState().startSession({
         id: "s1", projectId: "p1", task: "task", runtime: "claude-code",
       });
 
-      useSessionStore.getState().addMinion(createTestMinion({ id: "m1", name: "Kevin" }));
-      useSessionStore.getState().addMinion(createTestMinion({ id: "m2", name: "Stuart" }));
+      useSessionStore.getState().addElf(createTestElf({ id: "e1", name: "Spark" }));
+      useSessionStore.getState().addElf(createTestElf({ id: "e2", name: "Tinker" }));
 
-      expect(useSessionStore.getState().minions).toHaveLength(2);
+      expect(useSessionStore.getState().elves).toHaveLength(2);
     });
   });
 
-  describe("updateMinionStatus", () => {
-    it("updates the status of a specific minion", () => {
+  describe("updateElfStatus", () => {
+    it("updates the status of a specific elf", () => {
       useSessionStore.getState().startSession({
         id: "s1", projectId: "p1", task: "task", runtime: "claude-code",
       });
-      useSessionStore.getState().addMinion(createTestMinion({ id: "m1", status: "spawning" }));
+      useSessionStore.getState().addElf(createTestElf({ id: "e1", status: "spawning" }));
 
-      useSessionStore.getState().updateMinionStatus("m1", "working");
+      useSessionStore.getState().updateElfStatus("e1", "working");
 
-      expect(useSessionStore.getState().minions[0]!.status).toBe("working");
+      expect(useSessionStore.getState().elves[0]!.status).toBe("working");
     });
 
-    it("does not affect other minions", () => {
+    it("does not affect other elves", () => {
       useSessionStore.getState().startSession({
         id: "s1", projectId: "p1", task: "task", runtime: "claude-code",
       });
-      useSessionStore.getState().addMinion(createTestMinion({ id: "m1", status: "spawning" }));
-      useSessionStore.getState().addMinion(createTestMinion({ id: "m2", status: "working" }));
+      useSessionStore.getState().addElf(createTestElf({ id: "e1", status: "spawning" }));
+      useSessionStore.getState().addElf(createTestElf({ id: "e2", status: "working" }));
 
-      useSessionStore.getState().updateMinionStatus("m1", "done");
+      useSessionStore.getState().updateElfStatus("e1", "done");
 
-      expect(useSessionStore.getState().minions[0]!.status).toBe("done");
-      expect(useSessionStore.getState().minions[1]!.status).toBe("working");
+      expect(useSessionStore.getState().elves[0]!.status).toBe("done");
+      expect(useSessionStore.getState().elves[1]!.status).toBe("working");
     });
 
-    it("is a no-op for unknown minion IDs", () => {
+    it("is a no-op for unknown elf IDs", () => {
       useSessionStore.getState().startSession({
         id: "s1", projectId: "p1", task: "task", runtime: "claude-code",
       });
-      useSessionStore.getState().addMinion(createTestMinion({ id: "m1", status: "spawning" }));
+      useSessionStore.getState().addElf(createTestElf({ id: "e1", status: "spawning" }));
 
-      useSessionStore.getState().updateMinionStatus("nonexistent", "error");
+      useSessionStore.getState().updateElfStatus("nonexistent", "error");
 
-      expect(useSessionStore.getState().minions[0]!.status).toBe("spawning");
+      expect(useSessionStore.getState().elves[0]!.status).toBe("spawning");
     });
   });
 
@@ -222,14 +222,14 @@ describe("useSessionStore", () => {
         id: "s1", projectId: "p1", task: "task", runtime: "claude-code",
       });
       useSessionStore.getState().addEvent(createTestEvent());
-      useSessionStore.getState().addMinion(createTestMinion());
+      useSessionStore.getState().addElf(createTestElf());
 
       useSessionStore.getState().clearSession();
 
       const state = useSessionStore.getState();
       expect(state.activeSession).toBeNull();
       expect(state.events).toEqual([]);
-      expect(state.minions).toEqual([]);
+      expect(state.elves).toEqual([]);
     });
   });
 });

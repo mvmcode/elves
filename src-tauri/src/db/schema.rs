@@ -1,4 +1,4 @@
-// Database schema and migrations — creates all tables from the MINIONS product plan Section 6.2.
+// Database schema and migrations — creates all tables from the ELVES product plan Section 6.2.
 
 use rusqlite::Connection;
 
@@ -64,8 +64,8 @@ fn migrate_v1(conn: &Connection) -> Result<(), DbError> {
             summary TEXT
         );
 
-        -- Minions: individual agent instances within a session
-        CREATE TABLE IF NOT EXISTS minions (
+        -- Elves: individual agent instances within a session
+        CREATE TABLE IF NOT EXISTS elves (
             id TEXT PRIMARY KEY,
             session_id TEXT NOT NULL REFERENCES sessions(id),
             name TEXT NOT NULL,
@@ -77,7 +77,7 @@ fn migrate_v1(conn: &Connection) -> Result<(), DbError> {
             status TEXT NOT NULL DEFAULT 'spawning',
             spawned_at INTEGER NOT NULL,
             finished_at INTEGER,
-            parent_minion_id TEXT REFERENCES minions(id),
+            parent_elf_id TEXT REFERENCES elves(id),
             tools_used TEXT NOT NULL DEFAULT '[]'
         );
 
@@ -122,7 +122,7 @@ fn migrate_v1(conn: &Connection) -> Result<(), DbError> {
         CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT NOT NULL,
-            minion_id TEXT,
+            elf_id TEXT,
             event_type TEXT NOT NULL,
             payload TEXT NOT NULL,
             funny_status TEXT,
@@ -158,11 +158,11 @@ fn migrate_v1(conn: &Connection) -> Result<(), DbError> {
 
         -- Indexes for common queries
         CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id);
-        CREATE INDEX IF NOT EXISTS idx_minions_session ON minions(session_id);
+        CREATE INDEX IF NOT EXISTS idx_elves_session ON elves(session_id);
         CREATE INDEX IF NOT EXISTS idx_memory_project ON memory(project_id);
         CREATE INDEX IF NOT EXISTS idx_memory_category ON memory(category);
         CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
-        CREATE INDEX IF NOT EXISTS idx_events_minion ON events(minion_id);
+        CREATE INDEX IF NOT EXISTS idx_events_elf ON events(elf_id);
 
         -- Record this migration
         INSERT INTO schema_version (version) VALUES (1);
@@ -216,7 +216,7 @@ mod tests {
         let expected_tables = [
             "projects",
             "sessions",
-            "minions",
+            "elves",
             "memory",
             "skills",
             "mcp_servers",

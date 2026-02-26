@@ -1,15 +1,15 @@
-// Minion CRUD operations — create, read, list, and update agent instances in SQLite.
+// Elf CRUD operations — create, read, list, and update agent instances in SQLite.
 
 use rusqlite::{params, Connection};
 use serde::Serialize;
 
 use super::DbError;
 
-/// A minion row from the database, serialized to camelCase JSON for the frontend.
-/// Each minion represents a single agent instance within a session.
+/// An elf row from the database, serialized to camelCase JSON for the frontend.
+/// Each elf represents a single agent instance within a session.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MinionRow {
+pub struct ElfRow {
     pub id: String,
     pub session_id: String,
     pub name: String,
@@ -22,16 +22,16 @@ pub struct MinionRow {
     pub status: String,
     pub spawned_at: i64,
     pub finished_at: Option<i64>,
-    pub parent_minion_id: Option<String>,
+    pub parent_elf_id: Option<String>,
     /// JSON array string of tool names used during execution.
     pub tools_used: String,
 }
 
-/// Insert a new minion into the database. Returns the created minion row.
+/// Insert a new elf into the database. Returns the created elf row.
 ///
-/// The minion starts with status "spawning", an empty tools_used array, and
+/// The elf starts with status "spawning", an empty tools_used array, and
 /// `spawned_at` set to the current UTC timestamp.
-pub fn create_minion(
+pub fn create_elf(
     conn: &Connection,
     id: &str,
     session_id: &str,
@@ -41,23 +41,23 @@ pub fn create_minion(
     color: &str,
     quirk: Option<&str>,
     runtime: &str,
-) -> Result<MinionRow, DbError> {
+) -> Result<ElfRow, DbError> {
     let now = chrono::Utc::now().timestamp();
     conn.execute(
-        "INSERT INTO minions (id, session_id, name, role, avatar, color, quirk, runtime, status, spawned_at, tools_used)
+        "INSERT INTO elves (id, session_id, name, role, avatar, color, quirk, runtime, status, spawned_at, tools_used)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'spawning', ?9, '[]')",
         params![id, session_id, name, role, avatar, color, quirk, runtime, now],
     )?;
 
-    get_minion(conn, id)?.ok_or_else(|| {
+    get_elf(conn, id)?.ok_or_else(|| {
         DbError::Sqlite(rusqlite::Error::QueryReturnedNoRows)
     })
 }
 
-/// Update a minion's status. Sets `finished_at` to the current UTC timestamp when
+/// Update an elf's status. Sets `finished_at` to the current UTC timestamp when
 /// the status transitions to a terminal state ("done" or "error").
 /// Returns true if a row was updated.
-pub fn update_minion_status(
+pub fn update_elf_status(
     conn: &Connection,
     id: &str,
     status: &str,
@@ -70,27 +70,27 @@ pub fn update_minion_status(
     };
 
     let rows_affected = conn.execute(
-        "UPDATE minions SET status = ?1, finished_at = COALESCE(?2, finished_at) WHERE id = ?3",
+        "UPDATE elves SET status = ?1, finished_at = COALESCE(?2, finished_at) WHERE id = ?3",
         params![status, finished_at, id],
     )?;
 
     Ok(rows_affected > 0)
 }
 
-/// List all minions for a session, ordered by spawn time (oldest first).
-pub fn list_minions(
+/// List all elves for a session, ordered by spawn time (oldest first).
+pub fn list_elves(
     conn: &Connection,
     session_id: &str,
-) -> Result<Vec<MinionRow>, DbError> {
+) -> Result<Vec<ElfRow>, DbError> {
     let mut stmt = conn.prepare(
         "SELECT id, session_id, name, role, avatar, color, quirk, runtime,
-                status, spawned_at, finished_at, parent_minion_id, tools_used
-         FROM minions WHERE session_id = ?1 ORDER BY spawned_at ASC",
+                status, spawned_at, finished_at, parent_elf_id, tools_used
+         FROM elves WHERE session_id = ?1 ORDER BY spawned_at ASC",
     )?;
 
     let rows = stmt
         .query_map(params![session_id], |row| {
-            Ok(MinionRow {
+            Ok(ElfRow {
                 id: row.get(0)?,
                 session_id: row.get(1)?,
                 name: row.get(2)?,
@@ -102,7 +102,7 @@ pub fn list_minions(
                 status: row.get(8)?,
                 spawned_at: row.get(9)?,
                 finished_at: row.get(10)?,
-                parent_minion_id: row.get(11)?,
+                parent_elf_id: row.get(11)?,
                 tools_used: row.get(12)?,
             })
         })?
@@ -111,17 +111,17 @@ pub fn list_minions(
     Ok(rows)
 }
 
-/// Retrieve a single minion by ID. Returns None if the minion does not exist.
-pub fn get_minion(conn: &Connection, id: &str) -> Result<Option<MinionRow>, DbError> {
+/// Retrieve a single elf by ID. Returns None if the elf does not exist.
+pub fn get_elf(conn: &Connection, id: &str) -> Result<Option<ElfRow>, DbError> {
     let mut stmt = conn.prepare(
         "SELECT id, session_id, name, role, avatar, color, quirk, runtime,
-                status, spawned_at, finished_at, parent_minion_id, tools_used
-         FROM minions WHERE id = ?1",
+                status, spawned_at, finished_at, parent_elf_id, tools_used
+         FROM elves WHERE id = ?1",
     )?;
 
     let result = stmt
         .query_row(params![id], |row| {
-            Ok(MinionRow {
+            Ok(ElfRow {
                 id: row.get(0)?,
                 session_id: row.get(1)?,
                 name: row.get(2)?,
@@ -133,7 +133,7 @@ pub fn get_minion(conn: &Connection, id: &str) -> Result<Option<MinionRow>, DbEr
                 status: row.get(8)?,
                 spawned_at: row.get(9)?,
                 finished_at: row.get(10)?,
-                parent_minion_id: row.get(11)?,
+                parent_elf_id: row.get(11)?,
                 tools_used: row.get(12)?,
             })
         })
@@ -187,134 +187,134 @@ mod tests {
     }
 
     #[test]
-    fn create_and_get_minion() {
+    fn create_and_get_elf() {
         let conn = test_conn();
         seed_session(&conn, "proj-1", "sess-1");
 
-        let minion = create_minion(
+        let elf = create_elf(
             &conn,
-            "min-1",
+            "elf-1",
             "sess-1",
-            "Captain Banana",
+            "Captain Cookie",
             Some("lead"),
-            "banana-avatar",
+            "cookie-avatar",
             "#FFD93D",
-            Some("Says 'banana' after every sentence"),
+            Some("Says 'cookie' after every sentence"),
             "claude-code",
         )
-        .expect("Should create minion");
+        .expect("Should create elf");
 
-        assert_eq!(minion.id, "min-1");
-        assert_eq!(minion.session_id, "sess-1");
-        assert_eq!(minion.name, "Captain Banana");
-        assert_eq!(minion.role.as_deref(), Some("lead"));
-        assert_eq!(minion.avatar, "banana-avatar");
-        assert_eq!(minion.color, "#FFD93D");
-        assert_eq!(minion.quirk.as_deref(), Some("Says 'banana' after every sentence"));
-        assert_eq!(minion.runtime, "claude-code");
-        assert_eq!(minion.status, "spawning");
-        assert!(minion.finished_at.is_none());
-        assert!(minion.parent_minion_id.is_none());
-        assert_eq!(minion.tools_used, "[]");
+        assert_eq!(elf.id, "elf-1");
+        assert_eq!(elf.session_id, "sess-1");
+        assert_eq!(elf.name, "Captain Cookie");
+        assert_eq!(elf.role.as_deref(), Some("lead"));
+        assert_eq!(elf.avatar, "cookie-avatar");
+        assert_eq!(elf.color, "#FFD93D");
+        assert_eq!(elf.quirk.as_deref(), Some("Says 'cookie' after every sentence"));
+        assert_eq!(elf.runtime, "claude-code");
+        assert_eq!(elf.status, "spawning");
+        assert!(elf.finished_at.is_none());
+        assert!(elf.parent_elf_id.is_none());
+        assert_eq!(elf.tools_used, "[]");
 
-        let fetched = get_minion(&conn, "min-1")
+        let fetched = get_elf(&conn, "elf-1")
             .expect("Should query")
-            .expect("Should find minion");
-        assert_eq!(fetched.name, "Captain Banana");
+            .expect("Should find elf");
+        assert_eq!(fetched.name, "Captain Cookie");
     }
 
     #[test]
-    fn create_minion_without_optional_fields() {
+    fn create_elf_without_optional_fields() {
         let conn = test_conn();
         seed_session(&conn, "proj-1", "sess-1");
 
-        let minion = create_minion(
-            &conn, "min-2", "sess-1", "Worker Bob", None, "bob-avatar", "#4D96FF", None, "codex",
+        let elf = create_elf(
+            &conn, "elf-2", "sess-1", "Worker Bob", None, "bob-avatar", "#4D96FF", None, "codex",
         )
-        .expect("Should create minion");
+        .expect("Should create elf");
 
-        assert!(minion.role.is_none());
-        assert!(minion.quirk.is_none());
+        assert!(elf.role.is_none());
+        assert!(elf.quirk.is_none());
     }
 
     #[test]
-    fn list_minions_by_session() {
+    fn list_elves_by_session() {
         let conn = test_conn();
         seed_session(&conn, "proj-1", "sess-1");
         seed_session(&conn, "proj-1", "sess-2");
 
-        create_minion(&conn, "m1", "sess-1", "Alice", None, "a", "#FFF", None, "claude-code").unwrap();
-        create_minion(&conn, "m2", "sess-1", "Bob", None, "b", "#000", None, "claude-code").unwrap();
-        create_minion(&conn, "m3", "sess-2", "Carol", None, "c", "#F00", None, "codex").unwrap();
+        create_elf(&conn, "e1", "sess-1", "Alice", None, "a", "#FFF", None, "claude-code").unwrap();
+        create_elf(&conn, "e2", "sess-1", "Bob", None, "b", "#000", None, "claude-code").unwrap();
+        create_elf(&conn, "e3", "sess-2", "Carol", None, "c", "#F00", None, "codex").unwrap();
 
-        let minions = list_minions(&conn, "sess-1").expect("Should list");
-        assert_eq!(minions.len(), 2);
+        let elves = list_elves(&conn, "sess-1").expect("Should list");
+        assert_eq!(elves.len(), 2);
 
-        let minions_s2 = list_minions(&conn, "sess-2").expect("Should list");
-        assert_eq!(minions_s2.len(), 1);
-        assert_eq!(minions_s2[0].name, "Carol");
+        let elves_s2 = list_elves(&conn, "sess-2").expect("Should list");
+        assert_eq!(elves_s2.len(), 1);
+        assert_eq!(elves_s2[0].name, "Carol");
     }
 
     #[test]
-    fn list_minions_empty() {
+    fn list_elves_empty() {
         let conn = test_conn();
         seed_session(&conn, "proj-1", "sess-1");
 
-        let minions = list_minions(&conn, "sess-1").expect("Should list");
-        assert!(minions.is_empty());
+        let elves = list_elves(&conn, "sess-1").expect("Should list");
+        assert!(elves.is_empty());
     }
 
     #[test]
-    fn update_minion_status_to_working() {
+    fn update_elf_status_to_working() {
         let conn = test_conn();
         seed_session(&conn, "proj-1", "sess-1");
-        create_minion(&conn, "m1", "sess-1", "Alice", None, "a", "#FFF", None, "claude-code").unwrap();
+        create_elf(&conn, "e1", "sess-1", "Alice", None, "a", "#FFF", None, "claude-code").unwrap();
 
-        let updated = update_minion_status(&conn, "m1", "working").expect("Should update");
+        let updated = update_elf_status(&conn, "e1", "working").expect("Should update");
         assert!(updated);
 
-        let minion = get_minion(&conn, "m1").unwrap().unwrap();
-        assert_eq!(minion.status, "working");
-        assert!(minion.finished_at.is_none(), "Non-terminal status should not set finished_at");
+        let elf = get_elf(&conn, "e1").unwrap().unwrap();
+        assert_eq!(elf.status, "working");
+        assert!(elf.finished_at.is_none(), "Non-terminal status should not set finished_at");
     }
 
     #[test]
-    fn update_minion_status_to_done() {
+    fn update_elf_status_to_done() {
         let conn = test_conn();
         seed_session(&conn, "proj-1", "sess-1");
-        create_minion(&conn, "m1", "sess-1", "Alice", None, "a", "#FFF", None, "claude-code").unwrap();
+        create_elf(&conn, "e1", "sess-1", "Alice", None, "a", "#FFF", None, "claude-code").unwrap();
 
-        update_minion_status(&conn, "m1", "done").expect("Should update");
+        update_elf_status(&conn, "e1", "done").expect("Should update");
 
-        let minion = get_minion(&conn, "m1").unwrap().unwrap();
-        assert_eq!(minion.status, "done");
-        assert!(minion.finished_at.is_some(), "Terminal status should set finished_at");
+        let elf = get_elf(&conn, "e1").unwrap().unwrap();
+        assert_eq!(elf.status, "done");
+        assert!(elf.finished_at.is_some(), "Terminal status should set finished_at");
     }
 
     #[test]
-    fn update_minion_status_to_error() {
+    fn update_elf_status_to_error() {
         let conn = test_conn();
         seed_session(&conn, "proj-1", "sess-1");
-        create_minion(&conn, "m1", "sess-1", "Alice", None, "a", "#FFF", None, "claude-code").unwrap();
+        create_elf(&conn, "e1", "sess-1", "Alice", None, "a", "#FFF", None, "claude-code").unwrap();
 
-        update_minion_status(&conn, "m1", "error").expect("Should update");
+        update_elf_status(&conn, "e1", "error").expect("Should update");
 
-        let minion = get_minion(&conn, "m1").unwrap().unwrap();
-        assert_eq!(minion.status, "error");
-        assert!(minion.finished_at.is_some());
+        let elf = get_elf(&conn, "e1").unwrap().unwrap();
+        assert_eq!(elf.status, "error");
+        assert!(elf.finished_at.is_some());
     }
 
     #[test]
-    fn update_nonexistent_minion_returns_false() {
+    fn update_nonexistent_elf_returns_false() {
         let conn = test_conn();
-        let updated = update_minion_status(&conn, "nope", "done").expect("Should not error");
+        let updated = update_elf_status(&conn, "nope", "done").expect("Should not error");
         assert!(!updated);
     }
 
     #[test]
-    fn get_nonexistent_minion_returns_none() {
+    fn get_nonexistent_elf_returns_none() {
         let conn = test_conn();
-        let result = get_minion(&conn, "nope").expect("Should query");
+        let result = get_elf(&conn, "nope").expect("Should query");
         assert!(result.is_none());
     }
 
@@ -322,15 +322,15 @@ mod tests {
     fn serializes_to_camel_case_json() {
         let conn = test_conn();
         seed_session(&conn, "proj-1", "sess-1");
-        let minion = create_minion(
-            &conn, "m1", "sess-1", "Alice", Some("lead"), "a", "#FFF", Some("quirky"), "claude-code",
+        let elf = create_elf(
+            &conn, "e1", "sess-1", "Alice", Some("lead"), "a", "#FFF", Some("quirky"), "claude-code",
         )
         .unwrap();
-        let json = serde_json::to_string(&minion).expect("Should serialize");
+        let json = serde_json::to_string(&elf).expect("Should serialize");
         assert!(json.contains("sessionId"));
         assert!(json.contains("spawnedAt"));
         assert!(json.contains("finishedAt"));
-        assert!(json.contains("parentMinionId"));
+        assert!(json.contains("parentElfId"));
         assert!(json.contains("toolsUsed"));
     }
 }

@@ -1,37 +1,37 @@
-/* Tests for the MinionCard component — verifies rendering, status, progress, and expand/collapse. */
+/* Tests for the ElfCard component — verifies rendering, status, progress, and expand/collapse. */
 
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { MinionCard } from "./MinionCard";
-import type { Minion, MinionEvent } from "@/types/minion";
+import { ElfCard } from "./ElfCard";
+import type { Elf, ElfEvent } from "@/types/elf";
 
-/** Factory for a test minion with sensible defaults. */
-function createTestMinion(overrides?: Partial<Minion>): Minion {
+/** Factory for a test elf with sensible defaults. */
+function createTestElf(overrides?: Partial<Elf>): Elf {
   return {
-    id: "minion-1",
+    id: "elf-1",
     sessionId: "session-1",
-    name: "Kevin",
+    name: "Spark",
     role: "Lead & Coordinator",
-    avatar: "👷",
+    avatar: "⚡",
     color: "#FF6B6B",
-    quirk: "Narrates everything in third person",
+    quirk: "Leaves glitter on every file they touch",
     runtime: "claude-code",
     status: "working",
     spawnedAt: Date.now(),
     finishedAt: null,
-    parentMinionId: null,
+    parentElfId: null,
     toolsUsed: [],
     ...overrides,
   };
 }
 
 /** Factory for a test event. */
-function createTestEvent(overrides?: Partial<MinionEvent>): MinionEvent {
+function createTestEvent(overrides?: Partial<ElfEvent>): ElfEvent {
   return {
     id: "event-1",
     timestamp: Date.now(),
-    minionId: "minion-1",
-    minionName: "Kevin",
+    elfId: "elf-1",
+    elfName: "Spark",
     runtime: "claude-code",
     type: "thinking",
     payload: {},
@@ -39,63 +39,63 @@ function createTestEvent(overrides?: Partial<MinionEvent>): MinionEvent {
   };
 }
 
-describe("MinionCard", () => {
-  it("renders minion name and avatar", () => {
-    const minion = createTestMinion();
-    render(<MinionCard minion={minion} />);
-    expect(screen.getByText("Kevin")).toBeInTheDocument();
-    expect(screen.getByText("👷")).toBeInTheDocument();
+describe("ElfCard", () => {
+  it("renders elf name and avatar", () => {
+    const elf = createTestElf();
+    render(<ElfCard elf={elf} />);
+    expect(screen.getByText("Spark")).toBeInTheDocument();
+    expect(screen.getByText("⚡")).toBeInTheDocument();
   });
 
   it("shows status badge with correct text", () => {
-    const minion = createTestMinion({ status: "done" });
-    render(<MinionCard minion={minion} />);
+    const elf = createTestElf({ status: "done" });
+    render(<ElfCard elf={elf} />);
     expect(screen.getByText("Done")).toBeInTheDocument();
   });
 
   it("shows error status badge for error state", () => {
-    const minion = createTestMinion({ status: "error" });
-    render(<MinionCard minion={minion} />);
+    const elf = createTestElf({ status: "error" });
+    render(<ElfCard elf={elf} />);
     expect(screen.getByText("Error")).toBeInTheDocument();
   });
 
   it("displays funny status message", () => {
-    const minion = createTestMinion({ status: "working" });
-    render(<MinionCard minion={minion} />);
+    const elf = createTestElf({ status: "working" });
+    render(<ElfCard elf={elf} />);
     const funnyStatus = screen.getByTestId("funny-status");
     expect(funnyStatus).toBeInTheDocument();
-    /* Message should contain the minion's name */
-    expect(funnyStatus.textContent).toContain("Kevin");
+    /* Message should contain the elf's name */
+    expect(funnyStatus.textContent).toContain("Spark");
   });
 
   it("shows progress bar", () => {
-    const minion = createTestMinion();
-    render(<MinionCard minion={minion} />);
+    const elf = createTestElf();
+    render(<ElfCard elf={elf} />);
     expect(screen.getByTestId("progress-bar")).toBeInTheDocument();
   });
 
   it("shows 100% progress when done", () => {
-    const minion = createTestMinion({ status: "done" });
-    render(<MinionCard minion={minion} />);
+    const elf = createTestElf({ status: "done" });
+    render(<ElfCard elf={elf} />);
     expect(screen.getByText("100%")).toBeInTheDocument();
   });
 
   it("shows role when assigned", () => {
-    const minion = createTestMinion({ role: "Lead & Coordinator" });
-    render(<MinionCard minion={minion} />);
+    const elf = createTestElf({ role: "Lead & Coordinator" });
+    render(<ElfCard elf={elf} />);
     expect(screen.getByText("Role: Lead & Coordinator")).toBeInTheDocument();
   });
 
   it("does not show role when null", () => {
-    const minion = createTestMinion({ role: null });
-    render(<MinionCard minion={minion} />);
+    const elf = createTestElf({ role: null });
+    render(<ElfCard elf={elf} />);
     expect(screen.queryByText(/Role:/)).not.toBeInTheDocument();
   });
 
   it("toggles expand on click", () => {
-    const minion = createTestMinion();
+    const elf = createTestElf();
     const events = [createTestEvent()];
-    render(<MinionCard minion={minion} events={events} />);
+    render(<ElfCard elf={elf} events={events} />);
 
     /* Event list should not be visible initially */
     expect(screen.queryByTestId("event-list")).not.toBeInTheDocument();
@@ -106,21 +106,21 @@ describe("MinionCard", () => {
   });
 
   it("calls onToggleExpand when provided", () => {
-    const minion = createTestMinion();
+    const elf = createTestElf();
     const onToggle = vi.fn();
-    render(<MinionCard minion={minion} isExpanded={false} onToggleExpand={onToggle} />);
+    render(<ElfCard elf={elf} isExpanded={false} onToggleExpand={onToggle} />);
 
     fireEvent.click(screen.getByTestId("expand-toggle"));
     expect(onToggle).toHaveBeenCalledOnce();
   });
 
   it("shows events when expanded", () => {
-    const minion = createTestMinion();
+    const elf = createTestElf();
     const events = [
       createTestEvent({ id: "e1", type: "thinking" }),
       createTestEvent({ id: "e2", type: "tool_call", payload: { tool: "read_file" } }),
     ];
-    render(<MinionCard minion={minion} events={events} isExpanded />);
+    render(<ElfCard elf={elf} events={events} isExpanded />);
 
     const eventList = screen.getByTestId("event-list");
     expect(eventList).toBeInTheDocument();
@@ -128,17 +128,17 @@ describe("MinionCard", () => {
     expect(eventList.textContent).toContain("Using read_file");
   });
 
-  it("applies minion color to left border", () => {
-    const minion = createTestMinion({ color: "#6BCB77" });
-    render(<MinionCard minion={minion} />);
-    const card = screen.getByTestId("minion-card");
+  it("applies elf color to left border", () => {
+    const elf = createTestElf({ color: "#6BCB77" });
+    render(<ElfCard elf={elf} />);
+    const card = screen.getByTestId("elf-card");
     /* jsdom normalizes hex colors to rgb format */
     expect(card.style.borderLeftColor).toBe("rgb(107, 203, 119)");
   });
 
   it("shows empty event message when expanded with no events", () => {
-    const minion = createTestMinion();
-    render(<MinionCard minion={minion} events={[]} isExpanded />);
+    const elf = createTestElf();
+    render(<ElfCard elf={elf} events={[]} isExpanded />);
     expect(screen.getByText("No events yet...")).toBeInTheDocument();
   });
 });

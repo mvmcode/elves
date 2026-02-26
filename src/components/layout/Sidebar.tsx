@@ -18,7 +18,7 @@ export function Sidebar(): React.JSX.Element {
       {/* Logo / Branding */}
       <div className="flex items-center gap-2 border-b-[3px] border-border p-4">
         <span className="font-display text-2xl font-black uppercase tracking-tight">
-          MINIONS
+          ELVES
         </span>
         <Badge variant="info">v0.1</Badge>
       </div>
@@ -26,7 +26,7 @@ export function Sidebar(): React.JSX.Element {
       {/* Project list */}
       <div className="flex-1 overflow-y-auto">
         {projects.length === 0 ? (
-          <EmptyState message="Your minions are bored. Give them something to do." />
+          <EmptyState message="Your elves are bored. Give them something to do. 🍪" />
         ) : (
           <ul className="p-2">
             {projects.map((project) => (
@@ -37,8 +37,8 @@ export function Sidebar(): React.JSX.Element {
                     "w-full border-[2px] p-3 text-left transition-all duration-100",
                     "font-body text-sm font-bold",
                     activeProjectId === project.id
-                      ? "border-border bg-minion-yellow shadow-brutal-sm"
-                      : "border-transparent hover:border-border hover:bg-minion-yellow-light",
+                      ? "border-border bg-elf-gold shadow-brutal-sm"
+                      : "border-transparent hover:border-border hover:bg-elf-gold-light",
                   ].join(" ")}
                 >
                   {project.name}
@@ -52,7 +52,7 @@ export function Sidebar(): React.JSX.Element {
       {/* Bottom section */}
       <div className="border-t-[3px] border-border p-3">
         <p className="font-mono text-xs text-text-light/40">
-          Built with bananas
+          Built with cookies 🍪
         </p>
       </div>
     </aside>

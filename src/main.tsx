@@ -1,4 +1,4 @@
-/* MINIONS app entry point — mounts the React root with global styles. */
+/* ELVES app entry point — mounts the React root with global styles. */
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./App";

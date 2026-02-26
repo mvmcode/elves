@@ -12,7 +12,7 @@ use super::DbError;
 pub struct EventRow {
     pub id: i64,
     pub session_id: String,
-    pub minion_id: Option<String>,
+    pub elf_id: Option<String>,
     pub event_type: String,
     /// JSON string containing the event-specific payload.
     pub payload: String,
@@ -27,21 +27,21 @@ pub struct EventRow {
 pub fn insert_event(
     conn: &Connection,
     session_id: &str,
-    minion_id: Option<&str>,
+    elf_id: Option<&str>,
     event_type: &str,
     payload: &str,
     funny_status: Option<&str>,
 ) -> Result<EventRow, DbError> {
     let now = chrono::Utc::now().timestamp();
     conn.execute(
-        "INSERT INTO events (session_id, minion_id, event_type, payload, funny_status, timestamp)
+        "INSERT INTO events (session_id, elf_id, event_type, payload, funny_status, timestamp)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![session_id, minion_id, event_type, payload, funny_status, now],
+        params![session_id, elf_id, event_type, payload, funny_status, now],
     )?;
 
     let row_id = conn.last_insert_rowid();
     let mut stmt = conn.prepare(
-        "SELECT id, session_id, minion_id, event_type, payload, funny_status, timestamp
+        "SELECT id, session_id, elf_id, event_type, payload, funny_status, timestamp
          FROM events WHERE id = ?1",
     )?;
 
@@ -49,7 +49,7 @@ pub fn insert_event(
         Ok(EventRow {
             id: row.get(0)?,
             session_id: row.get(1)?,
-            minion_id: row.get(2)?,
+            elf_id: row.get(2)?,
             event_type: row.get(3)?,
             payload: row.get(4)?,
             funny_status: row.get(5)?,
@@ -67,7 +67,7 @@ pub fn list_events(
     session_id: &str,
 ) -> Result<Vec<EventRow>, DbError> {
     let mut stmt = conn.prepare(
-        "SELECT id, session_id, minion_id, event_type, payload, funny_status, timestamp
+        "SELECT id, session_id, elf_id, event_type, payload, funny_status, timestamp
          FROM events WHERE session_id = ?1 ORDER BY timestamp ASC, id ASC",
     )?;
 
@@ -76,7 +76,7 @@ pub fn list_events(
             Ok(EventRow {
                 id: row.get(0)?,
                 session_id: row.get(1)?,
-                minion_id: row.get(2)?,
+                elf_id: row.get(2)?,
                 event_type: row.get(3)?,
                 payload: row.get(4)?,
                 funny_status: row.get(5)?,
@@ -135,7 +135,7 @@ mod tests {
         let event = insert_event(
             &conn,
             "sess-1",
-            Some("minion-1"),
+            Some("elf-1"),
             "tool_use",
             r#"{"tool":"read_file","path":"src/main.rs"}"#,
             Some("Reading source code with great enthusiasm"),
@@ -143,7 +143,7 @@ mod tests {
         .expect("Should insert event");
 
         assert_eq!(event.session_id, "sess-1");
-        assert_eq!(event.minion_id.as_deref(), Some("minion-1"));
+        assert_eq!(event.elf_id.as_deref(), Some("elf-1"));
         assert_eq!(event.event_type, "tool_use");
         assert!(event.payload.contains("read_file"));
         assert_eq!(
@@ -158,7 +158,7 @@ mod tests {
     }
 
     #[test]
-    fn insert_event_without_minion_id() {
+    fn insert_event_without_elf_id() {
         let conn = test_conn();
         seed_session(&conn, "proj-1", "sess-1");
 
@@ -172,7 +172,7 @@ mod tests {
         )
         .expect("Should insert");
 
-        assert!(event.minion_id.is_none());
+        assert!(event.elf_id.is_none());
         assert!(event.funny_status.is_none());
     }
 
@@ -192,12 +192,12 @@ mod tests {
 
         // Insert events with manually controlled timestamps for deterministic ordering
         conn.execute(
-            "INSERT INTO events (session_id, minion_id, event_type, payload, funny_status, timestamp)
+            "INSERT INTO events (session_id, elf_id, event_type, payload, funny_status, timestamp)
              VALUES ('sess-1', NULL, 'second', '{}', NULL, 2000)",
             [],
         ).unwrap();
         conn.execute(
-            "INSERT INTO events (session_id, minion_id, event_type, payload, funny_status, timestamp)
+            "INSERT INTO events (session_id, elf_id, event_type, payload, funny_status, timestamp)
              VALUES ('sess-1', NULL, 'first', '{}', NULL, 1000)",
             [],
         ).unwrap();
@@ -244,11 +244,11 @@ mod tests {
         let conn = test_conn();
         seed_session(&conn, "proj-1", "sess-1");
 
-        let event = insert_event(&conn, "sess-1", Some("m1"), "test", "{}", Some("status"))
+        let event = insert_event(&conn, "sess-1", Some("e1"), "test", "{}", Some("status"))
             .unwrap();
         let json = serde_json::to_string(&event).expect("Should serialize");
         assert!(json.contains("sessionId"));
-        assert!(json.contains("minionId"));
+        assert!(json.contains("elfId"));
         assert!(json.contains("eventType"));
         assert!(json.contains("funnyStatus"));
     }

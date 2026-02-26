@@ -1,10 +1,10 @@
-/* Core minion types — defines the unified agent protocol event stream and minion state. */
+/* Core elf types — defines the unified agent protocol event stream and elf state. */
 
 /** Supported agent runtimes */
 export type Runtime = "claude-code" | "codex";
 
-/** All possible minion operational states */
-export type MinionStatus =
+/** All possible elf operational states */
+export type ElfStatus =
   | "spawning"
   | "working"
   | "thinking"
@@ -15,7 +15,7 @@ export type MinionStatus =
   | "sleeping";
 
 /** Event types emitted by the unified agent protocol */
-export type MinionEventType =
+export type ElfEventType =
   | "thinking"
   | "tool_call"
   | "tool_result"
@@ -28,30 +28,30 @@ export type MinionEventType =
   | "file_change";
 
 /** A single event from the unified agent protocol stream */
-export interface MinionEvent {
+export interface ElfEvent {
   readonly id: string;
   readonly timestamp: number;
-  readonly minionId: string;
-  readonly minionName: string;
+  readonly elfId: string;
+  readonly elfName: string;
   readonly runtime: Runtime;
-  readonly type: MinionEventType;
+  readonly type: ElfEventType;
   readonly payload: Record<string, unknown>;
   readonly funnyStatus?: string;
 }
 
-/** Personality profile assigned to each minion on spawn */
-export interface MinionPersonality {
+/** Personality profile assigned to each elf on spawn */
+export interface ElfPersonality {
   readonly name: string;
   readonly avatar: string;
   readonly color: string;
   readonly quirk: string;
 }
 
-/** Status messages keyed by MinionStatus — the funny text shown on cards */
-export type StatusMessageMap = Record<MinionStatus, readonly string[]>;
+/** Status messages keyed by ElfStatus — the funny text shown on cards */
+export type StatusMessageMap = Record<ElfStatus, readonly string[]>;
 
-/** A minion agent instance */
-export interface Minion {
+/** An elf agent instance */
+export interface Elf {
   readonly id: string;
   readonly sessionId: string;
   readonly name: string;
@@ -60,9 +60,9 @@ export interface Minion {
   readonly color: string;
   readonly quirk: string | null;
   readonly runtime: Runtime;
-  readonly status: MinionStatus;
+  readonly status: ElfStatus;
   readonly spawnedAt: number;
   readonly finishedAt: number | null;
-  readonly parentMinionId: string | null;
+  readonly parentElfId: string | null;
   readonly toolsUsed: readonly string[];
 }

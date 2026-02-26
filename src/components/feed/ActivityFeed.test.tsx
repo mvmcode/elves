@@ -3,15 +3,15 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { ActivityFeed } from "./ActivityFeed";
-import type { MinionEvent } from "@/types/minion";
+import type { ElfEvent } from "@/types/elf";
 
 /** Factory for creating test events with sensible defaults. */
-function createTestEvent(overrides?: Partial<MinionEvent>): MinionEvent {
+function createTestEvent(overrides?: Partial<ElfEvent>): ElfEvent {
   return {
     id: "event-1",
     timestamp: Date.now(),
-    minionId: "minion-1",
-    minionName: "Kevin",
+    elfId: "elf-1",
+    elfName: "Spark",
     runtime: "claude-code",
     type: "thinking",
     payload: {},
@@ -20,14 +20,14 @@ function createTestEvent(overrides?: Partial<MinionEvent>): MinionEvent {
 }
 
 /** Returns a diverse set of events for testing filters. */
-function createMixedEvents(): readonly MinionEvent[] {
+function createMixedEvents(): readonly ElfEvent[] {
   return [
-    createTestEvent({ id: "e1", type: "spawn", minionName: "Kevin", payload: { role: "Lead" } }),
-    createTestEvent({ id: "e2", type: "thinking", minionName: "Stuart" }),
-    createTestEvent({ id: "e3", type: "tool_call", minionName: "Kevin", payload: { tool: "read_file", path: "src/index.ts" } }),
-    createTestEvent({ id: "e4", type: "chat", minionName: "Bob", payload: { text: "Hello team!" } }),
-    createTestEvent({ id: "e5", type: "error", minionName: "Stuart", payload: { message: "File not found" } }),
-    createTestEvent({ id: "e6", type: "output", minionName: "Kevin", payload: { text: "Writing code..." } }),
+    createTestEvent({ id: "e1", type: "spawn", elfName: "Spark", payload: { role: "Lead" } }),
+    createTestEvent({ id: "e2", type: "thinking", elfName: "Tinker" }),
+    createTestEvent({ id: "e3", type: "tool_call", elfName: "Spark", payload: { tool: "read_file", path: "src/index.ts" } }),
+    createTestEvent({ id: "e4", type: "chat", elfName: "Jingle", payload: { text: "Hello team!" } }),
+    createTestEvent({ id: "e5", type: "error", elfName: "Tinker", payload: { message: "File not found" } }),
+    createTestEvent({ id: "e6", type: "output", elfName: "Spark", payload: { text: "Writing code..." } }),
   ];
 }
 
@@ -39,10 +39,10 @@ describe("ActivityFeed", () => {
     expect(rows).toHaveLength(2);
   });
 
-  it("shows timestamp and minion name for each event", () => {
-    const events = [createTestEvent({ minionName: "Kevin" })];
+  it("shows timestamp and elf name for each event", () => {
+    const events = [createTestEvent({ elfName: "Spark" })];
     render(<ActivityFeed events={events} />);
-    expect(screen.getByText("Kevin")).toBeInTheDocument();
+    expect(screen.getByText("Spark")).toBeInTheDocument();
   });
 
   it("renders filter buttons", () => {
@@ -105,7 +105,7 @@ describe("ActivityFeed", () => {
   it("shows empty state message when no events", () => {
     render(<ActivityFeed events={[]} />);
     expect(screen.getByTestId("empty-state")).toBeInTheDocument();
-    expect(screen.getByText("No events yet. Deploy minions to get started.")).toBeInTheDocument();
+    expect(screen.getByText("No events yet. Summon elves to get started.")).toBeInTheDocument();
   });
 
   it("shows filter-specific empty message when filter has no matches", () => {
@@ -116,22 +116,22 @@ describe("ActivityFeed", () => {
     expect(screen.getByText("No events match this filter.")).toBeInTheDocument();
   });
 
-  it("applies correct color per minion", () => {
-    /* Kevin has color #FF6B6B in minion-names.ts (index 1) */
-    const events = [createTestEvent({ minionName: "Kevin" })];
+  it("applies correct color per elf", () => {
+    /* Spark has color #FFD93D in elf-names.ts (index 0) */
+    const events = [createTestEvent({ elfName: "Spark" })];
     render(<ActivityFeed events={events} />);
-    const nameElement = screen.getByText("Kevin");
-    expect(nameElement.style.color).toBe("rgb(255, 107, 107)");
+    const nameElement = screen.getByText("Spark");
+    expect(nameElement.style.color).toBe("rgb(255, 217, 61)");
   });
 
-  it("highlights active filter in yellow", () => {
+  it("highlights active filter in gold", () => {
     render(<ActivityFeed events={[]} />);
     const allButton = screen.getByTestId("filter-all");
-    expect(allButton.className).toContain("bg-minion-yellow");
+    expect(allButton.className).toContain("bg-elf-gold");
 
     fireEvent.click(screen.getByTestId("filter-tools"));
     const toolsButton = screen.getByTestId("filter-tools");
-    expect(toolsButton.className).toContain("bg-minion-yellow");
+    expect(toolsButton.className).toContain("bg-elf-gold");
   });
 
   it("shows spawn events with role info", () => {

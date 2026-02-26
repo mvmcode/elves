@@ -6,10 +6,10 @@ use crate::commands::projects::DbState;
 use crate::db;
 use tauri::{AppHandle, Emitter, State};
 
-/// Start a task: creates a session, spawns a minion, starts the Claude process.
+/// Start a task: creates a session, spawns an elf, starts the Claude process.
 ///
 /// Emits events to the frontend via Tauri's event system as the agent works:
-/// - `minion:spawned` — when the minion DB row is created and process started
+/// - `elf:spawned` — when the elf DB row is created and process started
 /// - `session:error` — if spawning fails after DB rows are created
 ///
 /// Returns the session ID. The frontend subscribes to Tauri events keyed by
@@ -24,7 +24,7 @@ pub async fn start_task(
     runtime: String,
 ) -> Result<String, String> {
     let session_id = uuid::Uuid::new_v4().to_string();
-    let minion_id = uuid::Uuid::new_v4().to_string();
+    let elf_id = uuid::Uuid::new_v4().to_string();
 
     // 1. Create session in DB
     {
@@ -33,14 +33,14 @@ pub async fn start_task(
             .map_err(|e| format!("Database error: {e}"))?;
     }
 
-    // 2. Create minion in DB (placeholder personality — frontend assigns the real one)
+    // 2. Create elf in DB (placeholder personality — frontend assigns the real one)
     {
         let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
-        db::minions::create_minion(
+        db::elves::create_elf(
             &conn,
-            &minion_id,
+            &elf_id,
             &session_id,
-            "Minion",
+            "Elf",
             None,
             "\u{1F916}", // Robot emoji
             "#FFD93D",
@@ -59,12 +59,12 @@ pub async fn start_task(
         project.path.clone()
     };
 
-    // 4. Emit minion:spawned event to frontend
+    // 4. Emit elf:spawned event to frontend
     let _ = app.emit(
-        "minion:spawned",
+        "elf:spawned",
         serde_json::json!({
             "sessionId": &session_id,
-            "minionId": &minion_id,
+            "elfId": &elf_id,
         }),
     );
 

@@ -1,6 +1,6 @@
 /* Session types — represents a single task execution with its plan and results. */
 
-import type { Runtime } from "./minion";
+import type { Runtime } from "./elf";
 
 /** Status of a task session */
 export type SessionStatus = "active" | "completed" | "failed" | "cancelled";
@@ -27,7 +27,7 @@ export interface SessionPlan {
   readonly taskGraph: readonly PlanTask[];
 }
 
-/** A role in the task plan assigned to a minion */
+/** A role in the task plan assigned to an elf */
 export interface PlanRole {
   readonly name: string;
   readonly focus: string;

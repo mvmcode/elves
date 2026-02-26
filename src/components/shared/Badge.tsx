@@ -9,7 +9,7 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const variantStyles: Record<BadgeVariant, string> = {
-  default: "bg-minion-yellow text-text-light",
+  default: "bg-elf-gold text-text-light",
   success: "bg-success text-white",
   error: "bg-error text-white",
   warning: "bg-warning text-white",
@@ -17,7 +17,7 @@ const variantStyles: Record<BadgeVariant, string> = {
 };
 
 /**
- * Compact status badge with 2px border. Used for minion status indicators,
+ * Compact status badge with 2px border. Used for elf status indicators,
  * runtime labels, and count badges in the sidebar.
  */
 export function Badge({
