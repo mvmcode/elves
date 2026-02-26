@@ -39,6 +39,17 @@ export interface MinionEvent {
   readonly funnyStatus?: string;
 }
 
+/** Personality profile assigned to each minion on spawn */
+export interface MinionPersonality {
+  readonly name: string;
+  readonly avatar: string;
+  readonly color: string;
+  readonly quirk: string;
+}
+
+/** Status messages keyed by MinionStatus — the funny text shown on cards */
+export type StatusMessageMap = Record<MinionStatus, readonly string[]>;
+
 /** A minion agent instance */
 export interface Minion {
   readonly id: string;

@@ -53,3 +53,21 @@
 **Options:** Embedded SQL in code, migration files on disk, ORM migration, diesel migrations
 **Decision:** schema_version table with versioned Rust functions (migrate_v1, migrate_v2, etc.)
 **Rationale:** Simple, no external files to manage, fully testable in-memory. Each migration is a Rust function that runs SQL. Version table tracks what has been applied. Idempotent — migrations check current version before applying.
+
+## 2026-02-26 — Claude Code CLI Invocation via --print Flag
+**Context:** How to spawn and communicate with Claude Code from the Rust backend
+**Options:** Claude Code Agent SDK (TypeScript), Claude Code CLI with --print flag, HTTP API
+**Decision:** Spawn `claude --print --output-format json` as a child process
+**Rationale:** The --print flag runs Claude Code in non-interactive mode with output to stdout. Combined with --output-format json, we get structured JSON output we can parse. This avoids needing a Node.js bridge process or the full Agent SDK for Phase 2. The Rust process manager spawns, tracks, and kills child processes. Future phases can upgrade to the SDK for streaming events.
+
+## 2026-02-26 — Process Manager with HashMap<String, Child>
+**Context:** How to track and manage active agent processes
+**Options:** ProcessManager struct, OS-level process groups, tokio task handles
+**Decision:** ProcessManager with Mutex<HashMap<String, Child>> keyed by session ID
+**Rationale:** Simple ownership model — one process per session. The Mutex ensures thread-safe access from Tauri command handlers. kill() reaps zombies with wait(). kill_all() is called on shutdown. If we need multiple processes per session (multi-agent), we extend to HashMap<String, Vec<Child>>.
+
+## 2026-02-26 — Frontend Personality Assignment (not Backend)
+**Context:** Where to assign minion names, avatars, and personality quirks
+**Options:** Backend generates personality in Rust, frontend generates via TypeScript
+**Decision:** Frontend generates personality via generateMinion() and sends to store; backend stores a placeholder
+**Rationale:** The personality engine uses randomization and session-scoped deduplication that's simpler to manage in the reactive frontend layer. The backend creates a minion DB row with placeholder name/avatar, and the frontend overrides with the personality-enriched version. This keeps the Rust backend focused on data persistence and process management.
