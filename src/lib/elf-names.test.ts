@@ -14,6 +14,7 @@ describe("generateElf", () => {
     const personality = generateElf();
     expect(personality.name).toBeTruthy();
     expect(personality.avatar).toBeTruthy();
+    expect(personality.avatarId).toBeTruthy();
     expect(personality.color).toMatch(/^#[0-9A-Fa-f]{6}$/);
     expect(personality.quirk).toBeTruthy();
   });

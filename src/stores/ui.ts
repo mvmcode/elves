@@ -3,7 +3,7 @@
 import { create } from "zustand";
 
 /** Top-level views the shell can render in the main content area. */
-export type AppView = "session" | "memory" | "settings";
+export type AppView = "session" | "memory" | "skills" | "mcp" | "history" | "settings";
 
 interface UiState {
   /** Whether the task bar (Cmd+K) is focused/expanded */

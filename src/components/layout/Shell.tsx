@@ -13,15 +13,21 @@ import { TaskGraph } from "@/components/theater/TaskGraph";
 import { ThinkingPanel } from "@/components/theater/ThinkingPanel";
 import { MemoryExplorer } from "@/components/memory/MemoryExplorer";
 import { MemorySettings } from "@/components/settings/MemorySettings";
+import { SkillEditor } from "@/components/editors/SkillEditor";
+import { McpManager } from "@/components/editors/McpManager";
+import { SessionHistory } from "@/components/project/SessionHistory";
+import { ShortcutOverlay } from "@/components/shared/ShortcutOverlay";
 import { useSessionStore } from "@/stores/session";
 import { useUiStore } from "@/stores/ui";
 import { useTeamSession } from "@/hooks/useTeamSession";
 import { useMemoryActions } from "@/hooks/useMemoryActions";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useSounds } from "@/hooks/useSounds";
 
 /**
  * Root layout shell matching the UI design from product plan Section 7.1.
  * Left sidebar + main area (top bar, task bar, center content, activity feed).
- * Routes between session workshop, memory explorer, and settings views.
+ * Routes between session workshop, memory, skills, MCP, history, and settings views.
  * Shows PlanPreview during plan phase, ElfTheater + TaskGraph + ThinkingPanel during
  * active sessions, celebration banner on completion, or empty state when idle.
  */
@@ -33,7 +39,7 @@ export function Shell(): React.JSX.Element {
   const thinkingStream = useSessionStore((state) => state.thinkingStream);
   const isPlanPreview = useSessionStore((state) => state.isPlanPreview);
   const pendingPlan = useSessionStore((state) => state.pendingPlan);
-  const { deployWithPlan } = useTeamSession();
+  const { deployWithPlan, stopSession } = useTeamSession();
   const {
     handleCreateMemory,
     handleEditMemory,
@@ -42,6 +48,10 @@ export function Shell(): React.JSX.Element {
     handleSearch,
     handleClearAll,
   } = useMemoryActions();
+  const { play } = useSounds();
+  const { shortcutOverlayOpen, toggleOverlay } = useKeyboardShortcuts({
+    onCancelTask: () => void stopSession(),
+  });
 
   const [isThinkingVisible, setIsThinkingVisible] = useState(false);
 
@@ -51,9 +61,10 @@ export function Shell(): React.JSX.Element {
 
   const handleDeploy = useCallback(
     (plan: Parameters<typeof deployWithPlan>[0]): void => {
+      play("deploy");
       void deployWithPlan(plan);
     },
-    [deployWithPlan],
+    [deployWithPlan, play],
   );
 
   /** Whether the session completed successfully (elves in "done" or "sleeping" state) */
@@ -77,7 +88,7 @@ export function Shell(): React.JSX.Element {
         <TopBar />
         <TaskBar />
 
-        {/* View routing — session workshop, memory explorer, or settings */}
+        {/* View routing — session workshop, memory, skills, MCP, history, settings */}
         {activeView === "memory" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <MemoryExplorer
@@ -87,6 +98,18 @@ export function Shell(): React.JSX.Element {
               onDeleteMemory={handleDeleteMemory}
               onSearch={handleSearch}
             />
+          </div>
+        ) : activeView === "skills" ? (
+          <div className="flex flex-1 overflow-hidden">
+            <SkillEditor />
+          </div>
+        ) : activeView === "mcp" ? (
+          <div className="flex flex-1 flex-col overflow-y-auto">
+            <McpManager />
+          </div>
+        ) : activeView === "history" ? (
+          <div className="flex flex-1 flex-col overflow-y-auto">
+            <SessionHistory />
           </div>
         ) : activeView === "settings" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
@@ -174,6 +197,9 @@ export function Shell(): React.JSX.Element {
             )}
           </>
         )}
+
+        {/* Shortcut overlay — toggled via Cmd+/ */}
+        <ShortcutOverlay isOpen={shortcutOverlayOpen} onClose={toggleOverlay} />
       </main>
     </div>
   );

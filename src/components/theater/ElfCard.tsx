@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/shared/Badge";
+import { ElfAvatar, getAvatarId } from "@/components/theater/ElfAvatar";
 import type { Elf, ElfEvent, ElfStatus } from "@/types/elf";
 import { getStatusMessage } from "@/lib/elf-names";
 
@@ -89,9 +90,12 @@ export function ElfCard({
       {/* Header — avatar, name, status badge */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-2xl" role="img" aria-label={`${elf.name} avatar`}>
-            {elf.avatar}
-          </span>
+          <ElfAvatar
+            avatarId={getAvatarId(elf.name)}
+            status={elf.status}
+            size="md"
+            color={elf.color}
+          />
           <span className="font-display text-lg font-bold uppercase tracking-wide">
             {elf.name}
           </span>
