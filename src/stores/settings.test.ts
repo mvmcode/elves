@@ -10,6 +10,8 @@ function resetStore(): void {
     decayRate: "normal",
     maxMemoriesPerProject: 500,
     maxContextInjection: 20,
+    soundEnabled: true,
+    soundVolume: 0.5,
   });
 }
 
@@ -88,6 +90,33 @@ describe("useSettingsStore", () => {
     it("accepts small values", () => {
       useSettingsStore.getState().setMaxContextInjection(1);
       expect(useSettingsStore.getState().maxContextInjection).toBe(1);
+    });
+  });
+
+  describe("sound settings", () => {
+    it("has sound enabled by default", () => {
+      expect(useSettingsStore.getState().soundEnabled).toBe(true);
+    });
+
+    it("has volume at 0.5 by default", () => {
+      expect(useSettingsStore.getState().soundVolume).toBe(0.5);
+    });
+
+    it("toggles sound off", () => {
+      useSettingsStore.getState().setSoundEnabled(false);
+      expect(useSettingsStore.getState().soundEnabled).toBe(false);
+    });
+
+    it("sets volume", () => {
+      useSettingsStore.getState().setSoundVolume(0.8);
+      expect(useSettingsStore.getState().soundVolume).toBe(0.8);
+    });
+
+    it("clamps volume to valid range", () => {
+      useSettingsStore.getState().setSoundVolume(-0.5);
+      expect(useSettingsStore.getState().soundVolume).toBe(0);
+      useSettingsStore.getState().setSoundVolume(1.5);
+      expect(useSettingsStore.getState().soundVolume).toBe(1);
     });
   });
 });

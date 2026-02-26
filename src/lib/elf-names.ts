@@ -1,6 +1,7 @@
 /* Elf personality engine — assigns names, avatars, colors, and funny status messages to agents. */
 
 import type { ElfPersonality, ElfStatus, StatusMessageMap } from "@/types/elf";
+import type { AvatarId } from "@/components/theater/ElfAvatar";
 
 /** Pool of elf names for the workshop */
 const ELF_NAMES: readonly string[] = [
@@ -12,6 +13,13 @@ const ELF_NAMES: readonly string[] = [
 const ELF_AVATARS: readonly string[] = [
   "⚡", "🔧", "🔔", "⚙️", "🏃", "🕯️", "🌿", "🌸",
   "💎", "🐦", "🍃", "🍁", "🦗", "✨", "🔥",
+] as const;
+
+/** SVG avatar ID for each elf, indexed to match ELF_NAMES */
+const ELF_AVATAR_IDS: readonly AvatarId[] = [
+  "spark", "tinker", "jingle", "sprocket", "nimble",
+  "flicker", "bramble", "thistle", "cobalt", "pip",
+  "fern", "maple", "cricket", "rune", "ember",
 ] as const;
 
 /** Distinct neo-brutalist accent color for each elf, indexed to match ELF_NAMES */
@@ -108,6 +116,7 @@ export function generateElf(usedNames?: readonly string[]): ElfPersonality {
     return {
       name,
       avatar: ELF_AVATARS[originalIndex]!,
+      avatarId: ELF_AVATAR_IDS[originalIndex]!,
       color: ELF_COLORS[originalIndex]!,
       quirk: ELF_QUIRKS[originalIndex]!,
     };
@@ -123,6 +132,7 @@ export function generateElf(usedNames?: readonly string[]): ElfPersonality {
   return {
     name: `${baseName} ${suffix}`,
     avatar: ELF_AVATARS[baseIndex]!,
+    avatarId: ELF_AVATAR_IDS[baseIndex]!,
     color: ELF_COLORS[baseIndex]!,
     quirk: ELF_QUIRKS[baseIndex]!,
   };

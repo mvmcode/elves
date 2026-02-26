@@ -43,6 +43,7 @@ export interface ElfEvent {
 export interface ElfPersonality {
   readonly name: string;
   readonly avatar: string;
+  readonly avatarId: string;
   readonly color: string;
   readonly quirk: string;
 }

@@ -163,3 +163,55 @@
 **Options:** On every query, on app startup, on a timer, on session end
 **Decision:** Run `decayMemories()` once on app initialization in `useInitialize`. Fire-and-forget — does not block startup.
 **Rationale:** Decay is a batch operation that adjusts all non-pinned memory scores based on time elapsed. Running once on startup is sufficient for a desktop app that gets restarted regularly. Per-query decay adds latency to every memory read. Timer-based adds complexity with no benefit for the typical usage pattern.
+
+---
+
+## Phase 5+6: Visual Editors, Codex Integration & Polish — Decisions
+
+## 2026-02-26 — Web Audio API Oscillator Sounds (no Audio Files)
+**Context:** Sound effects for elf spawning, completion, deployment, and errors
+**Options:** Pre-recorded WAV/MP3 files, Web Audio API oscillators, no sounds
+**Decision:** Web Audio API with oscillator-based sound synthesis (6 effects: spawn, typing, complete, error, chat, deploy)
+**Rationale:** Zero audio files to bundle or load. Oscillator synthesis is deterministic and lightweight. Each sound is a few lines of gain/frequency/timing code. The sound engine uses a lazily-initialized AudioContext (created on first user interaction to comply with browser autoplay policies). Volume and enable/disable are synced from the settings store via the `useSounds` hook.
+
+## 2026-02-26 — Inline SVG Elf Avatars (not Image Assets)
+**Context:** Need 15+ unique elf avatar designs with per-status CSS animations
+**Options:** PNG/SVG image files, inline SVG components, CSS-only avatars, Lottie animations
+**Decision:** 15 inline SVG avatar components in ElfAvatar.tsx with CSS animation classes per ElfStatus. Four size variants (sm/md/lg/xl).
+**Rationale:** Inline SVGs are zero-network-request, tree-shakable, and can be styled with CSS classes. Each avatar has a unique silhouette (pointed ears, accessories, expressions) and status-specific animations (pulse for spawning, bounce for working, glow for done, shake for error, breathe for sleeping). This keeps all avatar logic in one file with no external dependencies.
+
+## 2026-02-26 — Codex Adapter with Event Normalization Layer
+**Context:** Codex CLI outputs JSONL events with different types than Claude Code
+**Options:** Frontend-side normalization, backend-side normalization, runtime-specific UI components
+**Decision:** Backend Rust adapter (`codex_adapter.rs`) parses Codex JSONL into `CodexEvent`, then normalizes to `NormalizedEvent` matching the unified event format. Separate `interop.rs` module handles context formatting per runtime.
+**Rationale:** The unified agent protocol is ELVES' core architectural boundary. Normalization in Rust means the frontend never sees runtime-specific types. The adapter maps Codex event types (exec→tool_call, patch→file_change, plan→thinking) to the unified schema. The interop layer handles the reverse direction: formatting memory context into runtime-specific prompt formats (CLAUDE.md for Claude Code, workspace config for Codex).
+
+## 2026-02-26 — Skills/MCP/Templates as Separate Rust CRUD Modules
+**Context:** Three new data domains (skills, MCP servers, templates) need backend support
+**Options:** Single monolithic data module, separate modules per domain, ORM-based
+**Decision:** Separate Rust modules: `db/skills.rs` (14 tests), `db/mcp.rs` (11 tests), `db/templates.rs` (16 tests + 5 built-in templates). Each has its own Row type, CRUD functions, and Tauri command handler module.
+**Rationale:** Follows the established pattern from db/memory.rs. Each module is self-contained with its own types, queries, and tests. The command modules (commands/skills.rs, etc.) are thin wrappers that acquire the DB connection and delegate to the data layer. 5 built-in templates (Feature Build, Bug Investigation, Code Review, Research Report, Document Analysis) are seeded on first run.
+
+## 2026-02-26 — Hook-per-Domain Pattern for Frontend IPC
+**Context:** SkillEditor, McpManager, TemplateLibrary all need IPC-connected callbacks
+**Options:** Inline IPC calls in components, shared generic hook, one hook per domain
+**Decision:** One hook per domain: `useSkillActions`, `useMcpActions`, `useTemplateActions`. Each auto-loads data on mount and provides typed CRUD callbacks.
+**Rationale:** Consistent with the Phase 4 `useMemoryActions` pattern. Each hook encapsulates all IPC calls, store updates, and error handling for its domain. Components stay pure UI — they read from Zustand stores and call hook-provided callbacks. The hooks auto-load data when mounted and when the active project changes, eliminating manual refresh logic.
+
+## 2026-02-26 — Global Keyboard Shortcuts via useKeyboardShortcuts Hook
+**Context:** Need Cmd+K (focus task bar), Cmd+N (new project), Cmd+1-9 (switch project), Cmd+M (memory), Cmd+, (settings), Cmd+/ (shortcut help), Cmd+R (runtime toggle), Cmd+. (cancel task), Escape (close)
+**Options:** Per-component event listeners, global hook, third-party shortcut library (react-hotkeys-hook)
+**Decision:** Single `useKeyboardShortcuts` hook registered in Shell.tsx. Uses window-level keydown listener. Exposes shortcut overlay state and toggle. Definitions exported as `SHORTCUT_DEFINITIONS` for the overlay to render.
+**Rationale:** Centralizing shortcuts in one hook prevents conflicts and makes it easy to see all bindings. The hook reads from Zustand stores for context-sensitive behavior (e.g., Escape closes the active view vs unfocuses task bar). No external dependency needed for a small fixed set of shortcuts. The TaskBar retains its own Cmd+K handler for focusing the DOM input ref — both handlers coexist since they operate at different layers (Zustand state vs DOM focus).
+
+## 2026-02-26 — Default Runtime in App Store (not Derived per-call)
+**Context:** useTeamSession had a `getDefaultRuntime()` that derived the runtime from detected runtimes on every call
+**Options:** Keep derived function, add `defaultRuntime` to app store, add to settings store
+**Decision:** Added `defaultRuntime: Runtime` to the app store with `setDefaultRuntime()` setter. TopBar shows a compact RuntimePicker that updates this value. useTeamSession reads it directly.
+**Rationale:** The runtime picker allows users to explicitly choose their preferred runtime before starting a task. Storing it in the app store (not settings) keeps it session-scoped — it resets to "claude-code" on restart rather than persisting. This is intentional: the available runtime may change between sessions if the user installs or uninstalls Claude Code or Codex.
+
+## 2026-02-26 — Shell.tsx Owns Sound Integration (not useTeamSession)
+**Context:** Sound effects need to play on deploy, spawn, complete, and error
+**Options:** Add useSounds to useTeamSession, add useSounds to Shell, create a SoundMiddleware
+**Decision:** Shell.tsx calls `useSounds()` and triggers `play("deploy")` in the `handleDeploy` callback. Sound triggers for session lifecycle events (spawn, complete, error) will be added via useEffect watchers on session store state.
+**Rationale:** Shell is the top-level component that already orchestrates all views and lifecycle. Adding sounds here keeps useTeamSession focused on IPC and state management. The `play` function is synchronous and fire-and-forget, so it adds zero complexity to callback chains.

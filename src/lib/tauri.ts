@@ -6,6 +6,9 @@ import type { RuntimeInfo } from "@/types/runtime";
 import type { Project } from "@/types/project";
 import type { Session, TaskPlan } from "@/types/session";
 import type { MemoryEntry, ExtractionResult } from "@/types/memory";
+import type { Skill } from "@/types/skill";
+import type { McpServer } from "@/types/mcp";
+import type { Template } from "@/types/template";
 
 /** Detect available AI runtimes (Claude Code, Codex) on the system */
 export async function detectRuntimes(): Promise<RuntimeInfo> {
@@ -132,6 +135,106 @@ export async function extractSessionMemories(sessionId: string): Promise<Extract
 export async function getMemoryCount(projectId: string): Promise<number> {
   return invoke<number>("get_memory_count", { projectId });
 }
+
+/* ── Skills commands ──────────────────────────────────────────── */
+
+/** List skills for a project (includes global skills). */
+export async function listSkills(projectId?: string): Promise<Skill[]> {
+  return invoke<Skill[]>("list_skills", { projectId });
+}
+
+/** Create a new skill. */
+export async function createSkill(
+  name: string,
+  content: string,
+  projectId?: string,
+  description?: string,
+  triggerPattern?: string,
+): Promise<Skill> {
+  return invoke<Skill>("create_skill", { name, content, projectId, description, triggerPattern });
+}
+
+/** Update an existing skill. */
+export async function updateSkill(
+  id: string,
+  name: string,
+  content: string,
+  description?: string,
+  triggerPattern?: string,
+): Promise<boolean> {
+  return invoke<boolean>("update_skill", { id, name, content, description, triggerPattern });
+}
+
+/** Delete a skill by ID. */
+export async function deleteSkill(id: string): Promise<boolean> {
+  return invoke<boolean>("delete_skill", { id });
+}
+
+/* ── MCP commands ────────────────────────────────────────────── */
+
+/** List all configured MCP servers. */
+export async function listMcpServers(): Promise<McpServer[]> {
+  return invoke<McpServer[]>("list_mcp_servers");
+}
+
+/** Add a new MCP server configuration. */
+export async function addMcpServer(
+  name: string,
+  command: string,
+  args?: string,
+  env?: string,
+  scope?: string,
+): Promise<McpServer> {
+  return invoke<McpServer>("add_mcp_server", { name, command, args, env, scope });
+}
+
+/** Toggle an MCP server enabled/disabled. */
+export async function toggleMcpServer(id: string, enabled: boolean): Promise<boolean> {
+  return invoke<boolean>("toggle_mcp_server", { id, enabled });
+}
+
+/** Run a health check on an MCP server. Returns true if healthy. */
+export async function healthCheckMcp(id: string): Promise<boolean> {
+  return invoke<boolean>("health_check_mcp", { id });
+}
+
+/** Import MCP servers from Claude Code config files. Returns count imported. */
+export async function importMcpFromClaude(): Promise<number> {
+  return invoke<number>("import_mcp_from_claude");
+}
+
+/** Delete an MCP server. */
+export async function deleteMcpServer(id: string): Promise<boolean> {
+  return invoke<boolean>("delete_mcp_server", { id });
+}
+
+/* ── Template commands ───────────────────────────────────────── */
+
+/** List all templates (built-in + custom). */
+export async function listTemplates(): Promise<Template[]> {
+  return invoke<Template[]>("list_templates");
+}
+
+/** Save a plan as a template. */
+export async function saveTemplate(
+  name: string,
+  plan: string,
+  description?: string,
+): Promise<Template> {
+  return invoke<Template>("save_template", { name, plan, description });
+}
+
+/** Delete a custom template. */
+export async function deleteTemplate(id: string): Promise<boolean> {
+  return invoke<boolean>("delete_template", { id });
+}
+
+/** Load a template by ID. Returns the template with its plan. */
+export async function loadTemplate(id: string): Promise<Template> {
+  return invoke<Template>("load_template", { id });
+}
+
+/* ── Event subscription ──────────────────────────────────────── */
 
 /** Subscribe to a Tauri event. Returns an unsubscribe function. */
 export async function onEvent<T>(

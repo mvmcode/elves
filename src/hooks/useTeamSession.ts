@@ -47,7 +47,7 @@ export function useTeamSession(): {
   const showPlanPreview = useSessionStore((s) => s.showPlanPreview);
   const acceptPlan = useSessionStore((s) => s.acceptPlan);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
-  const runtimes = useAppStore((s) => s.runtimes);
+  const defaultRuntime = useAppStore((s) => s.defaultRuntime);
   const autoLearn = useSettingsStore((s) => s.autoLearn);
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -59,11 +59,6 @@ export function useTeamSession(): {
       }
     };
   }, []);
-
-  /** Pick the default runtime based on detected runtimes */
-  const getDefaultRuntime = useCallback((): Runtime => {
-    return runtimes?.claudeCode ? "claude-code" : runtimes?.codex ? "codex" : "claude-code";
-  }, [runtimes]);
 
   /**
    * Completes a session: transitions elves to done, shows celebration,
@@ -78,7 +73,7 @@ export function useTeamSession(): {
         timestamp: Date.now(),
         elfId: "system",
         elfName: "System",
-        runtime: getDefaultRuntime(),
+        runtime: defaultRuntime,
         type: "task_update",
         payload: { status: "completed", message: `ALL DONE! ${leadName}: "The elfs have spoken."` },
         funnyStatus: `${leadName} declares victory!`,
@@ -97,7 +92,7 @@ export function useTeamSession(): {
         updateAllElfStatus("sleeping");
       }, SLEEP_DELAY_MS);
     },
-    [updateAllElfStatus, addEvent, endSession, getDefaultRuntime, autoLearn, activeSession],
+    [updateAllElfStatus, addEvent, endSession, defaultRuntime, autoLearn, activeSession],
   );
 
   /**
@@ -120,7 +115,7 @@ export function useTeamSession(): {
 
         if (plan.complexity === "solo") {
           /* Solo task — skip plan preview, deploy immediately */
-          const runtime = getDefaultRuntime();
+          const runtime = defaultRuntime;
           const sessionId = await invokeStartTask(activeProjectId, task, runtime);
 
           startSession({ id: sessionId, projectId: activeProjectId, task, runtime, plan });
@@ -165,7 +160,7 @@ export function useTeamSession(): {
         console.error("Failed to analyze task:", error);
       }
     },
-    [activeProjectId, getDefaultRuntime, startSession, addElf, addEvent, updateElfStatus, showPlanPreview],
+    [activeProjectId, defaultRuntime, startSession, addElf, addEvent, updateElfStatus, showPlanPreview],
   );
 
   /**
@@ -176,7 +171,7 @@ export function useTeamSession(): {
       if (!activeProjectId) return;
 
       acceptPlan();
-      const runtime = getDefaultRuntime();
+      const runtime = defaultRuntime;
 
       try {
         const sessionId = await invokeStartTeamTask(activeProjectId, plan.taskGraph[0]?.label ?? "Team task", plan);
@@ -235,7 +230,7 @@ export function useTeamSession(): {
         console.error("Failed to deploy team:", error);
       }
     },
-    [activeProjectId, getDefaultRuntime, acceptPlan, startSession, addElf, addEvent, updateElfStatus],
+    [activeProjectId, defaultRuntime, acceptPlan, startSession, addElf, addEvent, updateElfStatus],
   );
 
   const stopSession = useCallback(async (): Promise<void> => {

@@ -2,8 +2,19 @@
 
 import { useProjectStore } from "@/stores/project";
 import { useUiStore } from "@/stores/ui";
+import type { AppView } from "@/stores/ui";
 import { Badge } from "@/components/shared/Badge";
 import { EmptyState } from "@/components/shared/EmptyState";
+
+/** Navigation items for the sidebar. */
+const NAV_ITEMS: readonly { view: AppView; label: string }[] = [
+  { view: "session", label: "Workshop" },
+  { view: "memory", label: "Memory" },
+  { view: "skills", label: "Skills" },
+  { view: "mcp", label: "MCP Servers" },
+  { view: "history", label: "History" },
+  { view: "settings", label: "Settings" },
+];
 
 /**
  * Left sidebar showing the project list, global navigation, and branding.
@@ -54,39 +65,21 @@ export function Sidebar(): React.JSX.Element {
 
       {/* Navigation */}
       <div className="border-t-[3px] border-border p-2">
-        <button
-          onClick={() => setActiveView("session")}
-          className={[
-            "mb-1 w-full border-[2px] p-2 text-left font-body text-sm font-bold transition-all duration-100",
-            activeView === "session"
-              ? "border-border bg-elf-gold shadow-brutal-sm"
-              : "border-transparent hover:border-border hover:bg-elf-gold-light",
-          ].join(" ")}
-        >
-          Workshop
-        </button>
-        <button
-          onClick={() => setActiveView("memory")}
-          className={[
-            "mb-1 w-full border-[2px] p-2 text-left font-body text-sm font-bold transition-all duration-100",
-            activeView === "memory"
-              ? "border-border bg-elf-gold shadow-brutal-sm"
-              : "border-transparent hover:border-border hover:bg-elf-gold-light",
-          ].join(" ")}
-        >
-          Memory
-        </button>
-        <button
-          onClick={() => setActiveView("settings")}
-          className={[
-            "w-full border-[2px] p-2 text-left font-body text-sm font-bold transition-all duration-100",
-            activeView === "settings"
-              ? "border-border bg-elf-gold shadow-brutal-sm"
-              : "border-transparent hover:border-border hover:bg-elf-gold-light",
-          ].join(" ")}
-        >
-          Settings
-        </button>
+        {NAV_ITEMS.map((item, index) => (
+          <button
+            key={item.view}
+            onClick={() => setActiveView(item.view)}
+            className={[
+              "w-full border-[2px] p-2 text-left font-body text-sm font-bold transition-all duration-100",
+              index < NAV_ITEMS.length - 1 ? "mb-1" : "",
+              activeView === item.view
+                ? "border-border bg-elf-gold shadow-brutal-sm"
+                : "border-transparent hover:border-border hover:bg-elf-gold-light",
+            ].join(" ")}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
       {/* Bottom section */}

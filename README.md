@@ -154,29 +154,37 @@ ELVES uses Tauri v2: a Rust backend handles compute-heavy work (process manageme
 The key architectural insight is the **Unified Agent Protocol**. Both Claude Code and Codex emit different event formats. ELVES normalizes everything into a single typed stream (`ElfEvent`) that the frontend subscribes to. The frontend never imports anything runtime-specific — switching from Claude Code to Codex is invisible to the UI layer.
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    React Frontend                         │
-│  ┌─────────────┐ ┌──────────────┐ ┌──────────────────┐  │
-│  │  Workshop   │ │   Memory     │ │    Settings      │  │
-│  │  (Theater,  │ │   Explorer   │ │  (Memory config, │  │
-│  │  Plan, Feed)│ │   (FTS5)     │ │   decay, export) │  │
-│  └──────┬──────┘ └──────┬───────┘ └────────┬─────────┘  │
-│         └───────────┬───┘                   │            │
-│                     │ Tauri IPC             │            │
-└─────────────────────┼───────────────────────┘            │
-┌─────────────────────┴────────────────────────────────────┘
-│                    Rust Backend                            │
-│  ┌──────────┐ ┌────────────────┐ ┌───────────────────┐   │
-│  │ Process  │ │ SQLite (WAL)   │ │ Memory Engine     │   │
-│  │ Manager  │ │ Projects, Elves│ │ Context Builder   │   │
-│  │          │ │ Sessions, Events│ │ Heuristic Extract │   │
-│  │          │ │ Memory + FTS5  │ │ Relevance Decay   │   │
-│  └────┬─────┘ └────────────────┘ └───────────────────┘   │
-│       │                                                    │
-│  ┌────┴──────────────────────────┐ ┌──────────────────┐  │
-│  │ Unified Agent Protocol Adapter │ │ Task Analyzer    │  │
-│  └────┬──────────────────────┬───┘ │ (solo vs. team)  │  │
-└───────┼──────────────────────┼─────┴──────────────────┘──┘
+┌──────────────────────────────────────────────────────────────┐
+│                        React Frontend                         │
+│  ┌───────────┐ ┌──────────┐ ┌────────┐ ┌────────┐ ┌──────┐ │
+│  │ Workshop  │ │ Memory   │ │ Skills │ │  MCP   │ │ Hist │ │
+│  │ (Theater, │ │ Explorer │ │ Editor │ │Manager │ │ ory  │ │
+│  │ Plan,Feed)│ │ (FTS5)   │ │        │ │        │ │      │ │
+│  └─────┬─────┘ └────┬─────┘ └───┬────┘ └───┬────┘ └──┬───┘ │
+│        └─────────┬───┘           │          │         │     │
+│   Keyboard       │ Tauri IPC    │          │         │     │
+│   Shortcuts ─────┤              │          │         │     │
+│   Sound Engine   │              │          │         │     │
+│   Runtime Picker │              │          │         │     │
+└──────────────────┼──────────────┴──────────┴─────────┘     │
+┌──────────────────┴─────────────────────────────────────────┘
+│                        Rust Backend                           │
+│  ┌──────────┐ ┌─────────────────┐ ┌───────────────────────┐ │
+│  │ Process  │ │ SQLite (WAL)    │ │ Memory Engine         │ │
+│  │ Manager  │ │ Projects, Elves │ │ Context Builder       │ │
+│  │          │ │ Sessions, Events│ │ Heuristic Extraction  │ │
+│  │          │ │ Memory + FTS5   │ │ Relevance Decay       │ │
+│  │          │ │ Skills, MCP     │ └───────────────────────┘ │
+│  │          │ │ Templates       │                            │
+│  └────┬─────┘ └─────────────────┘ ┌───────────────────────┐ │
+│       │                            │ Interop Layer         │ │
+│  ┌────┴──────────────────────────┐ │ Context formatting    │ │
+│  │ Unified Agent Protocol Adapter │ │ per runtime           │ │
+│  └────┬──────────────────────┬───┘ └───────────────────────┘ │
+│       │                      │      ┌──────────────────┐     │
+│       │                      │      │ Task Analyzer     │     │
+│       │                      │      │ (solo vs. team)   │     │
+└───────┼──────────────────────┼──────┴──────────────────┘─────┘
         │                      │
   ┌─────┴───────┐       ┌─────┴────────┐
   │ Claude Code │       │  Codex CLI   │
@@ -238,22 +246,32 @@ npx tsc --noEmit
 elves/
 ├── src/                         # React frontend
 │   ├── components/
-│   │   ├── shared/              # Button, Card, Input, Panel, Badge, EmptyState, DeployButton
+│   │   ├── shared/              # Button, Card, Input, Panel, Badge, EmptyState, DeployButton,
+│   │   │                        # RuntimePicker, ShortcutOverlay
 │   │   ├── layout/              # Shell, Sidebar, TaskBar, TopBar
-│   │   ├── theater/             # ElfTheater, ElfCard, PlanPreview, TaskGraph, ThinkingPanel
+│   │   ├── theater/             # ElfTheater, ElfCard, ElfAvatar, PlanPreview, TaskGraph, ThinkingPanel
+│   │   ├── editors/             # SkillEditor, McpManager, ContextEditor, TemplateLibrary
+│   │   ├── project/             # SessionHistory
 │   │   ├── feed/                # ActivityFeed
 │   │   ├── memory/              # MemoryExplorer, MemoryCard
 │   │   └── settings/            # MemorySettings
-│   ├── stores/                  # Zustand stores (app, project, session, ui, memory, settings)
-│   ├── types/                   # TypeScript type definitions (elf, session, project, memory, runtime)
-│   ├── hooks/                   # useInitialize, useSession, useTeamSession, useMemoryActions
-│   └── lib/                     # elf-names, Tauri IPC wrappers
+│   ├── stores/                  # Zustand stores (app, project, session, ui, memory, settings,
+│   │                            # skills, mcp, templates)
+│   ├── types/                   # TypeScript types (elf, session, project, memory, runtime,
+│   │                            # skill, mcp, template)
+│   ├── hooks/                   # useInitialize, useSession, useTeamSession, useMemoryActions,
+│   │                            # useSkillActions, useMcpActions, useTemplateActions,
+│   │                            # useKeyboardShortcuts, useSessionHistory, useSounds
+│   └── lib/                     # elf-names, sounds, funny-copy, Tauri IPC wrappers
 │
 ├── src-tauri/                   # Rust backend
 │   └── src/
-│       ├── agents/              # Runtime detection, adapters, task analyzer, context builder, memory extractor
-│       ├── commands/            # Tauri IPC handlers (agents, projects, sessions, tasks, memory)
-│       └── db/                  # SQLite schema, migrations, CRUD (projects, sessions, elves, events, memory)
+│       ├── agents/              # Runtime detection, claude/codex adapters, interop,
+│       │                        # task analyzer, context builder, memory extractor
+│       ├── commands/            # Tauri IPC handlers (agents, projects, sessions, tasks,
+│       │                        # memory, skills, mcp, templates)
+│       └── db/                  # SQLite schema + migrations, CRUD modules
+│                                # (projects, sessions, elves, events, memory, skills, mcp, templates)
 │
 ├── assets/logo/                 # ELVES wordmark and logo assets
 ├── CLAUDE.md                    # Engineering standards
@@ -266,10 +284,15 @@ elves/
 - **Neo-brutalist components**: 3px black borders, hard drop shadows (`box-shadow: 6px 6px 0px 0px #000`), no border-radius by default, bold saturated colors
 - **Tailwind v4**: Design tokens defined via `@theme` in CSS, not a config file
 - **Tauri IPC**: `tauri::command` for request/response, `app.emit()` for streaming events
-- **Zustand stores**: Separate stores per domain (app, project, session, ui, memory, settings) to prevent unnecessary re-renders
+- **Zustand stores**: Separate stores per domain (app, project, session, ui, memory, settings, skills, mcp, templates) to prevent unnecessary re-renders
+- **Hook-per-domain IPC**: Each data domain has a dedicated hook (`useMemoryActions`, `useSkillActions`, `useMcpActions`, `useTemplateActions`) that auto-loads data and provides typed CRUD callbacks
 - **Persistent memory**: SQLite + FTS5 full-text search. Relevance decays exponentially (`score *= 0.995^days`), boosted on access. Pinned memories exempt from decay.
 - **Pre/post-task hooks**: Before each task, project context is built from relevant memories. After completion, heuristic extraction pulls decisions, learnings, and context from the event stream.
-- **View routing**: Simple `AppView` string union type in Zustand (session/memory/settings) — no React Router needed for a single-window desktop app
+- **View routing**: `AppView` union type in Zustand (session/memory/skills/mcp/history/settings) — no React Router needed for a single-window desktop app
+- **Unified agent protocol**: Claude Code and Codex events are normalized into a single typed stream. The interop layer formats context per runtime. Frontend never touches runtime-specific types.
+- **Inline SVG avatars**: 15 unique elf avatars with per-status CSS animations. Zero network requests.
+- **Web Audio API sounds**: Oscillator-based sound effects with no audio file dependencies. 6 effects (spawn, typing, complete, error, chat, deploy).
+- **Global keyboard shortcuts**: Centralized in `useKeyboardShortcuts` hook — Cmd+K (task bar), Cmd+1-9 (projects), Cmd+M (memory), Cmd+/ (help overlay)
 
 ---
 
@@ -279,8 +302,8 @@ elves/
 - [x] **Phase 2: Single Elf Mode** — ElfCard, ActivityFeed, live streaming, session management
 - [x] **Phase 3: Multi-Elf Teams** — Task analyzer, plan preview, team deployment, task graph, thinking panel
 - [x] **Phase 4: Memory & Intelligence** — Persistent memory with FTS5, auto-learning, context injection, memory explorer, settings
-- [ ] **Phase 5: Visual Editors & Polish** — Skills editor, MCP manager, avatar animations, sound design
-- [ ] **Phase 6: Codex Full Support** — Multi-agent Codex, runtime switching, task templates
+- [x] **Phase 5: Visual Editors & Polish** — Skills editor, MCP manager, context editor, 15 SVG elf avatars, Web Audio sounds, funny copy engine, keyboard shortcuts, shortcut overlay
+- [x] **Phase 6: Codex Full Support** — Codex adapter with JSONL normalization, interop layer, runtime picker, template library (5 built-in), session history
 - [ ] **Phase 7: Distribution** — Signed .dmg, auto-updater, Homebrew cask, landing page at elves.dev
 
 ---

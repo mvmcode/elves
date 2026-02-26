@@ -41,6 +41,20 @@ pub fn run() {
             commands::memory::get_memory_count,
             commands::memory::extract_session_memories,
             commands::memory::build_project_context,
+            commands::skills::list_skills,
+            commands::skills::create_skill,
+            commands::skills::update_skill,
+            commands::skills::delete_skill,
+            commands::mcp::list_mcp_servers,
+            commands::mcp::add_mcp_server,
+            commands::mcp::toggle_mcp_server,
+            commands::mcp::health_check_mcp,
+            commands::mcp::delete_mcp_server,
+            commands::templates::list_templates,
+            commands::templates::save_template,
+            commands::templates::delete_template,
+            commands::templates::load_template,
+            commands::templates::seed_templates,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");

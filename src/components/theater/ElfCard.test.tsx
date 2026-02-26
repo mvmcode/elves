@@ -44,7 +44,7 @@ describe("ElfCard", () => {
     const elf = createTestElf();
     render(<ElfCard elf={elf} />);
     expect(screen.getByText("Spark")).toBeInTheDocument();
-    expect(screen.getByText("⚡")).toBeInTheDocument();
+    expect(screen.getByTestId("elf-avatar")).toBeInTheDocument();
   });
 
   it("shows status badge with correct text", () => {

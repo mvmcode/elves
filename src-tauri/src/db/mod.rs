@@ -5,7 +5,10 @@ pub mod projects;
 pub mod sessions;
 pub mod events;
 pub mod elves;
+pub mod mcp;
 pub mod memory;
+pub mod skills;
+pub mod templates;
 
 use rusqlite::Connection;
 use std::path::Path;

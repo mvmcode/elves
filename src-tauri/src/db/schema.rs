@@ -5,7 +5,7 @@ use rusqlite::Connection;
 use super::DbError;
 
 /// Current schema version. Increment this when adding new migrations.
-const CURRENT_VERSION: i32 = 1;
+const CURRENT_VERSION: i32 = 2;
 
 /// Run all pending migrations up to CURRENT_VERSION.
 /// Uses a schema_version table to track which migrations have been applied.
@@ -28,6 +28,9 @@ pub fn run_migrations(conn: &Connection) -> Result<(), DbError> {
 
     if current < 1 {
         migrate_v1(conn)?;
+    }
+    if current < 2 {
+        migrate_v2(conn)?;
     }
 
     Ok(())
@@ -176,6 +179,34 @@ fn migrate_v1(conn: &Connection) -> Result<(), DbError> {
     Ok(())
 }
 
+/// Migration v2: Add templates table for saved task plans.
+fn migrate_v2(conn: &Connection) -> Result<(), DbError> {
+    conn.execute_batch(
+        "
+        -- Templates: saved task plans for reuse
+        CREATE TABLE IF NOT EXISTS templates (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            plan TEXT NOT NULL,
+            built_in INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_templates_built_in ON templates(built_in);
+
+        -- Record this migration
+        INSERT INTO schema_version (version) VALUES (2);
+        ",
+    )
+    .map_err(|e| DbError::Migration {
+        version: 2,
+        message: e.to_string(),
+    })?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,7 +229,7 @@ mod tests {
                 row.get(0)
             })
             .expect("Should query version");
-        assert_eq!(version, 1);
+        assert_eq!(version, CURRENT_VERSION);
     }
 
     #[test]
@@ -221,6 +252,7 @@ mod tests {
             "skills",
             "mcp_servers",
             "events",
+            "templates",
             "schema_version",
         ];
 
