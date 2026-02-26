@@ -1,0 +1,66 @@
+/* MINIONS global styles — neo-brutalist design system tokens via Tailwind v4. */
+@import "tailwindcss";
+
+@theme {
+  /* Neo-brutalist color palette */
+  --color-minion-yellow: #FFD93D;
+  --color-minion-yellow-light: #FFF0B3;
+  --color-minion-yellow-dark: #E6C235;
+
+  --color-surface-light: #FFFDF7;
+  --color-surface-dark: #1A1A2E;
+
+  --color-error: #FF6B6B;
+  --color-success: #6BCB77;
+  --color-info: #4D96FF;
+  --color-warning: #FF8B3D;
+
+  --color-border: #000000;
+  --color-text-light: #000000;
+  --color-text-dark: #FFFDF7;
+
+  /* Typography scale */
+  --font-display: "Space Grotesk", "DM Sans", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Neo-brutalist shadows — hard-edged, no blur */
+  --shadow-brutal-sm: 2px 2px 0px 0px #000;
+  --shadow-brutal: 4px 4px 0px 0px #000;
+  --shadow-brutal-lg: 6px 6px 0px 0px #000;
+  --shadow-brutal-xl: 8px 8px 0px 0px #000;
+
+  /* Border widths */
+  --border-brutal: 3px;
+  --border-brutal-thin: 2px;
+  --border-brutal-thick: 4px;
+}
+
+/* Base styles */
+html {
+  font-family: var(--font-body);
+  background: var(--color-surface-light);
+  color: var(--color-text-light);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prevent text selection on UI chrome (not content areas) */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border: 2px solid var(--color-surface-light);
+}

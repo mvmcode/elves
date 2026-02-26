@@ -1,0 +1,36 @@
+[package]
+name = "minions"
+version = "0.1.0"
+description = "Deploy your AI army — visual multi-agent orchestration for Claude Code and Codex"
+authors = ["Mani & Raghavan"]
+edition = "2021"
+
+[lib]
+name = "minions_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.31", features = ["bundled", "modern_sqlite"] }
+tokio = { version = "1", features = ["full"] }
+thiserror = "1"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+which = "7"
+log = "0.4"
+env_logger = "0.11"
+dirs = "6"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
