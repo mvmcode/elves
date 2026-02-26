@@ -4,6 +4,7 @@ mod agents;
 mod commands;
 mod db;
 
+use agents::process::ProcessManager;
 use commands::projects::DbState;
 use std::sync::Mutex;
 
@@ -16,10 +17,16 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(DbState(Mutex::new(conn)))
+        .manage(ProcessManager::new())
         .invoke_handler(tauri::generate_handler![
             commands::agents::detect_runtimes,
             commands::projects::list_projects,
             commands::projects::create_project,
+            commands::sessions::create_session,
+            commands::sessions::list_sessions,
+            commands::sessions::get_session,
+            commands::tasks::start_task,
+            commands::tasks::stop_task,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running MINIONS application");

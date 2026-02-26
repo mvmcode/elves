@@ -2,6 +2,9 @@
 
 pub mod schema;
 pub mod projects;
+pub mod sessions;
+pub mod events;
+pub mod minions;
 
 use rusqlite::Connection;
 use std::path::Path;
