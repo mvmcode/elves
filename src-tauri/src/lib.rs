@@ -27,6 +27,9 @@ pub fn run() {
             commands::sessions::get_session,
             commands::tasks::start_task,
             commands::tasks::stop_task,
+            commands::tasks::analyze_task,
+            commands::tasks::start_team_task,
+            commands::tasks::stop_team_task,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");
