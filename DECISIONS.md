@@ -77,3 +77,43 @@
 **Options:** Elves, Sprites, Gnomes, Imps, Pixies
 **Decision:** Rebrand to ELVES — all code, types, UI strings, database tables, file names, logos, docs
 **Rationale:** "Elves" fits the same playful personality archetype while being generic enough to avoid trademark issues. The workshop/crafting metaphor (elves making things) maps perfectly to AI agents building code. Key mappings: minion→elf, MinionEvent→ElfEvent, banana→cookie, deploy→summon, ~/.minions/→~/.elves/, minion-yellow→elf-gold. Complete rename across ~693 occurrences in 48 files.
+
+---
+
+## Phase 3: Multi-Elf Teams — Decisions
+
+## 2026-02-26 — Shared Types First, Then Parallel Work
+**Context:** Phase 3 requires both Rust backend (task analyzer, team deployment) and React frontend (plan preview, task graph, thinking panel) work
+**Options:** Sequential (all backend then frontend), parallel with shared types first, fully parallel with type stubs
+**Decision:** Lead builds shared types (TaskPlan, RoleDef, TaskNode in both Rust and TS) first, then Forge (backend) and Pixel (frontend) work in parallel
+**Rationale:** The type boundary between Rust and TypeScript is the critical contract. By establishing it first, both engineers work against the same interface. This prevents serialization mismatches — the Rust serde(rename_all = "camelCase") output must match TypeScript interfaces exactly.
+
+## 2026-02-26 — Heuristic Task Analyzer (not LLM-based yet)
+**Context:** Task analyzer needs to classify complexity as solo/team and propose agent roles
+**Options:** Claude Haiku API call (as spec suggests), local heuristic, hybrid
+**Decision:** Start with a local heuristic (keyword matching, sentence count) with a clear interface for swapping in an LLM call later
+**Rationale:** An API call introduces latency (~1-3s), API key management, and a hard dependency on network connectivity. The heuristic gives instant results and handles 80% of cases. The TaskPlan interface is the same regardless of implementation, so swapping in Claude Haiku later is a one-function change. Ship fast, upgrade later.
+
+## 2026-02-26 — Custom SVG Task Graph (not React Flow/D3)
+**Context:** Task graph visualization for 3-6 nodes
+**Options:** React Flow, D3.js, vis.js, custom SVG
+**Decision:** Custom SVG/div renderer with simple topological sort layout
+**Rationale:** React Flow and D3 are heavy dependencies (100KB+ gzipped) for rendering 3-6 nodes. A custom SVG renderer with hardcoded layout rules (left-to-right, stack parallel nodes vertically) is ~100 lines of code, zero dependencies, and perfectly adequate for our max 6-node graphs. If we need more complex graphs later, we can swap in React Flow.
+
+## 2026-02-26 — ProcessManager Extended to Vec<Child> for Teams
+**Context:** Phase 2 ProcessManager maps session_id → single Child. Phase 3 needs multiple processes per session.
+**Options:** Change HashMap<String, Child> to HashMap<String, Vec<Child>>, create TeamProcessManager, keep separate maps
+**Decision:** Extend existing ProcessManager with `HashMap<String, Vec<Child>>` and add `register_team()`, `kill_team()` methods alongside existing single-process methods
+**Rationale:** Single responsibility — one struct manages all processes. The Vec<Child> is backward compatible: solo sessions just have a Vec with one entry. No need for a separate manager struct.
+
+## 2026-02-26 — TaskBar Uses useTeamSession Instead of useSession
+**Context:** TaskBar needs to go through analyze → plan preview → deploy flow instead of direct deploy
+**Options:** Modify existing useSession hook, create new useTeamSession hook, inline logic in TaskBar
+**Decision:** Created useTeamSession hook that replaces useSession for task submission. The old useSession hook is preserved for backward compatibility.
+**Rationale:** useTeamSession encapsulates the full Phase 3 lifecycle (analyze → plan preview → team deploy OR solo deploy). Keeping useSession allows any legacy code paths to still work. TaskBar now calls `analyzeAndDeploy()` which routes through the analyzer before deciding solo vs team.
+
+## 2026-02-26 — Shell.tsx as Orchestration Hub for Phase 3 UI
+**Context:** PlanPreview, TaskGraph, ThinkingPanel, and celebration banner all need to appear in the main content area
+**Options:** Shell orchestrates all panels, create a SessionView wrapper component, use React context for panel visibility
+**Decision:** Shell.tsx directly orchestrates all Phase 3 panels based on store state (isPlanPreview, activeSession, thinkingStream)
+**Rationale:** Shell already manages the top-level layout. Adding another wrapper creates unnecessary indirection. The store state is the single source of truth for which panels to show: isPlanPreview → PlanPreview card, activeSession with team plan → TaskGraph + ThinkingPanel, session completed → celebration banner. This keeps rendering logic colocated with layout.

@@ -3,6 +3,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { useSessionStore } from "./session";
 import type { Elf, ElfEvent } from "@/types/elf";
+import type { TaskPlan } from "@/types/session";
 
 /** Reset store state between tests */
 function resetStore(): void {
@@ -43,6 +44,25 @@ function createTestEvent(overrides: Partial<ElfEvent> = {}): ElfEvent {
   };
 }
 
+/** Factory for a minimal valid TaskPlan */
+function createTestPlan(overrides: Partial<TaskPlan> = {}): TaskPlan {
+  return {
+    complexity: "team",
+    agentCount: 2,
+    roles: [
+      { name: "Researcher", focus: "Research competitors", runtime: "claude-code" },
+      { name: "Writer", focus: "Write the report", runtime: "claude-code" },
+    ],
+    taskGraph: [
+      { id: "t1", label: "Research", assignee: "Researcher", dependsOn: [], status: "pending" },
+      { id: "t2", label: "Report", assignee: "Writer", dependsOn: ["t1"], status: "pending" },
+    ],
+    runtimeRecommendation: "claude-code",
+    estimatedDuration: "~4 minutes",
+    ...overrides,
+  };
+}
+
 describe("useSessionStore", () => {
   beforeEach(() => {
     resetStore();
@@ -54,6 +74,9 @@ describe("useSessionStore", () => {
       expect(state.activeSession).toBeNull();
       expect(state.events).toEqual([]);
       expect(state.elves).toEqual([]);
+      expect(state.thinkingStream).toEqual([]);
+      expect(state.isPlanPreview).toBe(false);
+      expect(state.pendingPlan).toBeNull();
     });
   });
 
@@ -74,6 +97,23 @@ describe("useSessionStore", () => {
       expect(state.activeSession!.runtime).toBe("claude-code");
       expect(state.activeSession!.status).toBe("active");
       expect(state.activeSession!.startedAt).toBeGreaterThan(0);
+      expect(state.activeSession!.plan).toBeNull();
+    });
+
+    it("stores the plan when provided", () => {
+      const plan = createTestPlan();
+      useSessionStore.getState().startSession({
+        id: "session-1",
+        projectId: "project-1",
+        task: "Research competitors",
+        runtime: "claude-code",
+        plan,
+      });
+
+      const state = useSessionStore.getState();
+      expect(state.activeSession!.plan).not.toBeNull();
+      expect(state.activeSession!.plan!.agentCount).toBe(2);
+      expect(state.activeSession!.plan!.complexity).toBe("team");
     });
 
     it("clears previous events and elves when starting a new session", () => {
@@ -88,6 +128,7 @@ describe("useSessionStore", () => {
       expect(state.activeSession!.id).toBe("s2");
       expect(state.events).toEqual([]);
       expect(state.elves).toEqual([]);
+      expect(state.thinkingStream).toEqual([]);
     });
   });
 
@@ -216,6 +257,80 @@ describe("useSessionStore", () => {
     });
   });
 
+  describe("updateAllElfStatus", () => {
+    it("updates all elves to the given status", () => {
+      useSessionStore.getState().startSession({
+        id: "s1", projectId: "p1", task: "task", runtime: "claude-code",
+      });
+      useSessionStore.getState().addElf(createTestElf({ id: "e1", status: "working" }));
+      useSessionStore.getState().addElf(createTestElf({ id: "e2", status: "waiting" }));
+      useSessionStore.getState().addElf(createTestElf({ id: "e3", status: "thinking" }));
+
+      useSessionStore.getState().updateAllElfStatus("done");
+
+      const elves = useSessionStore.getState().elves;
+      expect(elves.every((elf) => elf.status === "done")).toBe(true);
+    });
+  });
+
+  describe("thinkingStream", () => {
+    it("appends thinking fragments", () => {
+      useSessionStore.getState().addThinkingFragment("First thought...");
+      useSessionStore.getState().addThinkingFragment("Second thought...");
+
+      const stream = useSessionStore.getState().thinkingStream;
+      expect(stream).toHaveLength(2);
+      expect(stream[0]).toBe("First thought...");
+      expect(stream[1]).toBe("Second thought...");
+    });
+  });
+
+  describe("planPreview", () => {
+    it("shows plan preview with pending plan", () => {
+      const plan = createTestPlan();
+      useSessionStore.getState().showPlanPreview(plan);
+
+      const state = useSessionStore.getState();
+      expect(state.isPlanPreview).toBe(true);
+      expect(state.pendingPlan).not.toBeNull();
+      expect(state.pendingPlan!.agentCount).toBe(2);
+    });
+
+    it("acceptPlan exits preview phase", () => {
+      const plan = createTestPlan();
+      useSessionStore.getState().showPlanPreview(plan);
+      useSessionStore.getState().acceptPlan();
+
+      const state = useSessionStore.getState();
+      expect(state.isPlanPreview).toBe(false);
+    });
+  });
+
+  describe("updateTaskNodeStatus", () => {
+    it("updates a task node status in the active plan", () => {
+      const plan = createTestPlan();
+      useSessionStore.getState().startSession({
+        id: "s1", projectId: "p1", task: "Research", runtime: "claude-code", plan,
+      });
+
+      useSessionStore.getState().updateTaskNodeStatus("t1", "active");
+
+      const state = useSessionStore.getState();
+      expect(state.activeSession!.plan!.taskGraph[0]!.status).toBe("active");
+      expect(state.activeSession!.plan!.taskGraph[1]!.status).toBe("pending");
+    });
+
+    it("is a no-op when no active plan exists", () => {
+      useSessionStore.getState().startSession({
+        id: "s1", projectId: "p1", task: "task", runtime: "claude-code",
+      });
+
+      useSessionStore.getState().updateTaskNodeStatus("t1", "done");
+
+      expect(useSessionStore.getState().activeSession!.plan).toBeNull();
+    });
+  });
+
   describe("clearSession", () => {
     it("resets all state to initial values", () => {
       useSessionStore.getState().startSession({
@@ -223,6 +338,8 @@ describe("useSessionStore", () => {
       });
       useSessionStore.getState().addEvent(createTestEvent());
       useSessionStore.getState().addElf(createTestElf());
+      useSessionStore.getState().addThinkingFragment("thought");
+      useSessionStore.getState().showPlanPreview(createTestPlan());
 
       useSessionStore.getState().clearSession();
 
@@ -230,6 +347,9 @@ describe("useSessionStore", () => {
       expect(state.activeSession).toBeNull();
       expect(state.events).toEqual([]);
       expect(state.elves).toEqual([]);
+      expect(state.thinkingStream).toEqual([]);
+      expect(state.isPlanPreview).toBe(false);
+      expect(state.pendingPlan).toBeNull();
     });
   });
 });

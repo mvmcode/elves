@@ -5,7 +5,7 @@ import { Input } from "@/components/shared/Input";
 import { DeployButton } from "@/components/shared/DeployButton";
 import { useUiStore } from "@/stores/ui";
 import { useProjectStore } from "@/stores/project";
-import { useSession } from "@/hooks/useSession";
+import { useTeamSession } from "@/hooks/useTeamSession";
 
 /**
  * Command-K style task input bar. Focuses on Cmd+K keypress.
@@ -18,9 +18,9 @@ export function TaskBar(): React.JSX.Element {
   const isFocused = useUiStore((s) => s.isTaskBarFocused);
   const setFocused = useUiStore((s) => s.setTaskBarFocused);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
-  const { deployTask, stopSession, isSessionActive } = useSession();
+  const { analyzeAndDeploy, stopSession, isSessionActive, isPlanPreview } = useTeamSession();
 
-  const canDeploy = taskText.trim().length > 0 && activeProjectId !== null && !isSessionActive;
+  const canDeploy = taskText.trim().length > 0 && activeProjectId !== null && !isSessionActive && !isPlanPreview;
 
   const handleDeploy = useCallback(async (): Promise<void> => {
     if (!canDeploy) return;
@@ -28,8 +28,8 @@ export function TaskBar(): React.JSX.Element {
     setTaskText("");
     inputRef.current?.blur();
     setFocused(false);
-    await deployTask(task);
-  }, [canDeploy, taskText, setFocused, deployTask]);
+    await analyzeAndDeploy(task);
+  }, [canDeploy, taskText, setFocused, analyzeAndDeploy]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -77,13 +77,15 @@ export function TaskBar(): React.JSX.Element {
           placeholder={
             !activeProjectId
               ? "Select a project first..."
-              : isSessionActive
-                ? "Elves are working... (Cmd+K)"
-                : "What do you want the elves to do? (Cmd+K)"
+              : isPlanPreview
+                ? "Review the plan below... (Cmd+K)"
+                : isSessionActive
+                  ? "Elves are working... (Cmd+K)"
+                  : "What do you want the elves to do? (Cmd+K)"
           }
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          disabled={isSessionActive}
+          disabled={isSessionActive || isPlanPreview}
         />
         {isSessionActive ? (
           <button
