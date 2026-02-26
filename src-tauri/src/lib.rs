@@ -1,4 +1,4 @@
-// MINIONS Tauri backend — agent orchestration, local storage, and process management.
+// ELVES Tauri backend — agent orchestration, local storage, and process management.
 
 mod agents;
 mod commands;
@@ -12,7 +12,7 @@ use std::sync::Mutex;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let db_path = db::default_db_path();
-    let conn = db::open_database(&db_path).expect("Failed to open MINIONS database");
+    let conn = db::open_database(&db_path).expect("Failed to open ELVES database");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -29,5 +29,5 @@ pub fn run() {
             commands::tasks::stop_task,
         ])
         .run(tauri::generate_context!())
-        .expect("Error while running MINIONS application");
+        .expect("Error while running ELVES application");
 }

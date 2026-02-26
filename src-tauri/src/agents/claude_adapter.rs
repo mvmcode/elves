@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A parsed event from Claude Code's output stream.
-/// These are normalized into the MinionEvent format for the frontend.
+/// These are normalized into the ElfEvent format for the frontend.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClaudeEvent {

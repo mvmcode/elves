@@ -17,7 +17,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           "w-full border-[3px] border-border bg-white px-4 py-3",
           "font-body text-base text-text-light outline-none",
           "placeholder:text-text-light/40",
-          "focus:shadow-brutal focus:shadow-minion-yellow",
+          "focus:shadow-brutal focus:shadow-elf-gold",
           className,
         ].join(" ")}
         {...props}

@@ -1,4 +1,4 @@
-/* Task bar — Cmd+K focused input for typing task descriptions with deploy action. */
+/* Task bar — Cmd+K focused input for typing task descriptions with summon action. */
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/shared/Input";
@@ -9,7 +9,7 @@ import { useSession } from "@/hooks/useSession";
 
 /**
  * Command-K style task input bar. Focuses on Cmd+K keypress.
- * Enter or clicking "Deploy" starts the task on the active project.
+ * Enter or clicking "Summon" starts the task on the active project.
  * Shows a stop button when a session is active.
  */
 export function TaskBar(): React.JSX.Element {
@@ -65,7 +65,7 @@ export function TaskBar(): React.JSX.Element {
     <div
       className={[
         "border-b-[3px] border-border p-3 transition-colors duration-100",
-        isFocused ? "bg-minion-yellow-light" : "bg-white",
+        isFocused ? "bg-elf-gold-light" : "bg-white",
       ].join(" ")}
     >
       <div className="flex items-center gap-3">
@@ -78,8 +78,8 @@ export function TaskBar(): React.JSX.Element {
             !activeProjectId
               ? "Select a project first..."
               : isSessionActive
-                ? "Minions are working... (Cmd+K)"
-                : "What do you want the minions to do? (Cmd+K)"
+                ? "Elves are working... (Cmd+K)"
+                : "What do you want the elves to do? (Cmd+K)"
           }
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}

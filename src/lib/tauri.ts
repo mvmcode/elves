@@ -29,7 +29,7 @@ export async function listSessions(projectId: string): Promise<Session[]> {
   return invoke<Session[]>("list_sessions", { projectId });
 }
 
-/** Start a task — creates session, spawns minion, starts agent process. Returns session ID. */
+/** Start a task — creates session, spawns elf, starts agent process. Returns session ID. */
 export async function startTask(
   projectId: string,
   task: string,

@@ -1,11 +1,11 @@
-/* MINIONS global styles — neo-brutalist design system tokens via Tailwind v4. */
+/* ELVES global styles — neo-brutalist design system tokens via Tailwind v4. */
 @import "tailwindcss";
 
 @theme {
   /* Neo-brutalist color palette */
-  --color-minion-yellow: #FFD93D;
-  --color-minion-yellow-light: #FFF0B3;
-  --color-minion-yellow-dark: #E6C235;
+  --color-elf-gold: #FFD93D;
+  --color-elf-gold-light: #FFF0B3;
+  --color-elf-gold-dark: #E6C235;
 
   --color-surface-light: #FFFDF7;
   --color-surface-dark: #1A1A2E;

@@ -1,93 +1,93 @@
-# 🍌 MINIONS — Deploy Your AI Army
+# 🍪 ELVES — Summon Your AI Workshop
 
-> *"You don't do the work. You have minions for that."*
+> *"You don't do the work. You have elves for that."*
 
-**Website:** minions.dev
+**Website:** elves.dev  
 **Tagline options:**
-- "Deploy the minions."
-- "Why do it yourself when you have minions?"
-- "Your personal army of AI chaos agents."
-- "One task. Many minions. Zero effort."
+- "Summon the elves."
+- "Why do it yourself when you have elves?"
+- "Your personal workshop of AI craftsmen."
+- "One task. Many elves. Zero effort."
 
 ---
 
 ## 1. Product Vision
 
-MINIONS is a Tauri-based macOS desktop app that turns Claude Code and OpenAI Codex into a visually chaotic, delightfully fun, general-purpose multi-agent system. You type a task. MINIONS deploys a team of animated, personality-driven AI agents who bicker, collaborate, and get the job done — all rendered in a gorgeous real-time UI with character avatars, live thinking bubbles, funny status messages, and inter-agent chat.
+ELVES is a Tauri-based macOS desktop app that turns Claude Code and OpenAI Codex into a visually chaotic, delightfully fun, general-purpose multi-agent system. You type a task. ELVES deploys a team of animated, personality-driven AI agents who bicker, collaborate, and get the job done — all rendered in a gorgeous real-time UI with character avatars, live thinking bubbles, funny status messages, and inter-agent chat.
 
-**Not just for coding.** Research, analysis, writing, planning, data processing — if Claude Code or Codex can do it, your minions can do it in parallel while you watch and eat a banana 🍌.
+**Not just for coding.** Research, analysis, writing, planning, data processing — if Claude Code or Codex can do it, your elfs can do it in parallel while you watch and eat a cookie 🍪.
 
-**Everything is local.** Projects, memory, skills, plans — all stored on your machine. No cloud. No accounts. Your minions, your data.
+**Everything is local.** Projects, memory, skills, plans — all stored on your machine. No cloud. No accounts. Your elfs, your data.
 
-**Interoperable.** Start a project with Claude Code, switch to Codex mid-stream. MINIONS doesn't care. The project layer is engine-agnostic.
+**Interoperable.** Start a project with Claude Code, switch to Codex mid-stream. ELVES doesn't care. The project layer is engine-agnostic.
 
 ---
 
-## 2. The Personality — What Makes It Fun
+## 2. The Personality — What Makes It Viral
 
-### 2.1 Every Minion Has Character
+### 2.1 Every Elf Has Character
 
 When agents spawn, they get randomly assigned:
-- **A name** from a pool of funny minion names: Gru Jr., Kevin, Stuart, Bob, Otto, Dave, Jerry, Phil, Norbert, Jorge, Carl, Tim, Mark, Lance, Steve
-- **An avatar** — expressive yellow blob characters with different accessories (hard hat, lab coat, glasses, headphones, detective hat, chef hat, etc.)
+- **A name** from a pool of funny elf names: Spark, Tinker, Jingle, Sprocket, Nimble, Flicker, Bramble, Thistle, Cobalt, Pip, Fern, Maple, Cricket, Rune, Ember
+- **An avatar** — expressive elf characters with different accessories (hard hat, lab coat, glasses, headphones, detective hat, chef hat, etc.)
 - **A personality quirk** that shows up in their status messages
 
 ### 2.2 Status Messages That Make You Screenshot
 
-Instead of boring "Running..." or "Processing...", minions have personality:
+Instead of boring "Running..." or "Processing...", elfs have personality:
 
-| Actual State | What Minion Shows |
+| Actual State | What Elf Shows |
 |---|---|
-| Thinking | "🧠 *Kevin is staring at the ceiling thinking really hard...*" |
-| Reading files | "📖 *Stuart is speed-reading your code with one eye closed...*" |
-| Writing code | "⌨️ *Bob is typing furiously with both hands AND feet...*" |
-| Waiting for another agent | "😤 *Otto is tapping his foot waiting for Kevin to finish...*" |
-| Running tests | "🧪 *Dave mixed some chemicals and is hoping nothing explodes...*" |
-| Tests passing | "🎉 *Dave is doing a victory dance! All tests pass!*" |
-| Tests failing | "😱 *Dave broke something. He's hiding under the desk.*" |
-| Searching the web | "🔍 *Jerry fell down a Wikipedia rabbit hole again...*" |
-| Writing a report | "✍️ *Phil is pretending to be a serious journalist...*" |
-| Error state | "🔥 *Kevin set something on fire. Classic Kevin.*" |
-| Completing task | "🍌 *Stuart finished and is demanding a banana as payment.*" |
-| Idle | "😴 *Bob fell asleep at his desk. Someone poke him.*" |
-| Communicating with teammate | "📢 *Otto is yelling across the room at Stuart...*" |
-| Spawning sub-agent | "👶 *Kevin hired an intern. This can only go well.*" |
-| Agent disagreement | "🥊 *Dave and Jerry are arguing about the right approach...*" |
+| Thinking | "🧠 *Tinker is staring at the ceiling thinking really hard...*" |
+| Reading files | "📖 *Jingle is speed-reading your code with pointy ears perked...*" |
+| Writing code | "⌨️ *Sprocket is typing furiously with nimble elf fingers...*" |
+| Waiting for another agent | "😤 *Nimble is tapping their foot waiting for Tinker to finish...*" |
+| Running tests | "🧪 *Flicker mixed some chemicals and is hoping nothing explodes...*" |
+| Tests passing | "🎉 *Flicker is doing a victory dance! All tests pass!*" |
+| Tests failing | "😱 *Flicker broke something. He's hiding under the desk.*" |
+| Searching the web | "🔍 *Bramble fell down a Wikipedia rabbit hole again...*" |
+| Writing a report | "✍️ *Thistle is pretending to be a serious journalist...*" |
+| Error state | "🔥 *Tinker set something on fire. Classic Tinker.*" |
+| Completing task | "🍪 *Jingle finished and is demanding a cookie as payment.*" |
+| Idle | "😴 *Sprocket fell asleep at the workbench. Someone poke them.*" |
+| Communicating with teammate | "📢 *Nimble is yelling across the room at Jingle...*" |
+| Spawning sub-agent | "👶 *Tinker recruited an apprentice. This can only go well.*" |
+| Agent disagreement | "🥊 *Flicker and Bramble are arguing about the right approach...*" |
 
 ### 2.3 Sound Design (Optional, Toggle)
-- Soft "bloop" when a minion spawns
+- Soft "bloop" when an elf spawns
 - Typing sounds when agents are writing
 - Celebration jingle when task completes
 - Cartoon crash sound on errors
-- Minion-style gibberish mumble ambient (very subtle, opt-in)
+- Workshop chatter ambient (very subtle, opt-in)
 
 ### 2.4 The Deploy Button
 The main action button doesn't say "Run" or "Execute." It says:
 
-**🍌 DEPLOY THE MINIONS**
+**🍪 SUMMON THE ELVES**
 
 ### 2.5 Loading States
-- "Waking up the minions..." (app startup)
-- "Recruiting minions for this job..." (planning phase)
-- "The minions are arguing about who does what..." (task decomposition)
-- "Herding the minions into position..." (agent spawning)
-- "The minions have been deployed. Pray for them." (execution start)
+- "Waking up the elves..." (app startup)
+- "Recruiting elves for this job..." (planning phase)
+- "The elves are arguing about who does what..." (task decomposition)
+- "Herding the elves into position..." (agent spawning)
+- "The elves have been summoned. Pray for them." (execution start)
 
 ### 2.6 Empty States
-- No projects yet: "Your minions are bored. Give them something to do. 🍌"
-- No tasks in project: "The minions are just sitting around eating bananas."
-- No memory entries: "Your minions have amnesia. Start a task to build memories."
+- No projects yet: "Your elves are bored. Give them something to do. 🍪"
+- No tasks in project: "The elves are just sitting around munching cookies."
+- No memory entries: "Your elves have amnesia. Start a task to build memories."
 
 ---
 
 ## 3. Core Principles
 
-1. **Zero ceremony** — Type a task. Hit deploy. MINIONS figures out how many agents, what roles, which runtime. No boilerplate.
+1. **Zero ceremony** — Type a task. Hit deploy. ELVES figures out how many agents, what roles, which runtime. No boilerplate.
 2. **Runtime agnostic** — Works with Claude Code AND Codex. Pick per-project or per-task. Mix freely.
 3. **Visually chaotic (in a good way)** — Animated avatars, live thought bubbles, task dependency graphs, inter-agent chat — all updating in real-time.
 4. **Expose everything** — Plans, skills, CLAUDE.md, MCP servers, permissions — all via visual editors. No vim-ing config files.
-5. **General purpose** — "Refactor my auth module" and "Research 5 competitors and write a report" are both valid minion tasks.
-6. **Persistent memory** — Minions remember across sessions. Project context, past decisions, user preferences — locally stored, always available.
+5. **General purpose** — "Refactor my auth module" and "Research 5 competitors and write a report" are both valid elf tasks.
+6. **Persistent memory** — Elves remember across sessions. Project context, past decisions, user preferences — locally stored, always available.
 7. **Interoperable projects** — Projects aren't locked to a runtime. Switch Claude Code ↔ Codex anytime.
 
 ---
@@ -100,12 +100,12 @@ The main action button doesn't say "Run" or "Execute." It says:
 - Node.js 18+ (required by both CLIs)
 
 **First launch flow:**
-1. MINIONS scans PATH for `claude` and `codex` binaries
+1. ELVES scans PATH for `claude` and `codex` binaries
 2. Shows a fun onboarding screen: *"Let's see who showed up for work today..."*
 3. Detects runtimes with checkmarks: ✅ Claude Code v2.1.x · ✅ Codex v1.x  (or ❌ Not Found with install link)
 4. User picks default runtime preference
 5. Optional: scan for existing MCP servers in `~/.claude.json`
-6. Done — drops into empty project state with the banana prompt
+6. Done — drops into empty project state with the cookie prompt
 
 ---
 
@@ -117,7 +117,7 @@ The main action button doesn't say "Run" or "Execute." It says:
 |-------|-----------|-----|
 | App Shell | **Tauri v2** (Rust) | ~10MB, native macOS feel, Rust for process mgmt + SQLite |
 | Frontend | **React 19 + TypeScript** | Component ecosystem, fast iteration |
-| Styling | **Tailwind CSS v4 + Framer Motion** | Animations are key for minion personality |
+| Styling | **Tailwind CSS v4 + Framer Motion** | Animations are key for elf personality |
 | State | **Zustand** | Lightweight, subscribe to slices |
 | Local DB | **SQLite** via `rusqlite` (Rust) | All structured data, FTS for memory search |
 | Claude Code | **Agent SDK (TypeScript)** | `query()` with streaming, subagent definitions, tool callbacks |
@@ -130,12 +130,12 @@ The main action button doesn't say "Run" or "Execute." It says:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                     MINIONS Desktop App                       │
+│                     ELVES Desktop App                       │
 │                                                               │
 │  ┌─────────────────── React Frontend ──────────────────────┐ │
 │  │                                                          │ │
 │  │  ┌──────────┐  ┌──────────────┐  ┌───────────────────┐ │ │
-│  │  │ 🍌 Task  │  │ 🎭 Minion    │  │ 📊 Live Activity  │ │ │
+│  │  │ 🍪 Task  │  │ 🎭 Elf    │  │ 📊 Live Activity  │ │ │
 │  │  │ Command  │  │ Theater      │  │ Feed & Task Graph │ │ │
 │  │  │ Bar      │  │ (avatars,    │  │                   │ │ │
 │  │  │          │  │  animations, │  │                   │ │ │
@@ -177,7 +177,7 @@ The main action button doesn't say "Run" or "Execute." It says:
 └──────────────────────────────────────────────────────────────┘
          │                              │
   ┌──────┴──────┐               ┌───────┴──────┐
-  │ ~/.minions/ │               │ MCP Servers   │
+  │ ~/.elves/ │               │ MCP Servers   │
   │ (projects,  │               │ (inherited    │
   │  memory,    │               │  from Claude  │
   │  skills)    │               │  Code/Codex)  │
@@ -186,22 +186,22 @@ The main action button doesn't say "Run" or "Execute." It says:
 
 ### 5.3 Unified Agent Protocol
 
-The key innovation. Both runtimes emit different formats. MINIONS normalizes everything:
+The key innovation. Both runtimes emit different formats. ELVES normalizes everything:
 
 ```typescript
-type MinionEvent = {
+type ElfEvent = {
   id: string;
   timestamp: number;
-  minionId: string;           // internal agent ID
-  minionName: string;         // "Kevin", "Stuart", etc.
+  elfId: string;           // internal agent ID
+  elfName: string;         // "Tinker", "Jingle", etc.
   runtime: 'claude-code' | 'codex';
   type:
     | 'thinking'              // extended thinking / plan mode
     | 'tool_call'             // calling a tool (bash, edit, MCP, etc.)
     | 'tool_result'           // tool returned something
     | 'output'                // text output / response
-    | 'spawn'                 // spawned a sub-minion
-    | 'chat'                  // inter-minion communication
+    | 'spawn'                 // spawned a sub-elf
+    | 'chat'                  // inter-elf communication
     | 'task_update'           // task status change
     | 'error'                 // something broke
     | 'permission_request'    // needs human approval
@@ -221,7 +221,7 @@ When user types a task, BEFORE deploying:
 User Input
     │
     ▼
-┌───────────────────────────────────┐
+┌───────────────────────────────┐
 │  Task Analyzer (fast LLM call)│
 │                               │
 │  Input: task text + project   │
@@ -237,20 +237,20 @@ User Input
 └───────────────┬───────────────┘
                 │
                 ▼
-┌───────────────────────────────────┐
+┌───────────────────────────────┐
 │  Plan Preview Card            │
 │  (user can edit or just go)   │
 │                               │
-│  "3 minions recommended"      │
-│  🟡 Kevin — Research          │
-│  🟡 Stuart — Analysis         │
-│  🟡 Bob — Report Writing      │
+│  "3 elfs recommended"      │
+│  🟡 Tinker — Research          │
+│  🟡 Jingle — Analysis         │
+│  🟡 Sprocket — Report Writing      │
 │                               │
-│  [Edit Plan]  [🍌 DEPLOY]     │
+│  [Edit Plan]  [🍪 DEPLOY]     │
 └───────────────────────────────┘
 ```
 
-For **simple tasks** (single file edit, quick question, small fix), MINIONS skips the planning and just deploys one agent immediately. The user never has to say "create a team" — it's automatic based on task complexity.
+For **simple tasks** (single file edit, quick question, small fix), ELVES skips the planning and just deploys one agent immediately. The user never has to say "create a team" — it's automatic based on task complexity.
 
 ---
 
@@ -259,8 +259,8 @@ For **simple tasks** (single file edit, quick question, small fix), MINIONS skip
 ### 6.1 Directory Structure
 
 ```
-~/.minions/
-├── minions.db                     # SQLite — all structured data
+~/.elves/
+├── elves.db                     # SQLite — all structured data
 ├── projects/
 │   ├── {project-id}/
 │   │   ├── project.json           # Manifest: name, path, runtime prefs, settings
@@ -274,18 +274,18 @@ For **simple tasks** (single file edit, quick question, small fix), MINIONS skip
 │   │   │   └── *.json             # Saved task decomposition plans
 │   │   ├── sessions/
 │   │   │   └── {session-id}/
-│   │   │       ├── events.jsonl   # Full event log (MinionEvent format)
+│   │   │       ├── events.jsonl   # Full event log (ElfEvent format)
 │   │   │       ├── summary.md     # Auto-generated session summary
 │   │   │       └── artifacts/     # Files produced
 │   │   └── .claude/               # Claude Code compatibility
-│   │       ├── CLAUDE.md          # Auto-managed (MINIONS injects project memory)
+│   │       ├── CLAUDE.md          # Auto-managed (ELVES injects project memory)
 │   │       └── settings.json      # Claude Code settings for this project
 ├── global/
 │   ├── memory/
 │   │   ├── preferences.md         # How user likes things done
 │   │   └── learnings.md           # Cross-project knowledge
 │   ├── skills/                    # Available to all projects
-│   ├── personas/                  # Custom minion personas
+│   ├── personas/                  # Custom elf personas
 │   │   └── *.json                 # {name, avatar, prompt_prefix, quirk}
 │   └── mcp-servers.json           # Global MCP configurations
 └── config.json                    # Theme, defaults, sound settings
@@ -320,10 +320,10 @@ CREATE TABLE sessions (
   summary TEXT
 );
 
-CREATE TABLE minions (
+CREATE TABLE elfs (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL REFERENCES sessions(id),
-  name TEXT NOT NULL,                    -- "Kevin", "Stuart", etc.
+  name TEXT NOT NULL,                    -- "Tinker", "Jingle", etc.
   role TEXT,                             -- "researcher", "implementer", "reviewer"
   avatar TEXT NOT NULL,                  -- avatar asset ID
   color TEXT NOT NULL,                   -- hex for UI
@@ -332,7 +332,7 @@ CREATE TABLE minions (
   status TEXT DEFAULT 'spawning',        -- spawning | working | waiting | chatting | done | error | sleeping
   spawned_at INTEGER NOT NULL,
   finished_at INTEGER,
-  parent_minion_id TEXT REFERENCES minions(id),
+  parent_elf_id TEXT REFERENCES elfs(id),
   tools_used TEXT DEFAULT '[]'           -- JSON array of tool names used
 );
 
@@ -373,7 +373,7 @@ CREATE TABLE mcp_servers (
 CREATE TABLE events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   session_id TEXT NOT NULL,
-  minion_id TEXT,
+  elf_id TEXT,
   event_type TEXT NOT NULL,
   payload TEXT NOT NULL,
   funny_status TEXT,
@@ -388,7 +388,7 @@ CREATE VIRTUAL TABLE memory_fts USING fts5(content, category, tags);
 
 ```
 ┌─────────────────────────────────────────┐
-│          MINIONS Project Layer           │
+│          ELVES Project Layer           │
 │  (memory, plans, skills, task history)   │
 │  ════════════════════════════════════    │
 │  This is the SOURCE OF TRUTH.            │
@@ -408,7 +408,7 @@ CREATE VIRTUAL TABLE memory_fts USING fts5(content, category, tags);
   spawns via SDK         spawns via CLI
 ```
 
-**When deploying minions:**
+**When deploying elfs:**
 1. Read project memory (context + decisions + learnings + relevant past sessions)
 2. Read relevant skills
 3. Build a context payload (runtime-agnostic markdown)
@@ -418,7 +418,7 @@ CREATE VIRTUAL TABLE memory_fts USING fts5(content, category, tags);
 5. Events flow back through Unified Protocol → frontend renders them identically
 
 **When switching runtimes mid-project:**
-- Memory stays untouched (it's in MINIONS' SQLite + markdown)
+- Memory stays untouched (it's in ELVES' SQLite + markdown)
 - Previous session artifacts stay in `sessions/{id}/`
 - New sessions just use the new runtime adapter
 - Zero migration needed
@@ -431,12 +431,12 @@ CREATE VIRTUAL TABLE memory_fts USING fts5(content, category, tags);
 
 ```
 ┌─────┬───────────────────────────────────────────────┐
-│     │  🍌 Task Bar (Cmd+K)                    ⚙️ 🔔 │
+│     │  🍪 Task Bar (Cmd+K)                    ⚙️ 🔔 │
 │  P  │━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│
 │  R  │                                               │
 │  O  │  ┌─────────────────────────────────────────┐  │
 │  J  │  │                                         │  │
-│  E  │  │        MINION THEATER                   │  │
+│  E  │  │        ELF WORKSHOP                   │  │
 │  C  │  │    (main content area — changes         │  │
 │  T  │  │     based on current view)              │  │
 │     │  │                                         │  │
@@ -446,7 +446,7 @@ CREATE VIRTUAL TABLE memory_fts USING fts5(content, category, tags);
 │  E  │                                               │
 │  B  │  ┌─────────────────────────────────────────┐  │
 │  A  │  │  ACTIVITY FEED (collapsible)            │  │
-│  R  │  │  Live stream of minion events + chat    │  │
+│  R  │  │  Live stream of elf events + chat    │  │
 │     │  └─────────────────────────────────────────┘  │
 └─────┴───────────────────────────────────────────────┘
 ```
@@ -454,19 +454,19 @@ CREATE VIRTUAL TABLE memory_fts USING fts5(content, category, tags);
 ### 7.2 Project Sidebar (Left)
 
 - List of projects with last activity time
-- Each project shows: name, minion count badge, runtime icon (Claude/Codex)
+- Each project shows: name, elf count badge, runtime icon (Claude/Codex)
 - "New Project" button (folder picker + name)
 - Bottom section: Global Skills, Global Memory, Settings
-- Cute: idle projects show tiny sleeping minion icons
+- Cute: idle projects show tiny sleeping elf icons
 
-### 7.3 Minion Theater (Center — Active Session View)
+### 7.3 Elf Workshop (Center — Active Session View)
 
-This is the star of the show. When minions are deployed:
+This is the star of the show. When elfs are deployed:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │  TASK: "Research top 5 Notion competitors & write report"│
-│  Status: 3 minions deployed · 2m 34s elapsed · ~$0.42   │
+│  Status: 3 elves deployed · 2m 34s elapsed · ~$0.42   │
 │━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│
 │                                                          │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐        │
@@ -480,7 +480,7 @@ This is the star of the show. When minions are deployed:
 │  │ "Assigning │  │ "Speed-    │  │ "Waiting   │        │
 │  │  tasks to  │  │  reading   │  │  for data  │        │
 │  │  the crew" │  │  Coda's    │  │  from      │        │
-│  │            │  │  website"  │  │  Stuart... │        │
+│  │            │  │  website"  │  │  Jingle... │        │
 │  │ ████░░ 40% │  │ ██████ 60%│  │ ░░░░░░ 0%  │        │
 │  └────────────┘  └────────────┘  └────────────┘        │
 │                                                          │
@@ -491,26 +491,26 @@ This is the star of the show. When minions are deployed:
 │  └─────────────────────────────┘                        │
 │                                                          │
 │  ┌──────── THINKING PANEL (expandable) ────────┐        │
-│  │ Kevin: "I need Stuart to research Coda,     │        │
-│  │ Notion, Craft, Slite, and Obsidian. Bob can │        │
+│  │ Tinker: "I need Jingle to research Coda,     │        │
+│  │ Notion, Craft, Slite, and Obsidian. Sprocket can │        │
 │  │ start the report template while we wait..."  │        │
 │  └──────────────────────────────────────────────┘        │
 └──────────────────────────────────────────────────────────┘
 ```
 
-**Each Minion Card shows:**
+**Each Elf Card shows:**
 - Animated avatar (idle, working, thinking, celebrating, error poses)
 - Name + role badge
 - Funny status text (auto-rotating)
 - Progress bar (estimated)
-- Expand arrow → shows full live output stream for that minion
-- Click → focuses on this minion, shows their detailed terminal-like output
+- Expand arrow → shows full live output stream for that elf
+- Click → focuses on this elf, shows their detailed terminal-like output
 
 **Task Graph:**
 - Visual DAG of task dependencies
 - Nodes colored by status: gray (pending), yellow (active), green (done), red (error)
-- Animated edges showing data flow between minions
-- Click a node → highlights the responsible minion
+- Animated edges showing data flow between elfs
+- Click a node → highlights the responsible elf
 
 **Thinking Panel:**
 - Shows extended thinking / reasoning from the lead agent
@@ -522,27 +522,27 @@ This is the star of the show. When minions are deployed:
 Real-time scrolling feed of everything happening:
 
 ```
-[12:03:42] 🟡 Kevin spawned and assigned as Lead
-[12:03:43] 🟡 Stuart spawned — role: Researcher
-[12:03:43] 🟡 Bob spawned — role: Report Writer
-[12:03:45] 📋 Kevin created task list (3 tasks)
-[12:03:47] 🔍 Stuart: searching web for "Notion alternatives 2026"
-[12:03:52] 📢 Stuart → Kevin: "Found 7 competitors, narrowing to top 5"
-[12:04:01] ✍️ Bob: creating report template in /output/report.md
-[12:04:15] 🔍 Stuart: fetching pricing pages for Coda, Craft, Slite
-[12:04:30] 📢 Stuart → Bob: "Here's the competitor data, ready for you"
-[12:04:31] ⌨️ Bob: writing comparison section
-[12:05:10] ✅ Stuart completed research task
-[12:05:11] 😴 Stuart fell asleep at his desk
-[12:06:45] ✅ Bob completed report
-[12:06:46] 📋 Kevin reviewing final output...
-[12:07:01] 🎉 ALL DONE! Kevin: "The minions have spoken."
+[12:03:42] 🟡 Tinker spawned and assigned as Lead
+[12:03:43] 🟡 Jingle spawned — role: Researcher
+[12:03:43] 🟡 Sprocket spawned — role: Report Writer
+[12:03:45] 📋 Tinker created task list (3 tasks)
+[12:03:47] 🔍 Jingle: searching web for "Notion alternatives 2026"
+[12:03:52] 📢 Jingle → Tinker: "Found 7 competitors, narrowing to top 5"
+[12:04:01] ✍️ Sprocket: creating report template in /output/report.md
+[12:04:15] 🔍 Jingle: fetching pricing pages for Coda, Craft, Slite
+[12:04:30] 📢 Jingle → Sprocket: "Here's the competitor data, ready for you"
+[12:04:31] ⌨️ Sprocket: writing comparison section
+[12:05:10] ✅ Jingle completed research task
+[12:05:11] 😴 Jingle fell asleep at his desk
+[12:06:45] ✅ Sprocket completed report
+[12:06:46] 📋 Tinker reviewing final output...
+[12:07:01] 🎉 ALL DONE! Tinker: "The elves have spoken."
 ```
 
-- Color-coded by minion
+- Color-coded by elf
 - Clickable events (tool calls expand to show details)
 - Filter buttons: All | Chat | Tools | Errors
-- Inter-minion messages shown as speech bubbles
+- Inter-elf messages shown as speech bubbles
 
 ### 7.5 Visual Editors
 
@@ -554,7 +554,7 @@ Real-time scrolling feed of everything happening:
 - Import/export skills as `.md` files
 
 #### Plan Editor
-- When MINIONS proposes a plan before deploying:
+- When ELVES proposes a plan before deploying:
   - Visual card-based editor
   - Drag to reorder tasks
   - Click to edit agent role, focus area, runtime
@@ -567,7 +567,7 @@ Real-time scrolling feed of everything happening:
 - Sections: Project Context, Coding Standards, Architecture Notes, Custom Instructions
 - Toggle sections on/off
 - Preview what gets injected into agent context
-- Diff view: what MINIONS auto-adds vs what user wrote
+- Diff view: what ELVES auto-adds vs what user wrote
 
 #### MCP Server Manager
 - Cards for each configured MCP server
@@ -607,14 +607,14 @@ Real-time scrolling feed of everything happening:
 │  │ [Edit] [Pin] [Delete]                             │   │
 │  └──────────────────────────────────────────────────┘   │
 │                                                          │
-│  Timeline view: ─●────●──●───●────●──●─── (sessions)   │
+│  Mapleeline view: ─●────●──●───●────●──●─── (sessions)   │
 │                                                          │
-│  [+ Add Memory Manually]  [🍌 Let Minions Learn]        │
+│  [+ Add Memory Manually]  [🍪 Let Elves Learn]        │
 └──────────────────────────────────────────────────────────┘
 ```
 
 **Memory is built automatically:**
-- After each session, MINIONS summarizes and extracts:
+- After each session, ELVES summarizes and extracts:
   - New context discovered about the project
   - Decisions made (and why)
   - Lessons learned (what worked, what didn't)
@@ -625,7 +625,7 @@ Real-time scrolling feed of everything happening:
 - Full-text search across all memory
 
 **Memory injection into agents:**
-- Before each task, MINIONS queries relevant memory
+- Before each task, ELVES queries relevant memory
 - Builds a context section injected into the agent's prompt
 - Includes: top N most relevant memories by score + recency + category
 
@@ -645,11 +645,11 @@ Real-time scrolling feed of everything happening:
 │  │ Default model: [GPT-5.2-Codex ▾]               │    │
 │  └─────────────────────────────────────────────────┘    │
 │                                                          │
-│  MINION PERSONALITY                                      │
+│  ELF PERSONALITY                                      │
 │  [✓] Funny status messages                               │
 │  [✓] Sound effects              Volume: [███░░] 60%     │
 │  [✓] Avatar animations                                   │
-│  [ ] Minion gibberish ambient                            │
+│  [ ] Elf gibberish ambient                            │
 │                                                          │
 │  MEMORY                                                  │
 │  Auto-learn from sessions:  [✓ On]                       │
@@ -658,7 +658,7 @@ Real-time scrolling feed of everything happening:
 │  Max context injection:     [20 memories]                │
 │                                                          │
 │  TEAM DEFAULTS                                           │
-│  Max minions per task:      [6]                          │
+│  Max elves per task:      [6]                          │
 │  Auto-deploy for simple:    [✓ Skip plan preview]        │
 │  Default runtime:           [Claude Code ▾]              │
 │                                                          │
@@ -676,10 +676,10 @@ Here's the complete lifecycle when a user types a task:
 ```
 Step 1: USER INPUT
    User types: "Add authentication to my Express app using Clerk"
-   Hits Enter or clicks 🍌 DEPLOY THE MINIONS
+   Hits Enter or clicks 🍪 SUMMON THE ELVES
 
 Step 2: CONTEXT GATHERING (50ms)
-   MINIONS reads:
+   ELVES reads:
    - Project memory (context, decisions, learnings)
    - Project skills
    - Recent session summaries
@@ -694,34 +694,34 @@ Step 3: TASK ANALYSIS (1-3 seconds)
    → Estimated time: ~4 minutes
 
 Step 4: PLAN PREVIEW
-   Shows plan card with 3 minion roles
+   Shows plan card with 3 elf roles
    User can edit or just hit Deploy
    If "auto-deploy for simple tasks" is on AND task is simple → skip to Step 5
 
-Step 5: MINION DEPLOYMENT
-   - Assigns names + avatars: Kevin (Lead), Stuart (Implementer), Bob (Tester)
+Step 5: ELF DEPLOYMENT
+   - Assigns names + avatars: Tinker (Lead), Jingle (Implementer), Sprocket (Tester)
    - Creates session in SQLite
    - Builds context payload (project memory + skills + CLAUDE.md)
    - For Claude Code: writes CLAUDE.md, calls Agent SDK query() with:
      - Team prompt describing roles
      - CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
      - Streaming enabled
-   - Minions appear in Theater with spawn animations
+   - Elves appear in Theater with spawn animations
 
 Step 6: LIVE EXECUTION
    - Events stream in via Unified Protocol
    - Each event updates:
-     - Minion card (status, progress, funny message)
+     - Elf card (status, progress, funny message)
      - Activity feed (scrolling log)
      - Task graph (node status changes)
      - Thinking panel (lead's reasoning)
    - File changes detected via watcher → shown in feed
-   - Inter-minion messages shown as chat bubbles
+   - Inter-elf messages shown as chat bubbles
    - Permission requests bubble up as modal dialogs
 
 Step 7: COMPLETION
    - All tasks marked done
-   - Celebration animation (minions doing a group dance)
+   - Celebration animation (elves doing a group dance)
    - Summary auto-generated
    - Memory extraction:
      - New context learned about the project
@@ -734,7 +734,7 @@ Step 8: POST-SESSION
    - Diff view of all changes
    - Can "replay" the session (step through events)
    - Memory entries are reviewable/editable
-   - Minions go to sleep 😴
+   - Elves go to sleep 😴
 ```
 
 ---
@@ -765,21 +765,21 @@ Step 8: POST-SESSION
 1.4 Rust backend: Process manager
     - Spawn Claude Code via Agent SDK (TS subprocess)
     - Parse JSONL streaming output
-    - Normalize to MinionEvent
+    - Normalize to ElfEvent
     - Emit events to frontend via Tauri event system
 
 1.5 Frontend: Basic shell
     - Left sidebar (project list)
-    - Center area (empty state with banana)
+    - Center area (empty state with cookie)
     - Task bar (Cmd+K input)
     - Settings panel stub
 ```
 
-### Phase 2: Single Minion Mode (Week 2-3)
-**Goal: Type a task, one minion works on it, see everything live**
+### Phase 2: Single Elf Mode (Week 2-3)
+**Goal: Type a task, one elf works on it, see everything live**
 
 ```
-2.1 Minion card component
+2.1 Elf card component
     - Avatar (static initially, animated later)
     - Name, role, status
     - Funny status message rotation
@@ -788,7 +788,7 @@ Step 8: POST-SESSION
 
 2.2 Activity feed component
     - Scrolling event list
-    - Color-coded by minion
+    - Color-coded by elf
     - Clickable tool calls (expand details)
     - Auto-scroll with "pause on hover"
 
@@ -809,8 +809,8 @@ Step 8: POST-SESSION
     - Map to Claude Code's allowedTools
 ```
 
-### Phase 3: Multi-Minion Teams (Week 3-4)
-**Goal: Auto-deploy agent teams, full Minion Theater**
+### Phase 3: Multi-Elf Teams (Week 3-4)
+**Goal: Auto-deploy agent teams, full Elf Workshop**
 
 ```
 3.1 Task analyzer
@@ -829,18 +829,18 @@ Step 8: POST-SESSION
     - Claude Code: use AGENT_TEAMS env var + team prompts
     - Spawn lead agent with team instructions
     - Track teammate spawning events
-    - Map each teammate to a Minion card
+    - Map each teammate to a Elf card
 
-3.4 Minion Theater (full version)
-    - Grid of minion cards (responsive, 1-6 agents)
+3.4 Elf Workshop (full version)
+    - Grid of elf cards (responsive, 1-6 agents)
     - Task dependency graph (D3.js or React Flow)
-    - Inter-minion chat bubbles
+    - Inter-elf chat bubbles
     - Thinking panel for lead agent
     - Global progress bar
 
 3.5 Codex adapter (basic)
     - Spawn codex CLI subprocess
-    - Parse output to MinionEvent format
+    - Parse output to ElfEvent format
     - Single agent only first
     - Verify interop (same project, different runtime)
 ```
@@ -882,7 +882,7 @@ Step 8: POST-SESSION
 ```
 5.1 Skills editor
     - Monaco editor integration
-    - Markdown preview
+    - Cricketdown preview
     - Skill list (global + project)
     - Create / edit / delete / import / export
     - "Test skill" quick action
@@ -897,10 +897,10 @@ Step 8: POST-SESSION
     - Section-based editing
     - Toggle sections on/off
     - Preview injected context
-    - Auto-sync with MINIONS memory
+    - Auto-sync with ELVES memory
 
 5.4 Avatar animations
-    - Lottie or Rive animated minion characters
+    - Lottie or Rive animated elf characters
     - States: idle, thinking, working, celebrating, error, sleeping
     - Each avatar has unique accessories
     - Smooth transitions between states
@@ -914,8 +914,8 @@ Step 8: POST-SESSION
 5.6 Polish & empty states
     - All funny copy (loading, empty, error states)
     - Keyboard shortcuts (Cmd+K task bar, Cmd+1-9 projects, etc.)
-    - Dark/light theme with yellow minion accent
-    - App icon: a yellow blob with sunglasses
+    - Dark/light theme with yellow elf accent
+    - App icon: a elf with sunglasses
 ```
 
 ### Phase 6: Codex Full Support & Interop (Week 6-7)
@@ -924,7 +924,7 @@ Step 8: POST-SESSION
 ```
 6.1 Codex multi-agent
     - Parse Codex team/parallel output
-    - Map to MinionEvent stream
+    - Map to ElfEvent stream
     - Same Theater UI
 
 6.2 Runtime switching
@@ -944,7 +944,7 @@ Step 8: POST-SESSION
     - Useful for comparing runtimes or approaches
 ```
 
-### Phase 7: Distribution & Sharing (Week 7-8)
+### Phase 7: Distribution & Virality (Week 7-8)
 **Goal: Ship it, make it shareable**
 
 ```
@@ -958,12 +958,12 @@ Step 8: POST-SESSION
     - Shareable HTML replay (static, no app needed)
     - "Share to X" with auto-generated screenshot
 
-7.3 Landing page (minions.dev)
-    - Hero: animated minions doing a task
+7.3 Landing page (elves.dev)
+    - Hero: animated elves doing a task
     - Demo video
     - Download button
     - GitHub star button
-    - "Made with 🍌" footer
+    - "Made with 🍪" footer
 
 7.4 Open source prep
     - Clean up repo
@@ -977,7 +977,7 @@ Step 8: POST-SESSION
 ## 10. File & Folder Structure for the Codebase
 
 ```
-minions/
+elves/
 ├── src-tauri/                    # Rust backend
 │   ├── Cargo.toml
 │   ├── tauri.conf.json
@@ -997,7 +997,7 @@ minions/
 │   │   │   ├── runtime.rs        # Runtime detection (claude/codex in PATH)
 │   │   │   ├── claude_adapter.rs # Claude Code Agent SDK bridge
 │   │   │   ├── codex_adapter.rs  # Codex CLI subprocess bridge
-│   │   │   ├── protocol.rs       # MinionEvent unified type
+│   │   │   ├── protocol.rs       # ElfEvent unified type
 │   │   │   └── process.rs        # Process spawn/monitor/kill
 │   │   ├── commands/
 │   │   │   ├── mod.rs
@@ -1025,12 +1025,12 @@ minions/
 │   │   │   ├── TopBar.tsx
 │   │   │   └── Shell.tsx
 │   │   ├── theater/
-│   │   │   ├── MinionTheater.tsx # Main agent display grid
-│   │   │   ├── MinionCard.tsx    # Individual minion card
-│   │   │   ├── MinionAvatar.tsx  # Animated avatar component
+│   │   │   ├── ElfWorkshop.tsx # Main agent display grid
+│   │   │   ├── ElfCard.tsx    # Individual elf card
+│   │   │   ├── ElfAvatar.tsx  # Animated avatar component
 │   │   │   ├── TaskGraph.tsx     # Dependency graph
 │   │   │   ├── ThinkingPanel.tsx # Lead agent thinking view
-│   │   │   └── ChatBubble.tsx    # Inter-minion messages
+│   │   │   └── ChatBubble.tsx    # Inter-elf messages
 │   │   ├── feed/
 │   │   │   ├── ActivityFeed.tsx  # Scrolling event log
 │   │   │   ├── EventRow.tsx      # Single event display
@@ -1043,7 +1043,7 @@ minions/
 │   │   ├── memory/
 │   │   │   ├── MemoryExplorer.tsx
 │   │   │   ├── MemoryCard.tsx
-│   │   │   ├── MemoryTimeline.tsx
+│   │   │   ├── MemoryMapleeline.tsx
 │   │   │   └── MemorySearch.tsx
 │   │   ├── project/
 │   │   │   ├── ProjectList.tsx
@@ -1059,26 +1059,26 @@ minions/
 │   │       ├── Button.tsx
 │   │       ├── Modal.tsx
 │   │       ├── EmptyState.tsx    # With funny messages
-│   │       ├── DeployButton.tsx  # The 🍌 DEPLOY THE MINIONS button
+│   │       ├── DeployButton.tsx  # The 🍪 SUMMON THE ELVES button
 │   │       └── FunnyStatus.tsx   # Status message generator
 │   ├── lib/
 │   │   ├── tauri.ts              # Tauri IPC wrappers
 │   │   ├── events.ts             # Event stream subscription
-│   │   ├── minion-names.ts       # Name + quirk + status message pools
+│   │   ├── elf-names.ts       # Name + quirk + status message pools
 │   │   ├── avatars.ts            # Avatar asset mapping
 │   │   └── sounds.ts             # Sound effect player
 │   ├── hooks/
-│   │   ├── useMinions.ts         # Active minion state
+│   │   ├── useElves.ts         # Active elf state
 │   │   ├── useEvents.ts          # Event stream subscription
 │   │   ├── useMemory.ts          # Memory queries
 │   │   └── useProject.ts         # Active project
 │   ├── types/
-│   │   ├── minion.ts             # MinionEvent, Minion, etc.
+│   │   ├── elf.ts             # ElfEvent, Elf, etc.
 │   │   ├── project.ts
 │   │   ├── memory.ts
 │   │   └── session.ts
 │   └── assets/
-│       ├── avatars/              # Minion avatar images/animations
+│       ├── avatars/              # Elf avatar images/animations
 │       ├── sounds/               # Sound effect files
 │       └── icons/                # UI icons
 │
@@ -1086,7 +1086,7 @@ minions/
 ├── tsconfig.json
 ├── tailwind.config.ts
 ├── vite.config.ts
-└── README.md                     # With lots of GIFs 🍌
+└── README.md                     # With lots of GIFs 🍪
 ```
 
 ---
@@ -1099,7 +1099,7 @@ minions/
 | DB | SQLite (not files-only) | FTS search, relational queries, single-file portability |
 | Agent SDK | TypeScript SDK (not CLI wrapping) | Structured streaming, tool callbacks, subagent control |
 | State | Zustand (not Redux) | Minimal boilerplate, subscribe to slices, good with streaming |
-| Animations | Framer Motion + Lottie/Rive | Smooth, GPU-accelerated, minion personality needs animation |
+| Animations | Framer Motion + Lottie/Rive | Smooth, GPU-accelerated, elf personality needs animation |
 | Memory format | SQLite + markdown files | SQLite for queries/search, markdown for human-readability + agent injection |
 | Inter-runtime | Unified Protocol Adapter | Never expose runtime details to frontend, clean abstraction |
 | Auto-team | Fast classifier LLM call | Sub-second decision on solo vs team, no user friction |
@@ -1107,30 +1107,49 @@ minions/
 
 ---
 
-## 12. Name & Branding Notes
+## 12. What Doesn't Exist Today (Our Moat)
 
-- **Domain:** minions.dev (check availability)
-- **GitHub:** github.com/minions-dev/minions (or similar)
-- **App icon:** Yellow blob character with sunglasses, holding a wrench
-- **Color palette:** Yellow (#FFD93D) primary, dark navy (#1A1A2E) background, white text
-- **Font:** Inter (UI) + JetBrains Mono (code/terminal)
-- **Legal note:** "Minions" is trademarked by Universal/Illumination for the movie franchise. For the actual product, consider variations: **MinionHQ**, **MyMinions**, **Minion.dev**, **DeployMinions**, or **Bananions** (portmanteau of banana + minions). The playful chaos brand works with any of these.
+| Feature | 1Code | Conductor | opcode | OpenClaw | Codex App | **ELVES** |
+|---|---|---|---|---|---|---|
+| Visual multi-agent theater | ❌ | ❌ | ❌ | ❌ | Partial | ✅ |
+| Auto-team (no ceremony) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Claude Code + Codex together | ✅ | Partial | ❌ | ❌ | ❌ | ✅ |
+| Persistent cross-session memory | ❌ | ❌ | ❌ | Partial | ❌ | ✅ |
+| Interoperable projects | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| General purpose (not just coding) | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ |
+| Funny/viral personality | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Visual skill/plan/memory editors | ❌ | ❌ | ❌ | ❌ | Partial | ✅ |
+| Task dependency graph | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Session replay | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ |
+| Shareable GIF/replay export | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ---
 
-## 13. Success Metrics for v1.0
+## 13. Name & Branding Notes
+
+- **Domain:** elves.dev (check availability)
+- **GitHub:** github.com/elves-dev/elves (or similar)
+- **App icon:** Yellow blob character with sunglasses, holding a wrench
+- **Color palette:** Yellow (#FFD93D) primary, dark navy (#1A1A2E) background, white text
+- **Font:** Inter (UI) + JetBrains Mono (code/terminal)
+- **Legal note:** "Elves" is a generic English word from mythology/folklore — no trademark concerns.
+
+---
+
+## 14. Success Metrics for v1.0
 
 - [ ] macOS .dmg ships and installs cleanly
 - [ ] Detects Claude Code + Codex on first launch
-- [ ] Single-minion task works end-to-end with live streaming
-- [ ] Multi-minion team (3+ agents) works with task graph
+- [ ] Single-elf task works end-to-end with live streaming
+- [ ] Multi-elf team (3+ agents) works with task graph
 - [ ] Memory persists across sessions and improves context
 - [ ] Skills and CLAUDE.md are visually editable
-- [ ] At least 5 funny status messages per minion state
+- [ ] At least 5 funny status messages per elf state
 - [ ] Session replay works
-- [ ] README has at least 3 GIFs showing minions in action
+- [ ] README has at least 3 GIFs showing elves in action
 - [ ] Someone screenshots the app and posts it on X without being asked
 
 ---
 
-*Built with 🍌 by the MINIONS contributors.*
+*Built with 🍪 by Mani & Raghavan*
+*The elfs approve this plan.*

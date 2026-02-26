@@ -5,9 +5,9 @@ import { describe, it, expect, vi } from "vitest";
 import { DeployButton } from "./DeployButton";
 
 describe("DeployButton", () => {
-  it("renders the deploy text", () => {
+  it("renders the summon text", () => {
     render(<DeployButton />);
-    expect(screen.getByRole("button")).toHaveTextContent("DEPLOY THE MINIONS");
+    expect(screen.getByRole("button")).toHaveTextContent("SUMMON THE ELVES");
   });
 
   it("calls onClick when clicked", () => {

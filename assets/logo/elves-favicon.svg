@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Minimal elf face for favicon -->
+  
+  <!-- Head -->
+  <circle cx="64" cy="68" r="44" fill="#FFD93D" stroke="#000" stroke-width="6"/>
+  
+  <!-- Left pointy ear -->
+  <path d="M24 56 L4 28 L28 64" fill="#FFD93D" stroke="#000" stroke-width="5" stroke-linejoin="round"/>
+  
+  <!-- Right pointy ear -->
+  <path d="M104 56 L124 28 L100 64" fill="#FFD93D" stroke="#000" stroke-width="5" stroke-linejoin="round"/>
+  
+  <!-- Hat -->
+  <path d="M32 52 Q64 4 96 52" fill="#FF6B6B" stroke="#000" stroke-width="5" stroke-linejoin="round"/>
+  <rect x="28" y="46" width="72" height="12" rx="6" fill="#FF6B6B" stroke="#000" stroke-width="4"/>
+  <!-- Bobble -->
+  <circle cx="72" cy="20" r="7" fill="#FFF" stroke="#000" stroke-width="3"/>
+  
+  <!-- Eyes -->
+  <ellipse cx="50" cy="70" rx="9" ry="10" fill="#FFF" stroke="#000" stroke-width="4"/>
+  <ellipse cx="78" cy="70" rx="9" ry="10" fill="#FFF" stroke="#000" stroke-width="4"/>
+  <circle cx="52" cy="72" r="5" fill="#000"/>
+  <circle cx="80" cy="72" r="5" fill="#000"/>
+  <circle cx="54" cy="70" r="2" fill="#FFF"/>
+  <circle cx="82" cy="70" r="2" fill="#FFF"/>
+  
+  <!-- Smile -->
+  <path d="M48 90 Q64 106 80 90" fill="none" stroke="#000" stroke-width="4" stroke-linecap="round"/>
+</svg>

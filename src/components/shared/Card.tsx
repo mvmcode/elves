@@ -8,7 +8,7 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
 
 /**
  * Neo-brutalist card container with 3px border and 6px hard shadow.
- * Use highlight=true for a yellow-accented card (e.g., active minion cards).
+ * Use highlight=true for a gold-accented card (e.g., active elf cards).
  */
 export function Card({
   highlight = false,
@@ -20,7 +20,7 @@ export function Card({
     <div
       className={[
         "border-[3px] border-border p-5 shadow-brutal-lg",
-        highlight ? "bg-minion-yellow-light" : "bg-white",
+        highlight ? "bg-elf-gold-light" : "bg-white",
         className,
       ].join(" ")}
       {...props}

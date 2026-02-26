@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 280" width="1000" height="280">
+  
+  <!-- Mini elf character -->
+  <g transform="translate(20, 24) scale(0.42)">
+    <!-- Body -->
+    <rect x="160" y="160" width="192" height="220" rx="48" fill="#FFD93D" stroke="#000" stroke-width="14"/>
+    
+    <!-- Head -->
+    <circle cx="256" cy="140" r="80" fill="#FFD93D" stroke="#000" stroke-width="14"/>
+    
+    <!-- Left ear -->
+    <path d="M176 120 L120 80 L168 140" fill="#FFD93D" stroke="#000" stroke-width="12" stroke-linejoin="round"/>
+    <!-- Right ear -->
+    <path d="M336 120 L392 80 L344 140" fill="#FFD93D" stroke="#000" stroke-width="12" stroke-linejoin="round"/>
+    
+    <!-- Hat -->
+    <path d="M192 108 Q256 20 320 108" fill="#FF6B6B" stroke="#000" stroke-width="12" stroke-linejoin="round"/>
+    <rect x="182" y="100" width="148" height="20" rx="10" fill="#FF6B6B" stroke="#000" stroke-width="10"/>
+    <circle cx="280" cy="52" r="14" fill="#FFF" stroke="#000" stroke-width="8"/>
+    
+    <!-- Eyes -->
+    <ellipse cx="228" cy="148" rx="18" ry="20" fill="#FFF" stroke="#000" stroke-width="7"/>
+    <ellipse cx="284" cy="148" rx="18" ry="20" fill="#FFF" stroke="#000" stroke-width="7"/>
+    <circle cx="232" cy="150" r="10" fill="#000"/>
+    <circle cx="288" cy="150" r="10" fill="#000"/>
+    <circle cx="236" cy="146" r="4" fill="#FFF"/>
+    <circle cx="292" cy="146" r="4" fill="#FFF"/>
+    
+    <!-- Smile -->
+    <path d="M224 186 Q256 218 288 186" fill="none" stroke="#000" stroke-width="7" stroke-linecap="round"/>
+    
+    <!-- Apron -->
+    <path d="M184 240 L184 360 Q184 380 204 380 L308 380 Q328 380 328 360 L328 240 Z" fill="#4D96FF" stroke="#000" stroke-width="10"/>
+    
+    <!-- Boots -->
+    <path d="M200 400 L200 430 Q200 442 212 442 L252 442 Q260 442 260 434 L260 400" fill="#8B4513" stroke="#000" stroke-width="8"/>
+    <path d="M264 400 L264 430 Q264 442 276 442 L316 442 Q324 442 324 434 L324 400" fill="#8B4513" stroke="#000" stroke-width="8"/>
+  </g>
+  
+  <!-- ELVES wordmark - hand-crafted geometric letters -->
+  <!-- E -->
+  <g transform="translate(240, 50)">
+    <rect x="0" y="0" width="28" height="160" fill="#000"/>
+    <rect x="0" y="0" width="96" height="28" fill="#000"/>
+    <rect x="0" y="66" width="80" height="28" fill="#000"/>
+    <rect x="0" y="132" width="96" height="28" fill="#000"/>
+  </g>
+  
+  <!-- L -->
+  <g transform="translate(370, 50)">
+    <rect x="0" y="0" width="28" height="160" fill="#000"/>
+    <rect x="0" y="132" width="96" height="28" fill="#000"/>
+  </g>
+  
+  <!-- V -->
+  <g transform="translate(490, 50)">
+    <polygon points="0,0 28,0 64,132 100,0 128,0 72,160 56,160" fill="#000"/>
+  </g>
+  
+  <!-- E -->
+  <g transform="translate(640, 50)">
+    <rect x="0" y="0" width="28" height="160" fill="#000"/>
+    <rect x="0" y="0" width="96" height="28" fill="#000"/>
+    <rect x="0" y="66" width="80" height="28" fill="#000"/>
+    <rect x="0" y="132" width="96" height="28" fill="#000"/>
+  </g>
+  
+  <!-- S -->
+  <g transform="translate(770, 50)">
+    <path d="M96 28 Q96 0 48 0 Q0 0 0 36 Q0 72 48 80 Q96 88 96 124 Q96 160 48 160 Q0 160 0 132" fill="none" stroke="#000" stroke-width="28" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Tagline -->
+  <text x="240" y="256" font-family="'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="700" fill="#666" letter-spacing="4">SUMMON YOUR AI WORKSHOP</text>
+  
+  <!-- Cookie accent -->
+  <text x="940" y="230" font-size="40">🍪</text>
+</svg>

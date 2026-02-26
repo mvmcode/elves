@@ -1,11 +1,11 @@
-/* ActivityFeed — real-time scrolling feed of all MinionEvents in the active session. */
+/* ActivityFeed — real-time scrolling feed of all ElfEvents in the active session. */
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import type { MinionEvent, MinionEventType } from "@/types/minion";
-import { getColor } from "@/lib/minion-names";
+import type { ElfEvent, ElfEventType } from "@/types/elf";
+import { getColor } from "@/lib/elf-names";
 
 interface ActivityFeedProps {
-  readonly events: readonly MinionEvent[];
+  readonly events: readonly ElfEvent[];
   readonly maxHeight?: string;
 }
 
@@ -13,7 +13,7 @@ interface ActivityFeedProps {
 type FilterKey = "all" | "tools" | "chat" | "errors";
 
 /** Maps filter keys to the event types they include. */
-const FILTER_EVENT_TYPES: Record<FilterKey, readonly MinionEventType[] | null> = {
+const FILTER_EVENT_TYPES: Record<FilterKey, readonly ElfEventType[] | null> = {
   all: null,
   tools: ["tool_call", "tool_result"],
   chat: ["chat", "output"],
@@ -27,7 +27,7 @@ function formatTimestamp(timestamp: number): string {
 }
 
 /** Returns a human-readable description for an event based on its type. */
-function describeEvent(event: MinionEvent): string {
+function describeEvent(event: ElfEvent): string {
   const payload = event.payload as Record<string, unknown>;
   switch (event.type) {
     case "spawn":
@@ -56,7 +56,7 @@ function describeEvent(event: MinionEvent): string {
 }
 
 /** Returns the emoji prefix for an event type. */
-function eventEmoji(type: MinionEventType): string {
+function eventEmoji(type: ElfEventType): string {
   switch (type) {
     case "spawn": return "🚀";
     case "thinking": return "💭";
@@ -73,9 +73,9 @@ function eventEmoji(type: MinionEventType): string {
 }
 
 /**
- * Real-time scrolling feed of MinionEvents. Features filter buttons for
+ * Real-time scrolling feed of ElfEvents. Features filter buttons for
  * event types, auto-scrolling that pauses when the user scrolls up,
- * expandable tool_call payloads, and per-minion color coding.
+ * expandable tool_call payloads, and per-elf color coding.
  */
 export function ActivityFeed({
   events,
@@ -154,7 +154,7 @@ export function ActivityFeed({
               "font-body text-xs font-bold uppercase tracking-wider",
               "transition-all duration-100",
               activeFilter === key
-                ? "bg-minion-yellow text-text-light"
+                ? "bg-elf-gold text-text-light"
                 : "bg-gray-700 text-gray-300 hover:bg-gray-600",
             ].join(" ")}
             data-testid={`filter-${key}`}
@@ -174,11 +174,11 @@ export function ActivityFeed({
       >
         {filteredEvents.length === 0 ? (
           <p className="p-4 text-center font-mono text-sm text-gray-500" data-testid="empty-state">
-            {events.length === 0 ? "No events yet. Deploy minions to get started." : "No events match this filter."}
+            {events.length === 0 ? "No events yet. Summon elves to get started." : "No events match this filter."}
           </p>
         ) : (
           filteredEvents.map((event) => {
-            const minionColor = getColor(event.minionName);
+            const elfColor = getColor(event.elfName);
             const isToolCall = event.type === "tool_call";
             const isExpandable = isToolCall;
             const isEventExpanded = expandedEventIds.has(event.id);
@@ -187,7 +187,7 @@ export function ActivityFeed({
               <div key={event.id} data-testid="event-row">
                 <div
                   className="flex items-start gap-2 border-b border-gray-800 px-2 py-1.5"
-                  style={{ borderLeftWidth: "4px", borderLeftColor: minionColor }}
+                  style={{ borderLeftWidth: "4px", borderLeftColor: elfColor }}
                 >
                   {/* Timestamp */}
                   <span className="shrink-0 font-mono text-xs text-gray-500">
@@ -199,8 +199,8 @@ export function ActivityFeed({
 
                   {/* Content */}
                   <span className="flex-1 font-mono text-xs text-gray-300">
-                    <span className="font-bold" style={{ color: minionColor }}>
-                      {event.minionName}
+                    <span className="font-bold" style={{ color: elfColor }}>
+                      {event.elfName}
                     </span>
                     {" "}
                     <span className={event.type === "error" ? "font-bold text-error" : ""}>
@@ -224,7 +224,7 @@ export function ActivityFeed({
                 {isEventExpanded && (
                   <div
                     className="border-b border-gray-800 bg-gray-950 px-6 py-2"
-                    style={{ borderLeftWidth: "4px", borderLeftColor: minionColor }}
+                    style={{ borderLeftWidth: "4px", borderLeftColor: elfColor }}
                     data-testid="event-payload"
                   >
                     <pre className="overflow-x-auto font-mono text-xs text-gray-400">

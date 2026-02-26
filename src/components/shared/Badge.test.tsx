@@ -12,7 +12,7 @@ describe("Badge", () => {
 
   it("applies default variant (yellow) styles", () => {
     render(<Badge data-testid="badge">Status</Badge>);
-    expect(screen.getByTestId("badge").className).toContain("bg-minion-yellow");
+    expect(screen.getByTestId("badge").className).toContain("bg-elf-gold");
   });
 
   it("applies success variant styles", () => {

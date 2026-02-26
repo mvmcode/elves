@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <!-- Neo-brutalist badge -->
+  
+  <!-- Hard drop shadow -->
+  <rect x="38" y="38" width="340" height="340" rx="24" fill="#000"/>
+  
+  <!-- Badge background -->
+  <rect x="24" y="24" width="340" height="340" rx="24" fill="#FFD93D" stroke="#000" stroke-width="8"/>
+  
+  <!-- Inner border -->
+  <rect x="44" y="44" width="300" height="300" rx="16" fill="none" stroke="#000" stroke-width="4"/>
+  
+  <!-- Elf face centered -->
+  <g transform="translate(120, 48) scale(0.8)">
+    <!-- Head -->
+    <circle cx="100" cy="120" r="72" fill="#FFFDF7" stroke="#000" stroke-width="8"/>
+    
+    <!-- Left ear -->
+    <path d="M32 100 L4 60 L38 112" fill="#FFFDF7" stroke="#000" stroke-width="7" stroke-linejoin="round"/>
+    
+    <!-- Right ear -->
+    <path d="M168 100 L196 60 L162 112" fill="#FFFDF7" stroke="#000" stroke-width="7" stroke-linejoin="round"/>
+    
+    <!-- Hat -->
+    <path d="M40 90 Q100 12 160 90" fill="#FF6B6B" stroke="#000" stroke-width="7" stroke-linejoin="round"/>
+    <rect x="36" y="84" width="128" height="16" rx="8" fill="#FF6B6B" stroke="#000" stroke-width="5"/>
+    <circle cx="115" cy="38" r="10" fill="#FFF" stroke="#000" stroke-width="4"/>
+    
+    <!-- Eyes -->
+    <ellipse cx="76" cy="124" rx="14" ry="16" fill="#FFF" stroke="#000" stroke-width="5"/>
+    <ellipse cx="124" cy="124" rx="14" ry="16" fill="#FFF" stroke="#000" stroke-width="5"/>
+    <circle cx="79" cy="126" r="8" fill="#000"/>
+    <circle cx="127" cy="126" r="8" fill="#000"/>
+    <circle cx="82" cy="123" r="3" fill="#FFF"/>
+    <circle cx="130" cy="123" r="3" fill="#FFF"/>
+    
+    <!-- Smile -->
+    <path d="M72 156 Q100 182 128 156" fill="#FFF" stroke="#000" stroke-width="5" stroke-linecap="round"/>
+    
+    <!-- Apron hint -->
+    <rect x="60" y="186" width="80" height="48" rx="8" fill="#4D96FF" stroke="#000" stroke-width="5"/>
+  </g>
+  
+  <!-- Text: ELVES -->
+  <text x="194" y="348" text-anchor="middle" font-family="'Helvetica Neue', 'Arial Black', sans-serif" font-size="56" font-weight="900" fill="#000" letter-spacing="8">ELVES</text>
+</svg>

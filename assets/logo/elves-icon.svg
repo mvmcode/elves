@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- ELF CHARACTER - yellow theme, neo-brutalist, workshop elf -->
+  
+  <!-- Body - rounded rectangle torso -->
+  <rect x="160" y="160" width="192" height="220" rx="48" fill="#FFD93D" stroke="#000" stroke-width="12"/>
+  
+  <!-- Head - circle -->
+  <circle cx="256" cy="140" r="80" fill="#FFD93D" stroke="#000" stroke-width="12"/>
+  
+  <!-- Left pointy ear -->
+  <path d="M176 120 L120 80 L168 140" fill="#FFD93D" stroke="#000" stroke-width="10" stroke-linejoin="round"/>
+  <!-- Inner ear detail -->
+  <path d="M168 118 L140 96 L164 132" fill="#F0C420" stroke="none"/>
+  
+  <!-- Right pointy ear -->
+  <path d="M336 120 L392 80 L344 140" fill="#FFD93D" stroke="#000" stroke-width="10" stroke-linejoin="round"/>
+  <!-- Inner ear detail -->
+  <path d="M344 118 L372 96 L348 132" fill="#F0C420" stroke="none"/>
+  
+  <!-- Workshop hat / beanie -->
+  <path d="M192 108 Q256 20 320 108" fill="#FF6B6B" stroke="#000" stroke-width="10" stroke-linejoin="round"/>
+  <!-- Hat brim -->
+  <rect x="182" y="100" width="148" height="20" rx="10" fill="#FF6B6B" stroke="#000" stroke-width="8"/>
+  <!-- Hat bobble -->
+  <circle cx="280" cy="52" r="14" fill="#FFF" stroke="#000" stroke-width="6"/>
+  
+  <!-- Eyes -->
+  <ellipse cx="228" cy="148" rx="18" ry="20" fill="#FFF" stroke="#000" stroke-width="6"/>
+  <ellipse cx="284" cy="148" rx="18" ry="20" fill="#FFF" stroke="#000" stroke-width="6"/>
+  <!-- Pupils -->
+  <circle cx="232" cy="150" r="10" fill="#000"/>
+  <circle cx="288" cy="150" r="10" fill="#000"/>
+  <!-- Eye shine -->
+  <circle cx="236" cy="146" r="4" fill="#FFF"/>
+  <circle cx="292" cy="146" r="4" fill="#FFF"/>
+  
+  <!-- Eyebrows - expressive -->
+  <path d="M210 126 Q228 116 246 126" fill="none" stroke="#000" stroke-width="6" stroke-linecap="round"/>
+  <path d="M266 126 Q284 116 302 126" fill="none" stroke="#000" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Nose -->
+  <ellipse cx="256" cy="168" rx="6" ry="4" fill="#F0C420" stroke="#000" stroke-width="3"/>
+  
+  <!-- Big smile -->
+  <path d="M224 186 Q256 218 288 186" fill="#FFF" stroke="#000" stroke-width="6" stroke-linecap="round"/>
+  <!-- Smile bottom -->
+  <path d="M232 192 Q256 210 280 192" fill="#FF6B6B" stroke="none"/>
+  
+  <!-- Workshop apron -->
+  <path d="M184 240 L184 360 Q184 380 204 380 L308 380 Q328 380 328 360 L328 240 Z" fill="#4D96FF" stroke="#000" stroke-width="10"/>
+  
+  <!-- Apron strap left -->
+  <line x1="200" y1="200" x2="200" y2="250" stroke="#000" stroke-width="8" stroke-linecap="round"/>
+  <!-- Apron strap right -->
+  <line x1="312" y1="200" x2="312" y2="250" stroke="#000" stroke-width="8" stroke-linecap="round"/>
+  
+  <!-- Apron pocket -->
+  <rect x="224" y="296" width="64" height="48" rx="8" fill="#3A7BDB" stroke="#000" stroke-width="6"/>
+  
+  <!-- Wrench sticking out of pocket -->
+  <g transform="translate(264, 296) rotate(-20)">
+    <rect x="-4" y="-32" width="8" height="30" rx="2" fill="#888" stroke="#000" stroke-width="3"/>
+    <circle cx="0" cy="-36" r="10" fill="none" stroke="#888" stroke-width="6"/>
+    <circle cx="0" cy="-36" r="10" fill="none" stroke="#000" stroke-width="3"/>
+  </g>
+  
+  <!-- Left arm -->
+  <path d="M160 220 Q120 260 108 300" fill="none" stroke="#FFD93D" stroke-width="28" stroke-linecap="round"/>
+  <path d="M160 220 Q120 260 108 300" fill="none" stroke="#000" stroke-width="10" stroke-linecap="round"/>
+  <!-- Left hand -->
+  <circle cx="106" cy="304" r="18" fill="#FFD93D" stroke="#000" stroke-width="8"/>
+  
+  <!-- Right arm - waving -->
+  <path d="M352 220 Q400 200 408 160" fill="none" stroke="#FFD93D" stroke-width="28" stroke-linecap="round"/>
+  <path d="M352 220 Q400 200 408 160" fill="none" stroke="#000" stroke-width="10" stroke-linecap="round"/>
+  <!-- Right hand -->
+  <circle cx="410" cy="156" r="18" fill="#FFD93D" stroke="#000" stroke-width="8"/>
+  
+  <!-- Sparkles around waving hand -->
+  <g fill="#FFD93D" stroke="#000" stroke-width="3">
+    <path d="M440 130 L444 120 L448 130 L458 134 L448 138 L444 148 L440 138 L430 134 Z"/>
+    <path d="M420 110 L422 104 L424 110 L430 112 L424 114 L422 120 L420 114 L414 112 Z"/>
+  </g>
+  
+  <!-- Legs -->
+  <rect x="208" y="376" width="32" height="56" rx="8" fill="#FFD93D" stroke="#000" stroke-width="8"/>
+  <rect x="272" y="376" width="32" height="56" rx="8" fill="#FFD93D" stroke="#000" stroke-width="8"/>
+  
+  <!-- Boots -->
+  <path d="M200 424 L200 444 Q200 456 212 456 L252 456 Q260 456 260 448 L260 424" fill="#8B4513" stroke="#000" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M264 424 L264 444 Q264 456 276 456 L316 456 Q324 456 324 448 L324 424" fill="#8B4513" stroke="#000" stroke-width="8" stroke-linejoin="round"/>
+  <!-- Boot curled toes -->
+  <circle cx="256" cy="450" r="8" fill="#8B4513" stroke="#000" stroke-width="6"/>
+  <circle cx="320" cy="450" r="8" fill="#8B4513" stroke="#000" stroke-width="6"/>
+</svg>

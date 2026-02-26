@@ -1,12 +1,12 @@
 [package]
-name = "minions"
+name = "elves"
 version = "0.1.0"
-description = "Deploy your AI army — visual multi-agent orchestration for Claude Code and Codex"
+description = "Summon your AI army — visual multi-agent orchestration for Claude Code and Codex"
 authors = ["Mani & Raghavan"]
 edition = "2021"
 
 [lib]
-name = "minions_lib"
+name = "elves_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

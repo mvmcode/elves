@@ -1,7 +1,7 @@
-/* Session state — tracks the active task session, its minions, and the unified event stream. */
+/* Session state — tracks the active task session, its elves, and the unified event stream. */
 
 import { create } from "zustand";
-import type { Minion, MinionEvent, MinionStatus, Runtime } from "@/types/minion";
+import type { Elf, ElfEvent, ElfStatus, Runtime } from "@/types/elf";
 
 /** Parameters for starting a new session */
 interface StartSessionParams {
@@ -25,20 +25,20 @@ interface SessionState {
   /** The currently active session (null when idle) */
   readonly activeSession: ActiveSession | null;
   /** Unified event stream for the active session */
-  readonly events: readonly MinionEvent[];
-  /** Minion instances spawned in the active session */
-  readonly minions: readonly Minion[];
+  readonly events: readonly ElfEvent[];
+  /** Elf instances spawned in the active session */
+  readonly elves: readonly Elf[];
 
   /** Start a new task session */
   startSession: (session: StartSessionParams) => void;
   /** End the current session with an optional summary */
   endSession: (summary?: string) => void;
   /** Append an event to the stream */
-  addEvent: (event: MinionEvent) => void;
-  /** Register a newly spawned minion */
-  addMinion: (minion: Minion) => void;
-  /** Update a minion's operational status */
-  updateMinionStatus: (minionId: string, status: MinionStatus) => void;
+  addEvent: (event: ElfEvent) => void;
+  /** Register a newly spawned elf */
+  addElf: (elf: Elf) => void;
+  /** Update an elf's operational status */
+  updateElfStatus: (elfId: string, status: ElfStatus) => void;
   /** Clear all session state (reset to idle) */
   clearSession: () => void;
 }
@@ -46,7 +46,7 @@ interface SessionState {
 export const useSessionStore = create<SessionState>((set) => ({
   activeSession: null,
   events: [],
-  minions: [],
+  elves: [],
 
   startSession: (session: StartSessionParams) =>
     set({
@@ -59,7 +59,7 @@ export const useSessionStore = create<SessionState>((set) => ({
         startedAt: Date.now(),
       },
       events: [],
-      minions: [],
+      elves: [],
     }),
 
   endSession: (summary?: string) =>
@@ -69,20 +69,20 @@ export const useSessionStore = create<SessionState>((set) => ({
         : null,
     })),
 
-  addEvent: (event: MinionEvent) =>
+  addEvent: (event: ElfEvent) =>
     set((state) => ({
       events: [...state.events, event],
     })),
 
-  addMinion: (minion: Minion) =>
+  addElf: (elf: Elf) =>
     set((state) => ({
-      minions: [...state.minions, minion],
+      elves: [...state.elves, elf],
     })),
 
-  updateMinionStatus: (minionId: string, status: MinionStatus) =>
+  updateElfStatus: (elfId: string, status: ElfStatus) =>
     set((state) => ({
-      minions: state.minions.map((minion) =>
-        minion.id === minionId ? { ...minion, status } : minion
+      elves: state.elves.map((elf) =>
+        elf.id === elfId ? { ...elf, status } : elf
       ),
     })),
 
@@ -90,6 +90,6 @@ export const useSessionStore = create<SessionState>((set) => ({
     set({
       activeSession: null,
       events: [],
-      minions: [],
+      elves: [],
     }),
 }));

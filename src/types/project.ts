@@ -1,8 +1,8 @@
-/* Project types — represents a MINIONS project with its configuration and metadata. */
+/* Project types — represents an ELVES project with its configuration and metadata. */
 
-import type { Runtime } from "./minion";
+import type { Runtime } from "./elf";
 
-/** A MINIONS project pointing to a local directory */
+/** An ELVES project pointing to a local directory */
 export interface Project {
   readonly id: string;
   readonly name: string;
@@ -15,7 +15,7 @@ export interface Project {
 
 /** Per-project configuration overrides */
 export interface ProjectSettings {
-  readonly maxMinions?: number;
+  readonly maxElves?: number;
   readonly autoDeploySimple?: boolean;
   readonly memoryEnabled?: boolean;
 }

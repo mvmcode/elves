@@ -1,20 +1,20 @@
-/* MinionCard — neo-brutalist card showing a single minion's live state with personality. */
+/* ElfCard — neo-brutalist card showing a single elf's live state with personality. */
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/shared/Badge";
-import type { Minion, MinionEvent, MinionStatus } from "@/types/minion";
-import { getStatusMessage } from "@/lib/minion-names";
+import type { Elf, ElfEvent, ElfStatus } from "@/types/elf";
+import { getStatusMessage } from "@/lib/elf-names";
 
-interface MinionCardProps {
-  readonly minion: Minion;
-  readonly events?: readonly MinionEvent[];
+interface ElfCardProps {
+  readonly elf: Elf;
+  readonly events?: readonly ElfEvent[];
   readonly isExpanded?: boolean;
   readonly onToggleExpand?: () => void;
 }
 
-/** Maps minion status to Badge variant for consistent visual feedback. */
-const statusBadgeVariant: Record<MinionStatus, "default" | "success" | "error" | "warning" | "info"> = {
+/** Maps elf status to Badge variant for consistent visual feedback. */
+const statusBadgeVariant: Record<ElfStatus, "default" | "success" | "error" | "warning" | "info"> = {
   spawning: "info",
   working: "default",
   thinking: "info",
@@ -26,7 +26,7 @@ const statusBadgeVariant: Record<MinionStatus, "default" | "success" | "error" |
 };
 
 /** Human-readable status label for the badge. */
-const statusLabel: Record<MinionStatus, string> = {
+const statusLabel: Record<ElfStatus, string> = {
   spawning: "Spawning",
   working: "Working",
   thinking: "Thinking",
@@ -37,8 +37,8 @@ const statusLabel: Record<MinionStatus, string> = {
   sleeping: "Sleeping",
 };
 
-/** Estimates a simple progress value (0-100) from minion status and event count. */
-function estimateProgress(status: MinionStatus, eventCount: number): number {
+/** Estimates a simple progress value (0-100) from elf status and event count. */
+function estimateProgress(status: ElfStatus, eventCount: number): number {
   if (status === "done") return 100;
   if (status === "error") return 100;
   if (status === "spawning") return 5;
@@ -53,16 +53,16 @@ function formatTime(timestamp: number): string {
 }
 
 /**
- * Neo-brutalist card displaying a minion's live state including avatar, name,
+ * Neo-brutalist card displaying an elf's live state including avatar, name,
  * status badge, funny status message, progress bar, and expandable event output.
  * Uses framer-motion for entrance animation and expand/collapse transitions.
  */
-export function MinionCard({
-  minion,
+export function ElfCard({
+  elf,
   events = [],
   isExpanded: controlledExpanded,
   onToggleExpand,
-}: MinionCardProps): React.JSX.Element {
+}: ElfCardProps): React.JSX.Element {
   const [internalExpanded, setInternalExpanded] = useState(false);
   const isExpanded = controlledExpanded ?? internalExpanded;
 
@@ -74,8 +74,8 @@ export function MinionCard({
     }
   };
 
-  const progress = estimateProgress(minion.status, events.length);
-  const funnyStatus = getStatusMessage(minion.name, minion.status);
+  const progress = estimateProgress(elf.status, events.length);
+  const funnyStatus = getStatusMessage(elf.name, elf.status);
 
   return (
     <motion.div
@@ -83,28 +83,28 @@ export function MinionCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 400, damping: 25 }}
       className="border-[3px] border-border bg-white p-5 shadow-brutal-lg"
-      style={{ borderLeftWidth: "4px", borderLeftColor: minion.color }}
-      data-testid="minion-card"
+      style={{ borderLeftWidth: "4px", borderLeftColor: elf.color }}
+      data-testid="elf-card"
     >
       {/* Header — avatar, name, status badge */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-2xl" role="img" aria-label={`${minion.name} avatar`}>
-            {minion.avatar}
+          <span className="text-2xl" role="img" aria-label={`${elf.name} avatar`}>
+            {elf.avatar}
           </span>
           <span className="font-display text-lg font-bold uppercase tracking-wide">
-            {minion.name}
+            {elf.name}
           </span>
         </div>
-        <Badge variant={statusBadgeVariant[minion.status]}>
-          {statusLabel[minion.status]}
+        <Badge variant={statusBadgeVariant[elf.status]}>
+          {statusLabel[elf.status]}
         </Badge>
       </div>
 
       {/* Role */}
-      {minion.role && (
+      {elf.role && (
         <p className="mt-1 font-body text-sm text-gray-600">
-          Role: {minion.role}
+          Role: {elf.role}
         </p>
       )}
 
@@ -119,7 +119,7 @@ export function MinionCard({
           <div className="h-4 flex-1 border-[2px] border-border bg-gray-200">
             <div
               className="h-full transition-all duration-300 ease-out"
-              style={{ width: `${progress}%`, backgroundColor: minion.color }}
+              style={{ width: `${progress}%`, backgroundColor: elf.color }}
             />
           </div>
           <span className="ml-2 font-mono text-xs font-bold">{progress}%</span>
@@ -158,7 +158,7 @@ export function MinionCard({
                 events.map((event) => (
                   <div key={event.id} className="font-mono text-xs text-gray-300">
                     <span className="text-gray-500">[{formatTime(event.timestamp)}]</span>{" "}
-                    <span className="font-bold" style={{ color: minion.color }}>
+                    <span className="font-bold" style={{ color: elf.color }}>
                       {event.type === "tool_call"
                         ? `Using ${(event.payload as Record<string, unknown>).tool ?? event.type}`
                         : event.type === "output"

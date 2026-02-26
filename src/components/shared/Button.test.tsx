@@ -13,7 +13,7 @@ describe("Button", () => {
   it("applies primary variant styles by default", () => {
     render(<Button>Click me</Button>);
     const button = screen.getByRole("button");
-    expect(button.className).toContain("bg-minion-yellow");
+    expect(button.className).toContain("bg-elf-gold");
   });
 
   it("applies danger variant styles", () => {

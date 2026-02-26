@@ -29,7 +29,7 @@ describe("Card", () => {
       </Card>,
     );
     expect(screen.getByTestId("card").className).toContain(
-      "bg-minion-yellow-light",
+      "bg-elf-gold-light",
     );
   });
 

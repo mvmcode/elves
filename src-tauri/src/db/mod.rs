@@ -4,7 +4,7 @@ pub mod schema;
 pub mod projects;
 pub mod sessions;
 pub mod events;
-pub mod minions;
+pub mod elves;
 
 use rusqlite::Connection;
 use std::path::Path;
@@ -26,7 +26,7 @@ pub enum DbError {
     Migration { version: i32, message: String },
 }
 
-/// Open (or create) the MINIONS SQLite database at the given path.
+/// Open (or create) the ELVES SQLite database at the given path.
 /// Enables WAL mode for concurrent reads, sets busy timeout, and runs migrations.
 pub fn open_database(db_path: &Path) -> Result<Connection, DbError> {
     // Ensure parent directory exists
@@ -52,10 +52,10 @@ pub fn open_database(db_path: &Path) -> Result<Connection, DbError> {
     Ok(conn)
 }
 
-/// Get the default database path: ~/.minions/minions.db
+/// Get the default database path: ~/.elves/elves.db
 pub fn default_db_path() -> std::path::PathBuf {
     let home = dirs::home_dir().expect("Could not determine home directory");
-    home.join(".minions").join("minions.db")
+    home.join(".elves").join("elves.db")
 }
 
 #[cfg(test)]
@@ -93,7 +93,7 @@ mod tests {
             )
             .expect("Failed to count tables");
 
-        // We expect at least 7 tables: projects, sessions, minions, memory, skills, mcp_servers, events
+        // We expect at least 7 tables: projects, sessions, elves, memory, skills, mcp_servers, events
         // Plus the schema_version table and the FTS virtual table
         assert!(
             table_count >= 7,
