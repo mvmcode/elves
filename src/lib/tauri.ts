@@ -234,6 +234,13 @@ export async function loadTemplate(id: string): Promise<Template> {
   return invoke<Template>("load_template", { id });
 }
 
+/* ── Export commands ──────────────────────────────────────────── */
+
+/** Export a session as a self-contained HTML replay file. Returns the HTML string. */
+export async function exportSessionHtml(sessionId: string): Promise<string> {
+  return invoke<string>("export_session_html", { sessionId });
+}
+
 /* ── Event subscription ──────────────────────────────────────── */
 
 /** Subscribe to a Tauri event. Returns an unsubscribe function. */

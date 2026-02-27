@@ -134,11 +134,11 @@ describe("SessionHistory", () => {
     expect(screen.getByText("No summary recorded for this session.")).toBeInTheDocument();
   });
 
-  it("shows Replay button in expanded detail", () => {
+  it("shows Export Replay button in expanded detail", () => {
     mockSessions.push(createTestSession());
     render(<SessionHistory />);
     fireEvent.click(screen.getByTestId("session-card-header"));
-    expect(screen.getByText("Replay Session")).toBeInTheDocument();
+    expect(screen.getByText("Export Replay")).toBeInTheDocument();
   });
 
   it("collapses on second click", () => {

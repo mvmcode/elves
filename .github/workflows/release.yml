@@ -1,0 +1,58 @@
+# Release pipeline for ELVES — builds macOS DMG and creates a GitHub Release on tag push.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  build-macos:
+    name: Build macOS DMG
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: cargo-release-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: cargo-release-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and package with Tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "ELVES ${{ github.ref_name }}"
+          releaseBody: |
+            See the [CHANGELOG](https://github.com/mvmcode/elves/blob/main/CHANGELOG.md) for details.
+
+            ## Install
+            - **macOS DMG:** Download `ELVES_${{ github.ref_name }}_aarch64.dmg` below
+            - **Homebrew:** `brew install --cask mvmcode/tap/elves` (coming soon)
+          releaseDraft: true
+          prerelease: false

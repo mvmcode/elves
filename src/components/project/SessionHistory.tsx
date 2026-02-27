@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useSessionHistory } from "@/hooks/useSessionHistory";
 import { Badge } from "@/components/shared/Badge";
-import { Button } from "@/components/shared/Button";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ShareButton } from "@/components/project/ShareButton";
 import { getEmptyState } from "@/lib/funny-copy";
 import type { Session, SessionStatus } from "@/types/session";
 
@@ -162,16 +162,8 @@ export function SessionHistory(): React.JSX.Element {
                     </div>
                   </div>
 
-                  {/* Replay button (placeholder) */}
-                  <Button
-                    variant="secondary"
-                    className="text-xs"
-                    onClick={() => {
-                      window.alert("Replay coming soon! This feature is under construction.");
-                    }}
-                  >
-                    Replay Session
-                  </Button>
+                  {/* Export replay button */}
+                  <ShareButton sessionId={session.id} sessionTask={session.task} />
                 </div>
               )}
             </div>

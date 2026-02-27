@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ELVES — Summon Your AI Workshop</title>
+  <meta name="description" content="A visual, personality-driven desktop app for orchestrating AI agent teams. Type a task. Watch your elves collaborate. Ship faster.">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ELVES — Summon Your AI Workshop">
+  <meta property="og:description" content="A visual, personality-driven desktop app for orchestrating AI agent teams. Type a task. Watch your elves collaborate. Ship faster.">
+  <meta property="og:image" content="https://elves.dev/og-image.png">
+  <meta property="og:url" content="https://elves.dev">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ELVES — Summon Your AI Workshop">
+  <meta name="twitter:description" content="A visual, personality-driven desktop app for orchestrating AI agent teams. Type a task. Watch your elves collaborate. Ship faster.">
+  <meta name="twitter:image" content="https://elves.dev/og-image.png">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ============================================
+       ELVES Landing Page — Neo-Brutalist Design
+       ============================================ */
+
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #FFFDF7;
+      --bg-dark: #1A1A2E;
+      --primary: #FFD93D;
+      --red: #FF6B6B;
+      --green: #6BCB77;
+      --blue: #4D96FF;
+      --orange: #FF8B3D;
+      --purple: #A855F7;
+      --text: #000000;
+      --text-light: #FFFDF7;
+      --border: #000000;
+      --shadow: 6px 6px 0px 0px #000;
+      --shadow-sm: 4px 4px 0px 0px #000;
+      --border-w: 3px;
+      --font-display: 'Space Grotesk', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ---- Utility ---- */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    section {
+      padding: 100px 0;
+    }
+
+    /* ---- Animation classes ---- */
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .reveal-left {
+      opacity: 0;
+      transform: translateX(-60px);
+      transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+    }
+    .reveal-left.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    .reveal-right {
+      opacity: 0;
+      transform: translateX(60px);
+      transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+    }
+    .reveal-right.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    /* Staggered children */
+    .stagger > * {
+      transition-delay: calc(var(--i, 0) * 0.1s);
+    }
+
+    /* ---- Nav ---- */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: var(--bg);
+      border-bottom: var(--border-w) solid var(--border);
+      padding: 16px 0;
+    }
+    nav .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .nav-logo {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 24px;
+      color: var(--text);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-logo .logo-icon {
+      font-size: 28px;
+    }
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+      list-style: none;
+    }
+    .nav-links a {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text);
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover {
+      color: var(--orange);
+    }
+    .nav-cta {
+      background: var(--primary);
+      color: var(--text) !important;
+      border: var(--border-w) solid var(--border);
+      box-shadow: var(--shadow-sm);
+      padding: 8px 20px;
+      font-weight: 700 !important;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .nav-cta:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0px 0px #000;
+    }
+
+    /* Mobile nav toggle */
+    .nav-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .nav-toggle span {
+      display: block;
+      width: 28px;
+      height: 3px;
+      background: var(--text);
+      margin: 5px 0;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+
+    /* ============================================
+       HERO
+       ============================================ */
+    .hero {
+      padding: 160px 0 120px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero .container {
+      text-align: center;
+      position: relative;
+      z-index: 2;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: var(--text);
+      color: var(--primary);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 6px 16px;
+      border: var(--border-w) solid var(--border);
+      margin-bottom: 32px;
+    }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 120px;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      margin-bottom: 24px;
+      color: var(--text);
+    }
+    .hero h1 .highlight {
+      color: var(--primary);
+      text-shadow: 4px 4px 0px var(--border);
+    }
+    .hero-tagline {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 32px;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+    .hero-sub {
+      font-size: 18px;
+      color: #444;
+      max-width: 600px;
+      margin: 0 auto 48px;
+      font-weight: 500;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 16px 32px;
+      border: var(--border-w) solid var(--border);
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+      text-decoration: none;
+      color: var(--text);
+    }
+    .btn:hover {
+      transform: translate(3px, 3px);
+      box-shadow: 3px 3px 0px 0px #000;
+    }
+    .btn:active {
+      transform: translate(6px, 6px);
+      box-shadow: 0px 0px 0px 0px #000;
+    }
+    .btn-primary {
+      background: var(--primary);
+    }
+    .btn-outline {
+      background: var(--bg);
+    }
+    .btn-dark {
+      background: var(--text);
+      color: var(--text-light);
+    }
+
+    /* Floating elves decoration */
+    .hero-elves {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .floating-elf {
+      position: absolute;
+      font-size: 48px;
+      animation: float 6s ease-in-out infinite;
+    }
+    .floating-elf:nth-child(1) { top: 15%; left: 8%; animation-delay: 0s; }
+    .floating-elf:nth-child(2) { top: 25%; right: 10%; animation-delay: 1.5s; }
+    .floating-elf:nth-child(3) { bottom: 20%; left: 12%; animation-delay: 3s; }
+    .floating-elf:nth-child(4) { bottom: 25%; right: 8%; animation-delay: 4.5s; }
+    .floating-elf:nth-child(5) { top: 45%; left: 3%; animation-delay: 2s; }
+    .floating-elf:nth-child(6) { top: 40%; right: 3%; animation-delay: 3.5s; }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      25% { transform: translateY(-15px) rotate(5deg); }
+      50% { transform: translateY(-25px) rotate(-3deg); }
+      75% { transform: translateY(-10px) rotate(4deg); }
+    }
+
+    /* ============================================
+       WHAT IS IT
+       ============================================ */
+    .what-section {
+      background: var(--bg);
+    }
+    .section-label {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--orange);
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 48px;
+      line-height: 1.15;
+      margin-bottom: 16px;
+    }
+    .section-desc {
+      font-size: 18px;
+      color: #444;
+      max-width: 640px;
+      margin-bottom: 60px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .feature-card {
+      background: #FFF;
+      border: var(--border-w) solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 32px 28px;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .feature-card:hover {
+      transform: translate(3px, 3px);
+      box-shadow: 3px 3px 0px 0px #000;
+    }
+    .feature-icon {
+      font-size: 48px;
+      margin-bottom: 20px;
+      display: block;
+    }
+    .feature-card h3 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 22px;
+      margin-bottom: 12px;
+    }
+    .feature-card p {
+      font-size: 15px;
+      line-height: 1.65;
+      color: #333;
+    }
+
+    /* Color accents per card */
+    .feature-card:nth-child(1) { border-top: 6px solid var(--primary); }
+    .feature-card:nth-child(2) { border-top: 6px solid var(--blue); }
+    .feature-card:nth-child(3) { border-top: 6px solid var(--green); }
+
+    /* ============================================
+       HOW IT WORKS
+       ============================================ */
+    .how-section {
+      background: var(--bg-dark);
+      color: var(--text-light);
+      position: relative;
+    }
+    .how-section .section-label {
+      color: var(--primary);
+    }
+    .how-section .section-desc {
+      color: #AAA;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+      position: relative;
+    }
+    .step {
+      text-align: center;
+      position: relative;
+    }
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 72px;
+      height: 72px;
+      background: var(--primary);
+      color: var(--text);
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 32px;
+      border: var(--border-w) solid var(--border);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 24px;
+    }
+    .step h3 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 24px;
+      margin-bottom: 12px;
+    }
+    .step p {
+      font-size: 15px;
+      color: #BBB;
+      max-width: 300px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    .step-emoji {
+      font-size: 48px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    /* Connector arrows between steps */
+    .step-connector {
+      display: none;
+    }
+
+    /* ============================================
+       FEATURES
+       ============================================ */
+    .features-section {
+      background: var(--bg);
+    }
+    .features-section .section-title {
+      text-align: center;
+    }
+    .features-section .section-label {
+      text-align: center;
+    }
+    .features-section .section-desc {
+      text-align: center;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .feat-card {
+      background: #FFF;
+      border: var(--border-w) solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 28px 24px;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .feat-card:hover {
+      transform: translate(3px, 3px);
+      box-shadow: 3px 3px 0px 0px #000;
+    }
+    .feat-card-icon {
+      font-size: 36px;
+      margin-bottom: 16px;
+    }
+    .feat-card h3 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+    .feat-card p {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #444;
+    }
+
+    /* Alternating accent colors */
+    .feat-card:nth-child(1) .feat-card-icon { background: var(--primary); }
+    .feat-card:nth-child(2) .feat-card-icon { background: var(--blue); }
+    .feat-card:nth-child(3) .feat-card-icon { background: var(--red); }
+    .feat-card:nth-child(4) .feat-card-icon { background: var(--green); }
+    .feat-card:nth-child(5) .feat-card-icon { background: var(--purple); }
+    .feat-card:nth-child(6) .feat-card-icon { background: var(--orange); }
+
+    .feat-card .feat-card-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      border: var(--border-w) solid var(--border);
+      box-shadow: 3px 3px 0px 0px #000;
+      font-size: 28px;
+    }
+
+    /* ============================================
+       DEMO
+       ============================================ */
+    .demo-section {
+      background: var(--bg-dark);
+      color: var(--text-light);
+    }
+    .demo-section .section-label {
+      color: var(--primary);
+      text-align: center;
+    }
+    .demo-section .section-title {
+      text-align: center;
+    }
+
+    .demo-frame {
+      max-width: 800px;
+      margin: 48px auto 0;
+      border: var(--border-w) solid var(--text-light);
+      box-shadow: 8px 8px 0px 0px var(--primary);
+      background: #0D0D1A;
+      position: relative;
+      overflow: hidden;
+    }
+    .demo-titlebar {
+      background: #1A1A2E;
+      border-bottom: 2px solid #333;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .demo-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid #333;
+    }
+    .demo-dot.red { background: var(--red); }
+    .demo-dot.yellow { background: var(--primary); }
+    .demo-dot.green { background: var(--green); }
+    .demo-titlebar-text {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: #666;
+      margin-left: 12px;
+    }
+    .demo-content {
+      padding: 60px 40px;
+      text-align: center;
+      min-height: 360px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .demo-content .demo-emoji {
+      font-size: 72px;
+      margin-bottom: 24px;
+      display: block;
+      animation: float 4s ease-in-out infinite;
+    }
+    .demo-content p {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: #999;
+      font-weight: 600;
+    }
+    .demo-content .demo-sub {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: #555;
+      margin-top: 12px;
+    }
+
+    /* ============================================
+       DOWNLOAD
+       ============================================ */
+    .download-section {
+      background: var(--primary);
+      border-top: var(--border-w) solid var(--border);
+      border-bottom: var(--border-w) solid var(--border);
+    }
+    .download-section .container {
+      text-align: center;
+    }
+    .download-section .section-label {
+      color: var(--text);
+    }
+    .download-section .section-title {
+      font-size: 48px;
+      margin-bottom: 24px;
+    }
+    .download-section .section-desc {
+      color: #333;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: center;
+    }
+
+    .download-actions {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+    .btn-download {
+      background: var(--text);
+      color: var(--text-light);
+      font-size: 18px;
+      padding: 18px 40px;
+      border: var(--border-w) solid var(--border);
+      box-shadow: var(--shadow);
+    }
+    .btn-github {
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .brew-block {
+      display: inline-block;
+      background: var(--bg-dark);
+      color: var(--green);
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 500;
+      padding: 16px 32px;
+      border: var(--border-w) solid var(--border);
+      box-shadow: var(--shadow-sm);
+      text-align: left;
+      position: relative;
+    }
+    .brew-block .brew-prefix {
+      color: #888;
+      user-select: none;
+    }
+    .brew-copy {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: 2px solid #555;
+      color: #888;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .brew-copy:hover {
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
+    /* ============================================
+       FOOTER
+       ============================================ */
+    footer {
+      background: var(--bg-dark);
+      color: var(--text-light);
+      padding: 48px 0;
+      border-top: var(--border-w) solid var(--border);
+    }
+    footer .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 24px;
+    }
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .footer-brand .logo-icon {
+      font-size: 28px;
+    }
+    .footer-brand span {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 20px;
+    }
+    .footer-info {
+      text-align: center;
+      font-size: 14px;
+      color: #888;
+    }
+    .footer-info a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .footer-info a:hover {
+      text-decoration: underline;
+    }
+    .footer-links {
+      display: flex;
+      gap: 24px;
+    }
+    .footer-links a {
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.15s;
+    }
+    .footer-links a:hover {
+      color: var(--primary);
+    }
+
+    /* ============================================
+       RESPONSIVE
+       ============================================ */
+    @media (max-width: 900px) {
+      .hero h1 {
+        font-size: 72px;
+      }
+      .hero-tagline {
+        font-size: 24px;
+      }
+      .feature-grid,
+      .features-grid,
+      .steps {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      .section-title {
+        font-size: 36px;
+      }
+      .floating-elf {
+        display: none;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .hero {
+        padding: 120px 0 80px;
+      }
+      .hero h1 {
+        font-size: 48px;
+      }
+      .hero-tagline {
+        font-size: 20px;
+      }
+      .hero-sub {
+        font-size: 16px;
+      }
+      .hero-actions {
+        flex-direction: column;
+        align-items: center;
+      }
+      .btn {
+        width: 100%;
+        justify-content: center;
+        max-width: 320px;
+      }
+      section {
+        padding: 64px 0;
+      }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--bg);
+        border-bottom: var(--border-w) solid var(--border);
+        flex-direction: column;
+        padding: 20px 24px;
+        gap: 16px;
+      }
+      .nav-links.open {
+        display: flex;
+      }
+      .nav-toggle {
+        display: block;
+      }
+      .nav-toggle.active span:nth-child(1) {
+        transform: rotate(45deg) translate(6px, 6px);
+      }
+      .nav-toggle.active span:nth-child(2) {
+        opacity: 0;
+      }
+      .nav-toggle.active span:nth-child(3) {
+        transform: rotate(-45deg) translate(6px, -6px);
+      }
+      .download-section .section-title {
+        font-size: 36px;
+      }
+      .demo-content {
+        padding: 40px 20px;
+        min-height: 260px;
+      }
+      .brew-block {
+        font-size: 13px;
+        padding: 14px 50px 14px 20px;
+      }
+      footer .container {
+        flex-direction: column;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== NAV ==================== -->
+  <nav>
+    <div class="container">
+      <a href="#" class="nav-logo">
+        <span class="logo-icon">🧝</span>
+        <span>ELVES</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how-it-works">How It Works</a></li>
+        <li><a href="#demo">Demo</a></li>
+        <li><a href="#download" class="nav-cta">Download</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ==================== HERO ==================== -->
+  <section class="hero" id="hero">
+    <div class="hero-elves">
+      <span class="floating-elf">🧝‍♂️</span>
+      <span class="floating-elf">🧝‍♀️</span>
+      <span class="floating-elf">🔨</span>
+      <span class="floating-elf">✨</span>
+      <span class="floating-elf">🍪</span>
+      <span class="floating-elf">⚡</span>
+    </div>
+    <div class="container">
+      <div class="hero-badge reveal">Open Source &bull; macOS</div>
+      <h1 class="reveal"><span class="highlight">ELVES</span></h1>
+      <p class="hero-tagline reveal">Summon Your AI Workshop</p>
+      <p class="hero-sub reveal">Type a task. Watch your elves collaborate. Ship faster.</p>
+      <div class="hero-actions reveal">
+        <a href="#download" class="btn btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download for macOS
+        </a>
+        <a href="https://github.com/mvmcode/elves" target="_blank" rel="noopener" class="btn btn-outline">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== WHAT IS IT ==================== -->
+  <section class="what-section" id="features">
+    <div class="container">
+      <p class="section-label reveal">What Is It</p>
+      <h2 class="section-title reveal">Your personal team of AI agents,<br>with personality.</h2>
+      <p class="section-desc reveal">ELVES is a Tauri desktop app that orchestrates AI agent teams with a visual, fun, neo-brutalist interface. No terminal required.</p>
+
+      <div class="feature-grid stagger">
+        <div class="feature-card reveal" style="--i: 0">
+          <span class="feature-icon">🤖</span>
+          <h3>Multi-Agent Teams</h3>
+          <p>ELVES auto-decomposes tasks and summons a team of named, personality-driven AI agents. Each elf has a funny name, a unique avatar, and amusing status messages as they work.</p>
+        </div>
+        <div class="feature-card reveal" style="--i: 1">
+          <span class="feature-icon">🧠</span>
+          <h3>Persistent Memory</h3>
+          <p>SQLite-backed memory with FTS5 search. Your elves remember decisions, context, and preferences across sessions. Relevance decays over time — important memories stay, noise fades.</p>
+        </div>
+        <div class="feature-card reveal" style="--i: 2">
+          <span class="feature-icon">🎨</span>
+          <h3>Visual Editors</h3>
+          <p>Skills editor, MCP server manager, context editor — all with neo-brutalist UI. Configure your agents visually instead of editing YAML files in a terminal.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== HOW IT WORKS ==================== -->
+  <section class="how-section" id="how-it-works">
+    <div class="container">
+      <p class="section-label reveal">How It Works</p>
+      <h2 class="section-title reveal">Three steps to shipping faster</h2>
+      <p class="section-desc reveal">No complex setup. No config files. Just type and watch.</p>
+
+      <div class="steps stagger">
+        <div class="step reveal" style="--i: 0">
+          <span class="step-number">1</span>
+          <span class="step-emoji">⌨️</span>
+          <h3>Type a Task</h3>
+          <p>Describe what you want in plain English. "Add user authentication with OAuth" — that's all it takes.</p>
+        </div>
+        <div class="step reveal" style="--i: 1">
+          <span class="step-number">2</span>
+          <span class="step-emoji">🧝</span>
+          <h3>Elves Deploy</h3>
+          <p>ELVES analyzes complexity, creates a plan, and summons the right team of agents. Review the plan or let them run.</p>
+        </div>
+        <div class="step reveal" style="--i: 2">
+          <span class="step-number">3</span>
+          <span class="step-emoji">✨</span>
+          <h3>Watch the Magic</h3>
+          <p>See your elves collaborate in real-time. Each agent streams their work — file edits, terminal commands, decisions — live.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FEATURES GRID ==================== -->
+  <section class="features-section">
+    <div class="container">
+      <p class="section-label reveal">Features</p>
+      <h2 class="section-title reveal">Everything you need to ship</h2>
+      <p class="section-desc reveal">Built for developers who want AI that works with them, not against them.</p>
+
+      <div class="features-grid stagger">
+        <div class="feat-card reveal" style="--i: 0">
+          <div class="feat-card-icon">🔀</div>
+          <h3>Auto-Team Decomposition</h3>
+          <p>Drop in a complex task and ELVES automatically breaks it into subtasks, assigns agents, and coordinates execution.</p>
+        </div>
+        <div class="feat-card reveal" style="--i: 1">
+          <div class="feat-card-icon">⚡</div>
+          <h3>Runtime Agnostic</h3>
+          <p>Switch between Claude Code and Codex seamlessly. Same memory, same interface — different engine underneath.</p>
+        </div>
+        <div class="feat-card reveal" style="--i: 2">
+          <div class="feat-card-icon">😄</div>
+          <h3>Funny Personalities</h3>
+          <p>15 named elves with unique personalities. "Biscuit is stress-eating cookies while refactoring your auth module."</p>
+        </div>
+        <div class="feat-card reveal" style="--i: 3">
+          <div class="feat-card-icon">🔄</div>
+          <h3>Session Replay</h3>
+          <p>Full event-by-event playback of any session. Scrub through the timeline to see exactly what happened and when.</p>
+        </div>
+        <div class="feat-card reveal" style="--i: 4">
+          <div class="feat-card-icon">💾</div>
+          <h3>Persistent Memory</h3>
+          <p>Relevance-scored memory with exponential decay and access boosting. FTS5 full-text search across all project context.</p>
+        </div>
+        <div class="feat-card reveal" style="--i: 5">
+          <div class="feat-card-icon">🛠️</div>
+          <h3>Visual Editors</h3>
+          <p>Skills, MCP servers, and context — all editable through a clean visual interface. No more YAML wrangling.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== DEMO ==================== -->
+  <section class="demo-section" id="demo">
+    <div class="container">
+      <p class="section-label reveal">Demo</p>
+      <h2 class="section-title reveal">See ELVES in Action</h2>
+
+      <div class="demo-frame reveal">
+        <div class="demo-titlebar">
+          <span class="demo-dot red"></span>
+          <span class="demo-dot yellow"></span>
+          <span class="demo-dot green"></span>
+          <span class="demo-titlebar-text">ELVES — My Project</span>
+        </div>
+        <div class="demo-content">
+          <span class="demo-emoji">🧝‍♂️</span>
+          <p>Demo coming soon — the elves are still rehearsing</p>
+          <p class="demo-sub">GIF / video placeholder</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== DOWNLOAD ==================== -->
+  <section class="download-section" id="download">
+    <div class="container">
+      <p class="section-label reveal">Get Started</p>
+      <h2 class="section-title reveal">Summon your elves today</h2>
+      <p class="section-desc reveal">Free and open source. macOS first, Linux and Windows coming soon.</p>
+
+      <div class="download-actions reveal">
+        <a href="https://github.com/mvmcode/elves/releases/latest" class="btn btn-download" target="_blank" rel="noopener">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 110 20 10 10 0 010-20z"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+          Download for macOS
+        </a>
+        <a href="https://github.com/mvmcode/elves" target="_blank" rel="noopener" class="btn btn-github">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          Star on GitHub
+        </a>
+      </div>
+
+      <div class="reveal">
+        <div class="brew-block">
+          <span class="brew-prefix">$ </span>brew install --cask elves
+          <button class="brew-copy" onclick="copyBrew()">Copy</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer>
+    <div class="container">
+      <div class="footer-brand">
+        <span class="logo-icon">🧝</span>
+        <span>ELVES</span>
+      </div>
+      <div class="footer-info">
+        Built with 🍪 by <a href="https://github.com/mvmcode" target="_blank" rel="noopener">Mani &amp; Raghavan</a>
+        &nbsp;&bull;&nbsp; MIT License
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/mvmcode/elves" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/mvmcode/elves/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/mvmcode/elves/issues" target="_blank" rel="noopener">Issues</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==================== JS ==================== -->
+  <script>
+    /* IntersectionObserver for scroll reveal animations */
+    (function () {
+      var revealElements = document.querySelectorAll('.reveal, .reveal-left, .reveal-right');
+      if ('IntersectionObserver' in window) {
+        var observer = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+              observer.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+
+        revealElements.forEach(function (el) {
+          observer.observe(el);
+        });
+      } else {
+        /* Fallback: show everything immediately */
+        revealElements.forEach(function (el) {
+          el.classList.add('visible');
+        });
+      }
+    })();
+
+    /* Mobile nav toggle */
+    (function () {
+      var toggle = document.querySelector('.nav-toggle');
+      var links = document.querySelector('.nav-links');
+      if (toggle && links) {
+        toggle.addEventListener('click', function () {
+          toggle.classList.toggle('active');
+          links.classList.toggle('open');
+        });
+        /* Close on link click */
+        links.querySelectorAll('a').forEach(function (a) {
+          a.addEventListener('click', function () {
+            toggle.classList.remove('active');
+            links.classList.remove('open');
+          });
+        });
+      }
+    })();
+
+    /* Copy brew command */
+    function copyBrew() {
+      var text = 'brew install --cask elves';
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(function () {
+          var btn = document.querySelector('.brew-copy');
+          btn.textContent = 'Copied!';
+          setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
+        });
+      }
+    }
+  </script>
+
+</body>
+</html>
