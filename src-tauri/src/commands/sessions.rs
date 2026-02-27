@@ -1,6 +1,7 @@
 // Session-related Tauri commands — CRUD operations for task execution sessions.
 
 use crate::db;
+use crate::db::events::EventRow;
 use crate::db::sessions::SessionRow;
 use super::projects::DbState;
 use tauri::State;
@@ -40,5 +41,18 @@ pub fn get_session(
 ) -> Result<Option<SessionRow>, String> {
     let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
     db::sessions::get_session(&conn, &id)
+        .map_err(|e| format!("Database error: {e}"))
+}
+
+/// List all events for a session, ordered chronologically.
+///
+/// Used by the History tab to display session output when a session card is expanded.
+#[tauri::command]
+pub fn list_session_events(
+    db: State<'_, DbState>,
+    session_id: String,
+) -> Result<Vec<EventRow>, String> {
+    let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+    db::events::list_events(&conn, &session_id)
         .map_err(|e| format!("Database error: {e}"))
 }

@@ -202,6 +202,7 @@ The key architectural insight is the **Unified Agent Protocol**. Both Claude Cod
 | State | Zustand |
 | Backend | Rust (2021 edition) |
 | Database | SQLite via rusqlite (WAL mode, FTS5) |
+| Terminal | xterm.js + portable-pty |
 | Process Mgmt | Tokio async runtime |
 | Frontend Tests | Vitest + Testing Library |
 | Backend Tests | cargo test |
@@ -244,30 +245,33 @@ elves/
 ├── src/                         # React frontend
 │   ├── components/
 │   │   ├── shared/              # Button, Card, Input, Panel, Badge, EmptyState, DeployButton,
-│   │   │                        # RuntimePicker, ShortcutOverlay
-│   │   ├── layout/              # Shell, Sidebar, TaskBar, TopBar
-│   │   ├── theater/             # ElfTheater, ElfCard, ElfAvatar, PlanPreview, TaskGraph, ThinkingPanel
+│   │   │                        # RuntimePicker, ShortcutOverlay, Dialog, ResizeHandle
+│   │   ├── layout/              # Shell, Sidebar, TaskBar, TopBar, TaskBarPickers
+│   │   ├── theater/             # ElfTheater, ElfCard, ElfAvatar, PlanPreview, TaskGraph,
+│   │   │                        # ThinkingPanel, EventBlock, TerminalOutput
+│   │   ├── terminal/            # XTerminal (xterm.js wrapper), SessionTerminal (PTY lifecycle)
 │   │   ├── editors/             # SkillEditor, McpManager, ContextEditor, TemplateLibrary
-│   │   ├── project/             # SessionHistory
+│   │   ├── project/             # SessionHistory, ShareButton, NewProjectDialog
 │   │   ├── feed/                # ActivityFeed
 │   │   ├── memory/              # MemoryExplorer, MemoryCard
 │   │   └── settings/            # MemorySettings
 │   ├── stores/                  # Zustand stores (app, project, session, ui, memory, settings,
 │   │                            # skills, mcp, templates)
 │   ├── types/                   # TypeScript types (elf, session, project, memory, runtime,
-│   │                            # skill, mcp, template)
-│   ├── hooks/                   # useInitialize, useSession, useTeamSession, useMemoryActions,
-│   │                            # useSkillActions, useMcpActions, useTemplateActions,
-│   │                            # useKeyboardShortcuts, useSessionHistory, useSounds
+│   │                            # skill, mcp, template, claude)
+│   ├── hooks/                   # useInitialize, useSession, useTeamSession, useSessionEvents,
+│   │                            # useMemoryActions, useSkillActions, useMcpActions,
+│   │                            # useTemplateActions, useKeyboardShortcuts, useSessionHistory,
+│   │                            # useSounds, useResizable
 │   └── lib/                     # elf-names, sounds, funny-copy, Tauri IPC wrappers
 │
 ├── src-tauri/                   # Rust backend
 │   └── src/
-│       ├── agents/              # Runtime detection, claude/codex adapters, interop,
-│       │                        # task analyzer, context builder, memory extractor
+│       ├── agents/              # Runtime detection, claude/codex adapters, claude discovery,
+│       │                        # interop, task analyzer, context builder, memory extractor
 │       ├── commands/            # Tauri IPC handlers (agents, projects, sessions, tasks,
-│       │                        # memory, skills, mcp, templates)
-│       └── db/                  # SQLite schema + migrations, CRUD modules
+│       │                        # memory, skills, mcp, templates, export, pty)
+│       └── db/                  # SQLite schema + migrations (v1-v3), CRUD modules
 │                                # (projects, sessions, elves, events, memory, skills, mcp, templates)
 │
 ├── assets/logo/                 # ELVES wordmark and logo assets
@@ -289,7 +293,12 @@ elves/
 - **Unified agent protocol**: Claude Code and Codex events are normalized into a single typed stream. The interop layer formats context per runtime. Frontend never touches runtime-specific types.
 - **Inline SVG avatars**: 15 unique elf avatars with per-status CSS animations. Zero network requests.
 - **Web Audio API sounds**: Oscillator-based sound effects with no audio file dependencies. 6 effects (spawn, typing, complete, error, chat, deploy).
-- **Global keyboard shortcuts**: Centralized in `useKeyboardShortcuts` hook — Cmd+K (task bar), Cmd+1-9 (projects), Cmd+M (memory), Cmd+/ (help overlay)
+- **Global keyboard shortcuts**: Centralized in `useKeyboardShortcuts` hook — Cmd+K (task bar), Cmd+1-9 (projects), Cmd+M (memory), Cmd+B (activity feed), Cmd+/ (help overlay)
+- **Streaming events**: Claude adapter uses `stream-json` format with background stdout/stderr threads for real-time event delivery
+- **Claude discovery**: Filesystem scan of `~/.claude/` surfaces agents, models, permission modes, and slash commands — no subprocess needed
+- **Embedded terminal**: PTY via `portable-pty` with xterm.js frontend for interactive Claude session resume
+- **Resizable panels**: `useResizable` hook with rAF-throttled drag tracking, width persisted in Zustand
+- **Solo terminal mode**: Single-elf sessions auto-switch to full-height terminal variant for maximum output visibility
 
 ---
 
@@ -302,6 +311,7 @@ elves/
 - [x] **Phase 5: Visual Editors & Polish** — Skills editor, MCP manager, context editor, 15 SVG elf avatars, Web Audio sounds, funny copy engine, keyboard shortcuts, shortcut overlay
 - [x] **Phase 6: Codex Full Support** — Codex adapter with JSONL normalization, interop layer, runtime picker, template library (5 built-in), session history
 - [x] **Phase 7: Distribution** — CI/CD, auto-updater, session replay export, Homebrew cask, landing page
+- [x] **Phase 8: Streaming & Terminal** — Real-time stream-json events, Claude discovery, embedded PTY terminal, session resume, resizable panels, solo terminal mode, native dialogs, TaskBar options
 
 ---
 

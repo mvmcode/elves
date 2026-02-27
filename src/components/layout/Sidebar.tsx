@@ -4,6 +4,7 @@ import { useProjectStore } from "@/stores/project";
 import { useUiStore } from "@/stores/ui";
 import type { AppView } from "@/stores/ui";
 import { Badge } from "@/components/shared/Badge";
+import { Button } from "@/components/shared/Button";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 /** Navigation items for the sidebar. */
@@ -26,9 +27,10 @@ export function Sidebar(): React.JSX.Element {
   const setActiveProject = useProjectStore((s) => s.setActiveProject);
   const activeView = useUiStore((s) => s.activeView);
   const setActiveView = useUiStore((s) => s.setActiveView);
+  const setNewProjectDialogOpen = useUiStore((s) => s.setNewProjectDialogOpen);
 
   return (
-    <aside className="no-select flex w-64 shrink-0 flex-col border-r-[3px] border-border bg-white">
+    <aside className="no-select flex h-full shrink-0 flex-col border-r-[3px] border-border bg-white">
       {/* Logo / Branding */}
       <div className="flex items-center gap-2 border-b-[3px] border-border p-4">
         <span className="font-display text-2xl font-black uppercase tracking-tight">
@@ -39,10 +41,20 @@ export function Sidebar(): React.JSX.Element {
 
       {/* Project list */}
       <div className="flex-1 overflow-y-auto">
+        <div className="p-2">
+          <Button
+            variant="primary"
+            className="mb-2 w-full py-2 text-xs"
+            onClick={() => setNewProjectDialogOpen(true)}
+            data-testid="new-project-button"
+          >
+            + New Project
+          </Button>
+        </div>
         {projects.length === 0 ? (
-          <EmptyState message="Your elves are bored. Give them something to do. 🍪" />
+          <EmptyState message="No projects yet. Create one above!" />
         ) : (
-          <ul className="p-2">
+          <ul className="px-2">
             {projects.map((project) => (
               <li key={project.id}>
                 <button

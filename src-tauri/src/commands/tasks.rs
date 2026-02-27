@@ -1,11 +1,11 @@
 // Task execution commands — start and stop agent tasks via Tauri IPC.
 
 use crate::agents::analyzer::{self, TaskPlan};
-use crate::agents::claude_adapter;
+use crate::agents::claude_adapter::{self, ClaudeSpawnOptions};
 use crate::agents::process::ProcessManager;
 use crate::commands::projects::DbState;
 use crate::db;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 /// Start a task: creates a session, spawns an elf, starts the Claude process.
 ///
@@ -23,6 +23,7 @@ pub async fn start_task(
     project_id: String,
     task: String,
     runtime: String,
+    options: Option<String>,
 ) -> Result<String, String> {
     let session_id = uuid::Uuid::new_v4().to_string();
     let elf_id = uuid::Uuid::new_v4().to_string();
@@ -69,11 +70,42 @@ pub async fn start_task(
         }),
     );
 
-    // 5. Spawn Claude process
-    let child = claude_adapter::spawn_claude(&task, &working_dir)
+    // 5. Parse spawn options and spawn Claude process
+    let spawn_options: ClaudeSpawnOptions = match options {
+        Some(ref json) => match serde_json::from_str(json) {
+            Ok(opts) => opts,
+            Err(e) => {
+                log::warn!("Failed to parse spawn options: {e}, json={json}");
+                ClaudeSpawnOptions::default()
+            }
+        },
+        None => ClaudeSpawnOptions::default(),
+    };
+    let mut child = claude_adapter::spawn_claude(&task, &working_dir, &spawn_options)
         .map_err(|e| format!("Failed to spawn claude: {e}"))?;
 
+    // Take stdout and stderr before registering — we read them in background threads
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
     process_mgr.register(&session_id, child);
+
+    // 6. Drain stderr in a background thread to prevent pipe buffer deadlock.
+    // If stderr fills up (64KB), the child process blocks on writes and stdout stalls.
+    if let Some(stderr) = stderr {
+        let sid_err = session_id.clone();
+        std::thread::spawn(move || {
+            drain_stderr(stderr, &sid_err);
+        });
+    }
+
+    // 7. Stream stdout events to the frontend in a background thread
+    if let Some(stdout) = stdout {
+        let app_handle = app.clone();
+        let sid = session_id.clone();
+        std::thread::spawn(move || {
+            stream_claude_output(stdout, &app_handle, &sid);
+        });
+    }
 
     Ok(session_id)
 }
@@ -161,6 +193,7 @@ pub async fn start_team_task(
     project_id: String,
     task: String,
     plan: TaskPlan,
+    options: Option<String>,
 ) -> Result<String, String> {
     let session_id = uuid::Uuid::new_v4().to_string();
     let runtime = plan.runtime_recommendation.clone();
@@ -217,11 +250,41 @@ pub async fn start_team_task(
         elf_ids.push(elf_id);
     }
 
-    // 4. Spawn Claude in team mode
-    let child = claude_adapter::spawn_claude_team(&task, &working_dir, &plan)
+    // 4. Parse spawn options and spawn Claude in team mode
+    let spawn_options: ClaudeSpawnOptions = match options {
+        Some(ref json) => match serde_json::from_str(json) {
+            Ok(opts) => opts,
+            Err(e) => {
+                log::warn!("Failed to parse team spawn options: {e}, json={json}");
+                ClaudeSpawnOptions::default()
+            }
+        },
+        None => ClaudeSpawnOptions::default(),
+    };
+    let mut child = claude_adapter::spawn_claude_team(&task, &working_dir, &plan, &spawn_options)
         .map_err(|e| format!("Failed to spawn claude team: {e}"))?;
 
+    // Take stdout and stderr before registering
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
     process_mgr.register(&session_id, child);
+
+    // 5. Drain stderr to prevent pipe buffer deadlock
+    if let Some(stderr) = stderr {
+        let sid_err = session_id.clone();
+        std::thread::spawn(move || {
+            drain_stderr(stderr, &sid_err);
+        });
+    }
+
+    // 6. Stream stdout events to the frontend in a background thread
+    if let Some(stdout) = stdout {
+        let app_handle = app.clone();
+        let sid = session_id.clone();
+        std::thread::spawn(move || {
+            stream_claude_output(stdout, &app_handle, &sid);
+        });
+    }
 
     Ok(session_id)
 }
@@ -261,4 +324,181 @@ pub async fn stop_team_task(
     }
 
     Ok(any_killed)
+}
+
+/// Drain stderr from the Claude process to prevent pipe buffer deadlock.
+///
+/// Reads stderr line-by-line and logs each line at warn level. Without this,
+/// if Claude writes enough to stderr to fill the OS pipe buffer (~64KB on macOS),
+/// the process blocks on stderr writes and stdout stalls — deadlocking the stream.
+fn drain_stderr(stderr: std::process::ChildStderr, session_id: &str) {
+    use std::io::BufRead;
+    let reader = std::io::BufReader::new(stderr);
+    for line in reader.lines() {
+        match line {
+            Ok(line) if !line.trim().is_empty() => {
+                // Use both log and eprintln to ensure visibility
+                log::warn!("[session {session_id}] claude stderr: {line}");
+                eprintln!("[ELVES] claude stderr [{session_id}]: {line}");
+            }
+            Err(e) => {
+                log::warn!("[session {session_id}] stderr read error: {e}");
+                break;
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Read Claude's stdout line-by-line, parse events, and emit them to the frontend.
+///
+/// Runs in a background thread. For each parsed line:
+/// 1. Emits `elf:event` to the frontend for real-time display
+/// 2. Persists the event to SQLite for history and replay
+///
+/// When stdout closes (process finished):
+/// 1. Extracts token/cost data from the last `result` event
+/// 2. Updates session usage stats in the database
+/// 3. Updates session status to "completed" with a summary from the result
+/// 4. Emits `session:completed` to the frontend
+fn stream_claude_output(
+    stdout: std::process::ChildStdout,
+    app: &AppHandle,
+    session_id: &str,
+) {
+    use std::io::BufRead;
+
+    eprintln!("[ELVES] Starting stdout stream for session {session_id}");
+    log::info!("[session {session_id}] Starting stdout stream reader");
+
+    let db_state = app.state::<DbState>();
+    let reader = std::io::BufReader::new(stdout);
+    let mut last_result_payload: Option<serde_json::Value> = None;
+    let mut event_count: u32 = 0;
+
+    for line in reader.lines() {
+        match line {
+            Ok(line) => {
+                if let Some(event) = claude_adapter::parse_claude_output(&line) {
+                    event_count += 1;
+
+                    if event_count <= 3 || event.event_type == "result" {
+                        log::info!(
+                            "[session {session_id}] Event #{event_count}: type={}, payload_len={}",
+                            event.event_type,
+                            line.len(),
+                        );
+                    }
+
+                    // Capture Claude Code's session ID from system events for resume support
+                    if event.event_type == "system" {
+                        if let Some(claude_sid) = event.payload.get("session_id").and_then(|v| v.as_str()) {
+                            if let Ok(conn) = db_state.0.lock() {
+                                let _ = db::sessions::update_claude_session_id(&conn, session_id, claude_sid);
+                            }
+                            let _ = app.emit(
+                                "session:claude_id",
+                                serde_json::json!({
+                                    "sessionId": session_id,
+                                    "claudeSessionId": claude_sid,
+                                }),
+                            );
+                        }
+                    }
+
+                    // 1. Emit to frontend for real-time display
+                    let _ = app.emit(
+                        "elf:event",
+                        serde_json::json!({
+                            "sessionId": session_id,
+                            "eventType": &event.event_type,
+                            "payload": &event.payload,
+                            "timestamp": event.timestamp,
+                        }),
+                    );
+
+                    // 2. Persist to SQLite for history and replay
+                    if let Ok(conn) = db_state.0.lock() {
+                        let payload_str = serde_json::to_string(&event.payload).unwrap_or_default();
+                        if let Err(e) = db::events::insert_event(
+                            &conn,
+                            session_id,
+                            None,
+                            &event.event_type,
+                            &payload_str,
+                            None,
+                        ) {
+                            log::warn!("Failed to store event for session {session_id}: {e}");
+                        }
+                    }
+
+                    // 3. Track the last result event for usage extraction
+                    if event.event_type == "result" {
+                        last_result_payload = Some(event.payload.clone());
+                    }
+                }
+            }
+            Err(error) => {
+                log::warn!("[session {session_id}] stdout read error: {error}");
+                break;
+            }
+        }
+    }
+
+    eprintln!("[ELVES] stdout closed for session {session_id} after {event_count} events");
+    log::info!("[session {session_id}] stdout closed after {event_count} events");
+
+    // stdout closed — the Claude process has finished.
+    if let Ok(conn) = db_state.0.lock() {
+        // Extract token/cost data from the result event if available
+        if let Some(ref result) = last_result_payload {
+            let cost = result.get("cost_usd")
+                .and_then(|v| v.as_f64())
+                .or_else(|| result.get("cost").and_then(|v| v.as_f64()))
+                .unwrap_or(0.0);
+
+            let tokens = result.get("total_tokens")
+                .and_then(|v| v.as_i64())
+                .or_else(|| {
+                    // Sum input + output tokens if total not provided
+                    let input = result.get("input_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
+                    let output = result.get("output_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
+                    if input > 0 || output > 0 { Some(input + output) } else { None }
+                })
+                .unwrap_or(0);
+
+            log::info!("[session {session_id}] Result: tokens={tokens}, cost={cost}");
+
+            if tokens > 0 || cost > 0.0 {
+                let _ = db::sessions::update_session_usage(&conn, session_id, tokens, cost);
+            }
+        }
+
+        // Extract summary from the result event's text content
+        let summary = last_result_payload.as_ref()
+            .and_then(|r| {
+                r.get("result").and_then(|v| v.as_str())
+                    .or_else(|| r.get("text").and_then(|v| v.as_str()))
+                    .or_else(|| r.get("content").and_then(|v| v.as_str()))
+            })
+            .map(|text| {
+                if text.len() > 500 { format!("{}...", &text[..497]) } else { text.to_string() }
+            });
+
+        log::info!("[session {session_id}] Summary: {:?}", summary.as_deref().unwrap_or("(none)"));
+
+        let _ = db::sessions::update_session_status(
+            &conn,
+            session_id,
+            "completed",
+            summary.as_deref().or(Some("Task completed")),
+        );
+    }
+
+    let _ = app.emit(
+        "session:completed",
+        serde_json::json!({
+            "sessionId": session_id,
+        }),
+    );
 }

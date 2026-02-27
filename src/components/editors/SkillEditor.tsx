@@ -40,7 +40,10 @@ export function SkillEditor(): React.JSX.Element {
     handleCreateSkill,
     handleUpdateSkill,
     handleDeleteSkill,
+    handleImportFromClaude,
   } = useSkillActions();
+
+  const [importStatus, setImportStatus] = useState<string | null>(null);
 
   /* Local editor state */
   const [editName, setEditName] = useState("");
@@ -93,6 +96,14 @@ export function SkillEditor(): React.JSX.Element {
     handleDeleteSkill(activeSkill.id);
   }, [activeSkill, handleDeleteSkill]);
 
+  const handleImport = useCallback((): void => {
+    setImportStatus("Importing...");
+    void handleImportFromClaude().then((count) => {
+      setImportStatus(count > 0 ? `Imported ${count} skill${count > 1 ? "s" : ""}` : "No new skills found");
+      setTimeout(() => setImportStatus(null), 3000);
+    });
+  }, [handleImportFromClaude]);
+
   /* Group skills: global first, then project-scoped */
   const globalSkills = skills.filter((s) => s.projectId === null);
   const projectSkills = skills.filter((s) => s.projectId !== null);
@@ -110,10 +121,20 @@ export function SkillEditor(): React.JSX.Element {
       {/* Left panel — skill list */}
       <div className="flex w-64 shrink-0 flex-col border-r-[3px] border-border bg-white">
         {/* List header */}
-        <div className="flex items-center justify-between border-b-[3px] border-border p-3">
-          <h2 className="font-display text-lg font-black uppercase tracking-tight">Skills</h2>
-          <Button variant="primary" className="px-3 py-1 text-xs" onClick={handleNewSkill}>
-            + New
+        <div className="flex flex-col gap-2 border-b-[3px] border-border p-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg font-black uppercase tracking-tight">Skills</h2>
+            <Button variant="primary" className="px-3 py-1 text-xs" onClick={handleNewSkill}>
+              + New
+            </Button>
+          </div>
+          <Button
+            variant="secondary"
+            className="w-full px-2 py-1 text-xs"
+            onClick={handleImport}
+            data-testid="import-claude-skills"
+          >
+            {importStatus ?? "Import from Claude"}
           </Button>
         </div>
 

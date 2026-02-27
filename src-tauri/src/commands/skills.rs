@@ -1,5 +1,6 @@
-// Skill-related Tauri commands — CRUD operations exposed to the frontend.
+// Skill-related Tauri commands — CRUD + import from Claude Code commands.
 
+use crate::agents::claude_discovery::DiscoveredSkill;
 use crate::db;
 use crate::db::skills::SkillRow;
 use super::projects::DbState;
@@ -72,4 +73,12 @@ pub fn delete_skill(
     let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
     db::skills::delete_skill(&conn, &id)
         .map_err(|e| format!("Database error: {e}"))
+}
+
+/// Discover skills from Claude Code command files (~/.claude/commands/ and project-level).
+#[tauri::command]
+pub fn discover_skills_from_claude(
+    project_path: Option<String>,
+) -> Result<Vec<DiscoveredSkill>, String> {
+    Ok(crate::agents::claude_discovery::discover_commands(project_path.as_deref()))
 }

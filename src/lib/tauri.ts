@@ -9,10 +9,16 @@ import type { MemoryEntry, ExtractionResult } from "@/types/memory";
 import type { Skill } from "@/types/skill";
 import type { McpServer } from "@/types/mcp";
 import type { Template } from "@/types/template";
+import type { ClaudeDiscovery, ClaudeSpawnOptions } from "@/types/claude";
 
 /** Detect available AI runtimes (Claude Code, Codex) on the system */
 export async function detectRuntimes(): Promise<RuntimeInfo> {
   return invoke<RuntimeInfo>("detect_runtimes");
+}
+
+/** Discover the user's Claude Code world: custom agents and settings from ~/.claude/ */
+export async function discoverClaude(): Promise<ClaudeDiscovery> {
+  return invoke<ClaudeDiscovery>("discover_claude");
 }
 
 /** Get all projects from the local database */
@@ -33,13 +39,31 @@ export async function listSessions(projectId: string): Promise<Session[]> {
   return invoke<Session[]>("list_sessions", { projectId });
 }
 
+/** Event row from the database, used for session history detail view. */
+export interface SessionEvent {
+  readonly id: number;
+  readonly sessionId: string;
+  readonly elfId: string | null;
+  readonly eventType: string;
+  readonly payload: string;
+  readonly funnyStatus: string | null;
+  readonly timestamp: number;
+}
+
+/** List all events for a session, ordered chronologically. */
+export async function listSessionEvents(sessionId: string): Promise<SessionEvent[]> {
+  return invoke<SessionEvent[]>("list_session_events", { sessionId });
+}
+
 /** Start a task — creates session, spawns elf, starts agent process. Returns session ID. */
 export async function startTask(
   projectId: string,
   task: string,
   runtime: string,
+  spawnOptions?: ClaudeSpawnOptions,
 ): Promise<string> {
-  return invoke<string>("start_task", { projectId, task, runtime });
+  const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
+  return invoke<string>("start_task", { projectId, task, runtime, options });
 }
 
 /** Stop a running task. Returns true if a process was killed. */
@@ -60,8 +84,10 @@ export async function startTeamTask(
   projectId: string,
   task: string,
   plan: TaskPlan,
+  spawnOptions?: ClaudeSpawnOptions,
 ): Promise<string> {
-  return invoke<string>("start_team_task", { projectId, task, plan: JSON.stringify(plan) });
+  const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
+  return invoke<string>("start_team_task", { projectId, task, plan, options });
 }
 
 /** Stop a team task. Kills all agent processes for the session. */
@@ -136,6 +162,14 @@ export async function getMemoryCount(projectId: string): Promise<number> {
   return invoke<number>("get_memory_count", { projectId });
 }
 
+/* ── Terminal commands ────────────────────────────────────────── */
+
+/** Open Terminal.app cd'd into the given project directory (macOS).
+ * When claudeSessionId is provided, runs `claude --resume <id>` in the terminal. */
+export async function openProjectTerminal(path: string, claudeSessionId?: string): Promise<void> {
+  await invoke<void>("open_project_terminal", { path, claudeSessionId: claudeSessionId ?? null });
+}
+
 /* ── Skills commands ──────────────────────────────────────────── */
 
 /** List skills for a project (includes global skills). */
@@ -168,6 +202,21 @@ export async function updateSkill(
 /** Delete a skill by ID. */
 export async function deleteSkill(id: string): Promise<boolean> {
   return invoke<boolean>("delete_skill", { id });
+}
+
+/** A skill discovered from Claude Code command files. */
+export interface DiscoveredSkill {
+  readonly name: string;
+  readonly description: string;
+  readonly content: string;
+  readonly triggerPattern: string;
+  readonly filePath: string;
+  readonly scope: string;
+}
+
+/** Discover skills from ~/.claude/commands/ and optionally project-level commands. */
+export async function discoverSkillsFromClaude(projectPath?: string): Promise<DiscoveredSkill[]> {
+  return invoke<DiscoveredSkill[]>("discover_skills_from_claude", { projectPath: projectPath ?? null });
 }
 
 /* ── MCP commands ────────────────────────────────────────────── */
@@ -239,6 +288,11 @@ export async function loadTemplate(id: string): Promise<Template> {
 /** Export a session as a self-contained HTML replay file. Returns the HTML string. */
 export async function exportSessionHtml(sessionId: string): Promise<string> {
   return invoke<string>("export_session_html", { sessionId });
+}
+
+/** Save a session replay to disk via native save dialog. Returns true if saved, false if cancelled. */
+export async function saveSessionReplay(sessionId: string): Promise<boolean> {
+  return invoke<boolean>("save_session_replay", { sessionId });
 }
 
 /* ── Event subscription ──────────────────────────────────────── */

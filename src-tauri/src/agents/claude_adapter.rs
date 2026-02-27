@@ -3,6 +3,31 @@
 use crate::agents::analyzer::TaskPlan;
 use serde::{Deserialize, Serialize};
 
+/// Options for customizing a Claude Code CLI invocation.
+///
+/// All fields are optional — omitted fields produce no extra CLI flags.
+/// Serialized as JSON from the frontend and deserialized in the task commands.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeSpawnOptions {
+    /// Custom agent slug from ~/.claude/agents/ (--agent flag)
+    pub agent: Option<String>,
+    /// Model override: opus, sonnet, haiku (--model flag)
+    pub model: Option<String>,
+    /// Permission mode: default, acceptEdits, plan, bypassPermissions, dontAsk (--permission-mode)
+    pub permission_mode: Option<String>,
+    /// Per-session spending cap in USD (--max-budget-usd)
+    pub max_budget_usd: Option<f64>,
+    /// Text appended to the system prompt (--append-system-prompt)
+    pub append_system_prompt: Option<String>,
+    /// Effort level: low, medium, high (--effort)
+    pub effort: Option<String>,
+    /// Resume a specific previous session (--resume)
+    pub resume_session_id: Option<String>,
+    /// Continue the most recent session (--continue)
+    pub continue_session: Option<bool>,
+}
+
 /// A parsed event from Claude Code's output stream.
 /// These are normalized into the ElfEvent format for the frontend.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,8 +43,13 @@ pub struct ClaudeEvent {
 
 /// Spawn a Claude Code CLI process in non-interactive (print) mode.
 ///
-/// Runs: `claude --print --output-format json "<task>"`
-/// in the given working directory.
+/// Runs: `claude --print --output-format stream-json [options...] "<task>"`
+/// in the given working directory. The `stream-json` format outputs one
+/// JSON object per line as events happen (thinking, tool_use, result, etc.),
+/// enabling real-time progress in the frontend.
+///
+/// Options are applied conditionally — only non-None fields add CLI flags.
+/// The task string is always the last positional argument.
 ///
 /// Returns the child process handle for the caller to manage stdout/stderr.
 /// The caller is responsible for reading stdout line-by-line and passing each
@@ -27,23 +57,35 @@ pub struct ClaudeEvent {
 pub fn spawn_claude(
     task: &str,
     working_dir: &str,
+    options: &ClaudeSpawnOptions,
 ) -> Result<std::process::Child, std::io::Error> {
-    std::process::Command::new("claude")
-        .arg("--print")
+    log::info!("Spawning claude in {working_dir} with task: {}", &task[..task.len().min(100)]);
+    log::info!("Claude spawn options: {:?}", options);
+
+    let mut cmd = std::process::Command::new("claude");
+    cmd.arg("--print")
+        .arg("--verbose")
         .arg("--output-format")
-        .arg("json")
-        .arg(task)
+        .arg("stream-json");
+
+    // Apply optional flags from ClaudeSpawnOptions
+    apply_spawn_options(&mut cmd, options);
+
+    cmd.arg(task)
         .current_dir(working_dir)
+        // Clear CLAUDECODE env var to allow spawning from within a Claude Code session
+        .env_remove("CLAUDECODE")
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
+        .stderr(std::process::Stdio::piped());
+
+    cmd.spawn()
 }
 
 /// Parse a single line of output from the Claude Code CLI into a ClaudeEvent.
 ///
-/// Claude Code in `--print --output-format json` mode emits JSON objects.
-/// Lines that are valid JSON with a "type" field use that as the event_type.
-/// Lines that are valid JSON without a "type" field default to "output".
+/// Claude Code in `--print --output-format stream-json` mode emits one JSON
+/// object per line. Lines with a "type" field use that as the event_type.
+/// Lines without a "type" field default to "output".
 /// Non-JSON lines are wrapped as plain text output events.
 /// Empty lines return None.
 pub fn parse_claude_output(line: &str) -> Option<ClaudeEvent> {
@@ -83,26 +125,72 @@ pub fn parse_claude_output(line: &str) -> Option<ClaudeEvent> {
 ///
 /// Sets `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` and constructs a team prompt
 /// from the TaskPlan, describing each role, its focus, and task dependencies.
+/// Uses `stream-json` output format for real-time event streaming.
 /// Claude Code's native team support coordinates the agents internally.
+///
+/// Options are applied the same as for solo spawn — model, permission mode,
+/// budget, etc. all flow through to the team leader process.
 ///
 /// Returns the child process handle. The caller manages stdout/stderr.
 pub fn spawn_claude_team(
     task: &str,
     working_dir: &str,
     plan: &TaskPlan,
+    options: &ClaudeSpawnOptions,
 ) -> Result<std::process::Child, std::io::Error> {
     let team_prompt = build_team_prompt(task, plan);
 
-    std::process::Command::new("claude")
-        .arg("--print")
+    log::info!("Spawning claude team in {working_dir} with {} roles", plan.agent_count);
+    log::info!("Claude team spawn options: {:?}", options);
+
+    let mut cmd = std::process::Command::new("claude");
+    cmd.arg("--print")
+        .arg("--verbose")
         .arg("--output-format")
-        .arg("json")
-        .arg(&team_prompt)
+        .arg("stream-json");
+
+    // Apply optional flags from ClaudeSpawnOptions
+    apply_spawn_options(&mut cmd, options);
+
+    cmd.arg(&team_prompt)
         .current_dir(working_dir)
         .env("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1")
+        .env_remove("CLAUDECODE")
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
+        .stderr(std::process::Stdio::piped());
+
+    cmd.spawn()
+}
+
+/// Apply ClaudeSpawnOptions as CLI flags to a Command.
+///
+/// Each non-None field maps to its corresponding --flag. Called by both
+/// spawn_claude and spawn_claude_team to keep flag logic in one place.
+fn apply_spawn_options(cmd: &mut std::process::Command, options: &ClaudeSpawnOptions) {
+    if let Some(ref agent) = options.agent {
+        cmd.arg("--agent").arg(agent);
+    }
+    if let Some(ref model) = options.model {
+        cmd.arg("--model").arg(model);
+    }
+    if let Some(ref mode) = options.permission_mode {
+        cmd.arg("--permission-mode").arg(mode);
+    }
+    if let Some(budget) = options.max_budget_usd {
+        cmd.arg("--max-budget-usd").arg(budget.to_string());
+    }
+    if let Some(ref prompt) = options.append_system_prompt {
+        cmd.arg("--append-system-prompt").arg(prompt);
+    }
+    if let Some(ref effort) = options.effort {
+        cmd.arg("--effort").arg(effort);
+    }
+    if let Some(ref session_id) = options.resume_session_id {
+        cmd.arg("--resume").arg(session_id);
+    }
+    if options.continue_session == Some(true) {
+        cmd.arg("--continue");
+    }
 }
 
 /// Build a structured team prompt from a TaskPlan.
