@@ -1,6 +1,6 @@
-/* Team session lifecycle hook — orchestrates task analysis, plan preview, team deployment, and completion. */
+/* Team session lifecycle hook — orchestrates task analysis, plan preview, and team deployment. */
 
-import { useCallback, useRef, useEffect } from "react";
+import { useCallback } from "react";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/project";
 import { useAppStore } from "@/stores/app";
@@ -11,27 +11,25 @@ import {
   stopTask as invokeStopTask,
   stopTeamTask as invokeStopTeamTask,
   buildProjectContext,
-  extractSessionMemories,
 } from "@/lib/tauri";
-import { useSettingsStore } from "@/stores/settings";
 import { generateElf, getStatusMessage } from "@/lib/elf-names";
 import type { Runtime, ElfStatus } from "@/types/elf";
 import type { TaskPlan } from "@/types/session";
-
-/** Delay in milliseconds before elves transition from "done" to "sleeping" */
-const SLEEP_DELAY_MS = 5000;
+import type { ClaudeSpawnOptions } from "@/types/claude";
 
 /**
- * Provides the full Phase 3 task lifecycle:
+ * Provides the task lifecycle for analysis and deployment:
  * 1. Analyze task → determine solo vs team
  * 2. Show plan preview for team tasks (or auto-deploy for solo)
  * 3. Deploy agents with personality assignment
- * 4. Handle session completion with celebrations and sleep transitions
+ * 4. Stop a running session
+ *
+ * Session completion (celebrations, memory extraction, sleep transitions) is
+ * handled by `useSessionEvents` which listens for `session:completed` events.
  */
 export function useTeamSession(): {
   analyzeAndDeploy: (task: string) => Promise<void>;
   deployWithPlan: (plan: TaskPlan) => Promise<void>;
-  completeSession: (leadName: string) => void;
   stopSession: () => Promise<void>;
   isSessionActive: boolean;
   isPlanPreview: boolean;
@@ -39,61 +37,25 @@ export function useTeamSession(): {
   const activeSession = useSessionStore((s) => s.activeSession);
   const isPlanPreview = useSessionStore((s) => s.isPlanPreview);
   const startSession = useSessionStore((s) => s.startSession);
-  const endSession = useSessionStore((s) => s.endSession);
   const addElf = useSessionStore((s) => s.addElf);
   const addEvent = useSessionStore((s) => s.addEvent);
   const updateElfStatus = useSessionStore((s) => s.updateElfStatus);
-  const updateAllElfStatus = useSessionStore((s) => s.updateAllElfStatus);
   const showPlanPreview = useSessionStore((s) => s.showPlanPreview);
   const acceptPlan = useSessionStore((s) => s.acceptPlan);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const defaultRuntime = useAppStore((s) => s.defaultRuntime);
-  const autoLearn = useSettingsStore((s) => s.autoLearn);
-  const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /** Clean up sleep timer on unmount */
-  useEffect(() => {
-    return () => {
-      if (sleepTimerRef.current) {
-        clearTimeout(sleepTimerRef.current);
-      }
+  /** Build ClaudeSpawnOptions from current app store selections. */
+  const buildSpawnOptions = useCallback((): ClaudeSpawnOptions => {
+    const { selectedAgent, selectedModel, selectedPermissionMode, budgetCap } =
+      useAppStore.getState();
+    return {
+      agent: selectedAgent?.slug ?? undefined,
+      model: selectedModel ?? selectedAgent?.model ?? undefined,
+      permissionMode: selectedPermissionMode ?? undefined,
+      maxBudgetUsd: budgetCap ?? undefined,
     };
   }, []);
-
-  /**
-   * Completes a session: transitions elves to done, shows celebration,
-   * then sleeps elves after a delay.
-   */
-  const completeSession = useCallback(
-    (leadName: string): void => {
-      updateAllElfStatus("done");
-
-      addEvent({
-        id: `event-complete-${Date.now()}`,
-        timestamp: Date.now(),
-        elfId: "system",
-        elfName: "System",
-        runtime: defaultRuntime,
-        type: "task_update",
-        payload: { status: "completed", message: `ALL DONE! ${leadName}: "The elfs have spoken."` },
-        funnyStatus: `${leadName} declares victory!`,
-      });
-
-      /* Post-session: extract memories if auto-learn is enabled */
-      if (autoLearn && activeSession) {
-        extractSessionMemories(activeSession.id).catch((error: unknown) => {
-          console.error("Failed to extract session memories:", error);
-        });
-      }
-
-      endSession("Task completed successfully");
-
-      sleepTimerRef.current = setTimeout(() => {
-        updateAllElfStatus("sleeping");
-      }, SLEEP_DELAY_MS);
-    },
-    [updateAllElfStatus, addEvent, endSession, defaultRuntime, autoLearn, activeSession],
-  );
 
   /**
    * Analyze the task and either auto-deploy (solo) or show plan preview (team).
@@ -113,12 +75,32 @@ export function useTeamSession(): {
 
         const plan = await invokeAnalyzeTask(task, activeProjectId);
 
+        /* When forceTeamMode is active, override solo classification to show plan preview
+         * so the user can configure roles before deployment. */
+        const { forceTeamMode } = useAppStore.getState();
+        if (forceTeamMode && plan.complexity === "solo") {
+          showPlanPreview(plan);
+          return;
+        }
+
         if (plan.complexity === "solo") {
           /* Solo task — skip plan preview, deploy immediately */
           const runtime = defaultRuntime;
-          const sessionId = await invokeStartTask(activeProjectId, task, runtime);
+          const spawnOptions = buildSpawnOptions();
+          const sessionId = await invokeStartTask(activeProjectId, task, runtime, spawnOptions);
 
-          startSession({ id: sessionId, projectId: activeProjectId, task, runtime, plan });
+          startSession({
+            id: sessionId,
+            projectId: activeProjectId,
+            task,
+            runtime,
+            plan,
+            appliedOptions: {
+              agent: spawnOptions.agent,
+              model: spawnOptions.model,
+              permissionMode: spawnOptions.permissionMode,
+            },
+          });
 
           const personality = generateElf();
           addElf({
@@ -160,7 +142,7 @@ export function useTeamSession(): {
         console.error("Failed to analyze task:", error);
       }
     },
-    [activeProjectId, defaultRuntime, startSession, addElf, addEvent, updateElfStatus, showPlanPreview],
+    [activeProjectId, defaultRuntime, buildSpawnOptions, startSession, addElf, addEvent, updateElfStatus, showPlanPreview],
   );
 
   /**
@@ -174,7 +156,8 @@ export function useTeamSession(): {
       const runtime = defaultRuntime;
 
       try {
-        const sessionId = await invokeStartTeamTask(activeProjectId, plan.taskGraph[0]?.label ?? "Team task", plan);
+        const spawnOptions = buildSpawnOptions();
+        const sessionId = await invokeStartTeamTask(activeProjectId, plan.taskGraph[0]?.label ?? "Team task", plan, spawnOptions);
 
         startSession({
           id: sessionId,
@@ -182,6 +165,11 @@ export function useTeamSession(): {
           task: plan.taskGraph.map((n) => n.label).join(", "),
           runtime,
           plan,
+          appliedOptions: {
+            agent: spawnOptions.agent,
+            model: spawnOptions.model,
+            permissionMode: spawnOptions.permissionMode,
+          },
         });
 
         /* Assign a personality to each role and add to the store */
@@ -230,16 +218,11 @@ export function useTeamSession(): {
         console.error("Failed to deploy team:", error);
       }
     },
-    [activeProjectId, defaultRuntime, acceptPlan, startSession, addElf, addEvent, updateElfStatus],
+    [activeProjectId, defaultRuntime, buildSpawnOptions, acceptPlan, startSession, addElf, addEvent, updateElfStatus],
   );
 
   const stopSession = useCallback(async (): Promise<void> => {
     if (!activeSession) return;
-
-    if (sleepTimerRef.current) {
-      clearTimeout(sleepTimerRef.current);
-      sleepTimerRef.current = null;
-    }
 
     try {
       const isTeam = activeSession.plan?.complexity === "team";
@@ -248,18 +231,17 @@ export function useTeamSession(): {
       } else {
         await invokeStopTask(activeSession.id);
       }
-      endSession("Cancelled by user");
+      /* Cancellation events are handled by useSessionEvents via session:cancelled listener */
     } catch (error) {
       console.error("Failed to stop task:", error);
     }
-  }, [activeSession, endSession]);
+  }, [activeSession]);
 
   return {
     analyzeAndDeploy,
     deployWithPlan,
-    completeSession,
     stopSession,
-    isSessionActive: activeSession !== null,
+    isSessionActive: activeSession !== null && activeSession.status === "active",
     isPlanPreview,
   };
 }

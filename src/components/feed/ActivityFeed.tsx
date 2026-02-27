@@ -33,19 +33,26 @@ function describeEvent(event: ElfEvent): string {
     case "spawn":
       return `spawned${payload.role ? ` as ${String(payload.role)}` : ""}`;
     case "thinking":
-      return "thinking...";
-    case "tool_call":
-      return String(payload.tool ?? "tool call");
+      return String(payload.text ?? "thinking...").slice(0, 120);
+    case "tool_call": {
+      const tool = String(payload.tool ?? "tool");
+      const input = payload.input as Record<string, unknown> | undefined;
+      const detail = input?.file_path ?? input?.command ?? input?.pattern ?? input?.query ?? input?.url ?? "";
+      return detail ? `${tool} ${String(detail).slice(0, 80)}` : tool;
+    }
     case "tool_result":
-      return `result: ${String(payload.result ?? "").slice(0, 60)}`;
-    case "output":
-      return String(payload.text ?? "output");
+      return String(payload.result ?? "").slice(0, 120) || "done";
+    case "output": {
+      const text = String(payload.text ?? "");
+      if (payload.isFinal) return `Result: ${text.slice(0, 120)}`;
+      return text.slice(0, 120) || "output";
+    }
     case "error":
       return String(payload.message ?? "error occurred");
     case "chat":
       return String(payload.text ?? "");
     case "task_update":
-      return `task: ${String(payload.description ?? "updated")}`;
+      return String(payload.message ?? payload.description ?? "updated");
     case "permission_request":
       return `requesting permission: ${String(payload.tool ?? "")}`;
     case "file_change":

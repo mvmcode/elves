@@ -5,6 +5,7 @@ pub mod export;
 pub mod mcp;
 pub mod memory;
 pub mod projects;
+pub mod pty;
 pub mod sessions;
 pub mod skills;
 pub mod tasks;

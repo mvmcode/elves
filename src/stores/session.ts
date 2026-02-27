@@ -1,8 +1,16 @@
 /* Session state — tracks the active task session, its elves, and the unified event stream. */
 
 import { create } from "zustand";
+import { useAppStore } from "@/stores/app";
 import type { Elf, ElfEvent, ElfStatus, Runtime } from "@/types/elf";
 import type { TaskPlan, TaskNodeStatus } from "@/types/session";
+
+/** Spawn options that were applied when the session started */
+export interface AppliedOptions {
+  readonly agent?: string;
+  readonly model?: string;
+  readonly permissionMode?: string;
+}
 
 /** Parameters for starting a new session */
 interface StartSessionParams {
@@ -11,10 +19,11 @@ interface StartSessionParams {
   readonly task: string;
   readonly runtime: Runtime;
   readonly plan?: TaskPlan;
+  readonly appliedOptions?: AppliedOptions;
 }
 
 /** The active session snapshot displayed in the UI */
-interface ActiveSession {
+export interface ActiveSession {
   readonly id: string;
   readonly projectId: string;
   readonly task: string;
@@ -22,6 +31,8 @@ interface ActiveSession {
   readonly status: string;
   readonly startedAt: number;
   readonly plan: TaskPlan | null;
+  readonly appliedOptions?: AppliedOptions;
+  readonly claudeSessionId?: string;
 }
 
 interface SessionState {
@@ -40,8 +51,8 @@ interface SessionState {
 
   /** Start a new task session */
   startSession: (session: StartSessionParams) => void;
-  /** End the current session with an optional summary */
-  endSession: (summary?: string) => void;
+  /** End the current session with a status ("completed", "cancelled", or "ended") */
+  endSession: (status?: string) => void;
   /** Append an event to the stream */
   addEvent: (event: ElfEvent) => void;
   /** Register a newly spawned elf */
@@ -58,6 +69,8 @@ interface SessionState {
   acceptPlan: () => void;
   /** Update a task node's status in the active plan's task graph */
   updateTaskNodeStatus: (nodeId: string, status: TaskNodeStatus) => void;
+  /** Store the Claude Code session ID received from the backend */
+  setClaudeSessionId: (claudeSessionId: string) => void;
   /** Clear all session state (reset to idle) */
   clearSession: () => void;
 }
@@ -80,6 +93,7 @@ export const useSessionStore = create<SessionState>((set) => ({
         status: "active",
         startedAt: Date.now(),
         plan: session.plan ?? null,
+        appliedOptions: session.appliedOptions,
       },
       events: [],
       elves: [],
@@ -88,10 +102,10 @@ export const useSessionStore = create<SessionState>((set) => ({
       pendingPlan: null,
     }),
 
-  endSession: (summary?: string) =>
+  endSession: (status?: string) =>
     set((state) => ({
       activeSession: state.activeSession
-        ? { ...state.activeSession, status: summary ? "completed" : "ended" }
+        ? { ...state.activeSession, status: status ?? "ended" }
         : null,
     })),
 
@@ -149,7 +163,15 @@ export const useSessionStore = create<SessionState>((set) => ({
       };
     }),
 
-  clearSession: () =>
+  setClaudeSessionId: (claudeSessionId: string) =>
+    set((state) => ({
+      activeSession: state.activeSession
+        ? { ...state.activeSession, claudeSessionId }
+        : null,
+    })),
+
+  clearSession: () => {
+    useAppStore.getState().resetTaskOptions();
     set({
       activeSession: null,
       events: [],
@@ -157,5 +179,6 @@ export const useSessionStore = create<SessionState>((set) => ({
       thinkingStream: [],
       isPlanPreview: false,
       pendingPlan: null,
-    }),
+    });
+  },
 }));

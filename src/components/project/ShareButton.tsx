@@ -1,61 +1,56 @@
-/* ShareButton — exports a session as a self-contained HTML replay file. */
+/* ShareButton — exports a session as a self-contained HTML replay file via native save dialog. */
 
 import { useState } from "react";
 import { Button } from "@/components/shared/Button";
-import { exportSessionHtml } from "@/lib/tauri";
+import { saveSessionReplay } from "@/lib/tauri";
 
 interface ShareButtonProps {
   readonly sessionId: string;
   readonly sessionTask: string;
 }
 
+/** Transient button state during and after export. */
+type ExportState = "idle" | "exporting" | "saved";
+
 /**
  * Neo-brutalist share button that exports a session as a self-contained HTML replay file.
- * Calls the Rust backend to generate the HTML, then triggers a browser download.
+ * Uses Tauri's native save dialog to write the file to disk (the Blob+anchor approach
+ * silently fails in Tauri WebView).
  */
-export function ShareButton({ sessionId, sessionTask }: ShareButtonProps): React.JSX.Element {
-  const [isExporting, setIsExporting] = useState(false);
+export function ShareButton({ sessionId }: ShareButtonProps): React.JSX.Element {
+  const [exportState, setExportState] = useState<ExportState>("idle");
 
   async function handleExport(): Promise<void> {
-    if (isExporting) return;
-    setIsExporting(true);
+    if (exportState === "exporting") return;
+    setExportState("exporting");
 
     try {
-      const html = await exportSessionHtml(sessionId);
-      const blob = new Blob([html], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-
-      const sanitizedTask = sessionTask
-        .replace(/[^a-zA-Z0-9\s-]/g, "")
-        .replace(/\s+/g, "-")
-        .substring(0, 40)
-        .toLowerCase();
-      const filename = `elves-replay-${sanitizedTask || sessionId}.html`;
-
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
+      const saved = await saveSessionReplay(sessionId);
+      if (saved) {
+        setExportState("saved");
+        setTimeout(() => setExportState("idle"), 2000);
+      } else {
+        /* User cancelled the save dialog */
+        setExportState("idle");
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       window.alert(`Export failed: ${message}`);
-    } finally {
-      setIsExporting(false);
+      setExportState("idle");
     }
   }
+
+  const label = exportState === "exporting" ? "Exporting..." : exportState === "saved" ? "Saved!" : "Export Replay";
 
   return (
     <Button
       variant="secondary"
       className="text-xs"
       onClick={handleExport}
-      disabled={isExporting}
+      disabled={exportState === "exporting"}
       data-testid="share-button"
     >
-      {isExporting ? "Exporting..." : "Export Replay"}
+      {label}
     </Button>
   );
 }

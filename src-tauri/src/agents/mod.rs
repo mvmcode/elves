@@ -2,6 +2,7 @@
 
 pub mod analyzer;
 pub mod claude_adapter;
+pub mod claude_discovery;
 pub mod codex_adapter;
 pub mod context_builder;
 pub mod interop;

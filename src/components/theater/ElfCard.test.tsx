@@ -1,4 +1,4 @@
-/* Tests for the ElfCard component — verifies rendering, status, progress, and expand/collapse. */
+/* Tests for the ElfCard component — verifies rendering, status, progress, expand/collapse, and variant modes. */
 
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
@@ -64,7 +64,6 @@ describe("ElfCard", () => {
     render(<ElfCard elf={elf} />);
     const funnyStatus = screen.getByTestId("funny-status");
     expect(funnyStatus).toBeInTheDocument();
-    /* Message should contain the elf's name */
     expect(funnyStatus.textContent).toContain("Spark");
   });
 
@@ -98,11 +97,11 @@ describe("ElfCard", () => {
     render(<ElfCard elf={elf} events={events} />);
 
     /* Event list should not be visible initially */
-    expect(screen.queryByTestId("event-list")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("terminal-output")).not.toBeInTheDocument();
 
     /* Click expand */
     fireEvent.click(screen.getByTestId("expand-toggle"));
-    expect(screen.getByTestId("event-list")).toBeInTheDocument();
+    expect(screen.getByTestId("terminal-output")).toBeInTheDocument();
   });
 
   it("calls onToggleExpand when provided", () => {
@@ -117,15 +116,14 @@ describe("ElfCard", () => {
   it("shows events when expanded", () => {
     const elf = createTestElf();
     const events = [
-      createTestEvent({ id: "e1", type: "thinking" }),
+      createTestEvent({ id: "e1", type: "thinking", payload: { text: "thinking..." } }),
       createTestEvent({ id: "e2", type: "tool_call", payload: { tool: "read_file" } }),
     ];
     render(<ElfCard elf={elf} events={events} isExpanded />);
 
-    const eventList = screen.getByTestId("event-list");
-    expect(eventList).toBeInTheDocument();
-    expect(eventList.textContent).toContain("Thinking...");
-    expect(eventList.textContent).toContain("Using read_file");
+    expect(screen.getByTestId("terminal-output")).toBeInTheDocument();
+    const blocks = screen.getAllByTestId("event-block");
+    expect(blocks).toHaveLength(2);
   });
 
   it("applies elf color to left border", () => {
@@ -140,5 +138,80 @@ describe("ElfCard", () => {
     const elf = createTestElf();
     render(<ElfCard elf={elf} events={[]} isExpanded />);
     expect(screen.getByText("No events yet...")).toBeInTheDocument();
+  });
+
+  /* Terminal variant tests */
+  describe("variant='terminal'", () => {
+    it("renders in full-height terminal layout", () => {
+      const elf = createTestElf();
+      render(<ElfCard elf={elf} variant="terminal" />);
+      const card = screen.getByTestId("elf-card");
+      expect(card.className).toContain("h-full");
+      expect(card.className).toContain("flex-col");
+    });
+
+    it("always shows terminal output without expand toggle", () => {
+      const elf = createTestElf();
+      const events = [createTestEvent({ id: "e1", type: "tool_call", payload: { tool: "bash" } })];
+      render(<ElfCard elf={elf} events={events} variant="terminal" />);
+      expect(screen.getByTestId("terminal-output")).toBeInTheDocument();
+      expect(screen.queryByTestId("expand-toggle")).not.toBeInTheDocument();
+    });
+
+    it("shows elf name and status badge", () => {
+      const elf = createTestElf({ status: "thinking" });
+      render(<ElfCard elf={elf} variant="terminal" />);
+      expect(screen.getByText("Spark")).toBeInTheDocument();
+      expect(screen.getByText("Thinking")).toBeInTheDocument();
+    });
+
+    it("shows progress bar inline", () => {
+      const elf = createTestElf();
+      render(<ElfCard elf={elf} variant="terminal" />);
+      expect(screen.getByTestId("progress-bar")).toBeInTheDocument();
+    });
+
+    it("shows funny status inline", () => {
+      const elf = createTestElf();
+      render(<ElfCard elf={elf} variant="terminal" />);
+      expect(screen.getByTestId("funny-status")).toBeInTheDocument();
+    });
+
+    it("shows role inline when provided", () => {
+      const elf = createTestElf({ role: "Backend Dev" });
+      render(<ElfCard elf={elf} variant="terminal" />);
+      expect(screen.getByText("Backend Dev")).toBeInTheDocument();
+    });
+
+    it("shows collapse toggle button", () => {
+      const elf = createTestElf();
+      render(<ElfCard elf={elf} variant="terminal" />);
+      expect(screen.getByTestId("output-collapse-toggle")).toBeInTheDocument();
+      expect(screen.getByText("Hide Output")).toBeInTheDocument();
+    });
+
+    it("hides terminal output when collapse toggle is clicked", () => {
+      const elf = createTestElf();
+      const events = [createTestEvent({ id: "e1", type: "tool_call", payload: { tool: "bash" } })];
+      render(<ElfCard elf={elf} events={events} variant="terminal" />);
+
+      expect(screen.getByTestId("terminal-output")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("output-collapse-toggle"));
+      expect(screen.queryByTestId("terminal-output")).not.toBeInTheDocument();
+      expect(screen.getByText("Show Output")).toBeInTheDocument();
+    });
+
+    it("re-shows terminal output when collapse toggle is clicked again", () => {
+      const elf = createTestElf();
+      const events = [createTestEvent({ id: "e1", type: "tool_call", payload: { tool: "bash" } })];
+      render(<ElfCard elf={elf} events={events} variant="terminal" />);
+
+      fireEvent.click(screen.getByTestId("output-collapse-toggle"));
+      expect(screen.queryByTestId("terminal-output")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("output-collapse-toggle"));
+      expect(screen.getByTestId("terminal-output")).toBeInTheDocument();
+    });
   });
 });

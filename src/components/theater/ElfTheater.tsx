@@ -1,4 +1,4 @@
-/* ElfTheater — responsive workshop grid with global progress bar, lead badge, and inter-elf chat bubbles. */
+/* ElfTheater — responsive workshop grid with solo terminal mode, global progress bar, lead badge, and inter-elf chat bubbles. */
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,6 +12,8 @@ interface ElfTheaterProps {
   readonly leadElfId?: string;
   readonly costEstimate?: number;
   readonly startedAt?: number;
+  /** Session status — timer freezes when not "active". */
+  readonly sessionStatus?: string;
 }
 
 /** A chat bubble message extracted from chat-type events. */
@@ -38,10 +40,9 @@ const GLOBAL_STATUS_MESSAGES: readonly string[] = [
 
 /**
  * Returns the responsive grid column class based on elf count.
- * 1 = centered, 2 = side by side, 3 = row of 3, 4-6 = 2 rows.
+ * Only used for team mode (2+ elves).
  */
 function gridColumnsClass(count: number): string {
-  if (count <= 1) return "grid-cols-1 max-w-md mx-auto";
   if (count === 2) return "grid-cols-1 md:grid-cols-2 max-w-2xl mx-auto";
   if (count === 3) return "grid-cols-1 md:grid-cols-3";
   return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
@@ -61,9 +62,9 @@ function formatCost(cost: number): string {
 }
 
 /**
- * Responsive grid layout that renders an ElfCard for each active elf.
- * Supports lead agent crown badge, inter-elf chat bubbles with auto-dismiss,
- * a global progress top bar with elapsed time and cost, and fun status messages.
+ * Responsive layout that renders elf cards. Supports two modes:
+ * - Solo (1 elf): full-height terminal view with rich output
+ * - Team (2+ elves): grid layout with compact cards, chat bubbles, heading
  */
 export function ElfTheater({
   elves,
@@ -71,11 +72,14 @@ export function ElfTheater({
   leadElfId,
   costEstimate = 0,
   startedAt,
+  sessionStatus,
 }: ElfTheaterProps): React.JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [chatBubbles, setChatBubbles] = useState<readonly ChatBubble[]>([]);
   const [globalStatusIndex, setGlobalStatusIndex] = useState(0);
+
+  const isSolo = elves.length === 1;
 
   /** Pre-compute events grouped by elfId for efficient lookup. */
   const eventsByElf = useMemo(() => {
@@ -91,14 +95,15 @@ export function ElfTheater({
     return grouped;
   }, [events]);
 
-  /** Elapsed time counter — ticks every second when session is active. */
+  /** Elapsed time counter — ticks every second while session is active, freezes on completion. */
   useEffect(() => {
     if (!startedAt) return;
+    if (sessionStatus && sessionStatus !== "active") return;
     const interval = setInterval(() => {
       setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
     }, 1000);
     return () => clearInterval(interval);
-  }, [startedAt]);
+  }, [startedAt, sessionStatus]);
 
   /** Rotate global status message every 8 seconds. */
   useEffect(() => {
@@ -151,8 +156,56 @@ export function ElfTheater({
     );
   }
 
+  /* Solo mode: full-height terminal view */
+  if (isSolo) {
+    const soloElf = elves[0]!;
+    const soloEvents = eventsByElf.get(soloElf.id) ?? [];
+
+    return (
+      <div className="flex flex-1 flex-col" data-testid="elf-theater" data-mode="solo">
+        {/* Slim progress bar for solo mode */}
+        <div
+          className="flex items-center gap-4 border-b-[2px] border-border bg-white px-4 py-2"
+          data-testid="progress-bar-global"
+        >
+          <Badge variant="info">
+            {elves.length} {elves.length === 1 ? "elf" : "elves"} deployed
+          </Badge>
+          {startedAt && (
+            <span className="font-mono text-sm font-bold" data-testid="elapsed-time">
+              {formatElapsed(elapsedSeconds)} elapsed
+            </span>
+          )}
+          {costEstimate > 0 && (
+            <span className="font-mono text-sm text-gray-600" data-testid="cost-estimate">
+              {formatCost(costEstimate)}
+            </span>
+          )}
+          <span
+            className="ml-auto font-body text-xs italic text-gray-500"
+            data-testid="global-status"
+          >
+            {GLOBAL_STATUS_MESSAGES[globalStatusIndex]}
+          </span>
+        </div>
+
+        {/* Solo elf card fills remaining space */}
+        <div className="flex flex-1 overflow-hidden p-2">
+          <div className="flex flex-1 flex-col">
+            <ElfCard
+              elf={soloElf}
+              events={soloEvents}
+              variant="terminal"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* Team mode: grid layout with compact cards */
   return (
-    <div className="flex flex-col gap-4 p-4" data-testid="elf-theater">
+    <div className="flex flex-1 flex-col gap-4 p-4" data-testid="elf-theater" data-mode="team">
       {/* Global progress top bar */}
       <div
         className="flex items-center justify-between border-[3px] border-border bg-white px-4 py-3 shadow-brutal"
@@ -237,6 +290,7 @@ export function ElfTheater({
               onToggleExpand={() =>
                 setExpandedId((prev) => (prev === elf.id ? null : elf.id))
               }
+              variant="compact"
             />
           </div>
         ))}

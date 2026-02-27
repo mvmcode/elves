@@ -5,7 +5,7 @@ use rusqlite::Connection;
 use super::DbError;
 
 /// Current schema version. Increment this when adding new migrations.
-const CURRENT_VERSION: i32 = 2;
+const CURRENT_VERSION: i32 = 3;
 
 /// Run all pending migrations up to CURRENT_VERSION.
 /// Uses a schema_version table to track which migrations have been applied.
@@ -31,6 +31,9 @@ pub fn run_migrations(conn: &Connection) -> Result<(), DbError> {
     }
     if current < 2 {
         migrate_v2(conn)?;
+    }
+    if current < 3 {
+        migrate_v3(conn)?;
     }
 
     Ok(())
@@ -201,6 +204,24 @@ fn migrate_v2(conn: &Connection) -> Result<(), DbError> {
     )
     .map_err(|e| DbError::Migration {
         version: 2,
+        message: e.to_string(),
+    })?;
+
+    Ok(())
+}
+
+/// Migration v3: Add claude_session_id column to sessions for terminal resume support.
+fn migrate_v3(conn: &Connection) -> Result<(), DbError> {
+    conn.execute_batch(
+        "
+        ALTER TABLE sessions ADD COLUMN claude_session_id TEXT;
+
+        -- Record this migration
+        INSERT INTO schema_version (version) VALUES (3);
+        ",
+    )
+    .map_err(|e| DbError::Migration {
+        version: 3,
         message: e.to_string(),
     })?;
 

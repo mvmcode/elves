@@ -133,20 +133,33 @@ describe("useSessionStore", () => {
   });
 
   describe("endSession", () => {
-    it("sets status to completed when summary is provided", () => {
+    it("sets status to completed when passed explicitly", () => {
       useSessionStore.getState().startSession({
         id: "session-1",
         projectId: "project-1",
         task: "task",
         runtime: "claude-code",
       });
-      useSessionStore.getState().endSession("All done!");
+      useSessionStore.getState().endSession("completed");
 
       const state = useSessionStore.getState();
       expect(state.activeSession!.status).toBe("completed");
     });
 
-    it("sets status to ended when no summary is provided", () => {
+    it("sets status to cancelled when passed explicitly", () => {
+      useSessionStore.getState().startSession({
+        id: "session-1",
+        projectId: "project-1",
+        task: "task",
+        runtime: "claude-code",
+      });
+      useSessionStore.getState().endSession("cancelled");
+
+      const state = useSessionStore.getState();
+      expect(state.activeSession!.status).toBe("cancelled");
+    });
+
+    it("sets status to ended when no status is provided", () => {
       useSessionStore.getState().startSession({
         id: "session-1",
         projectId: "project-1",
@@ -160,7 +173,7 @@ describe("useSessionStore", () => {
     });
 
     it("does nothing when there is no active session", () => {
-      useSessionStore.getState().endSession("summary");
+      useSessionStore.getState().endSession("completed");
       expect(useSessionStore.getState().activeSession).toBeNull();
     });
   });

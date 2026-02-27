@@ -243,3 +243,55 @@
 **Options:** Next.js static export, Astro, plain HTML/CSS, Docusaurus
 **Decision:** Single self-contained HTML file with inline CSS and minimal vanilla JS
 **Rationale:** Zero build step, instant deploy to any static host (GitHub Pages, Vercel, Netlify). No dependency maintenance. Page loads in <1s. The page is simple enough (7 sections, no dynamic content) that a framework adds complexity without value. Neo-brutalist styling is CSS-only — no component library needed.
+
+---
+
+## Phase 8: Streaming, Terminal & Discovery — Decisions
+
+## 2026-02-27 — stream-json Output Format (not json)
+**Context:** Claude adapter was using `--output-format json` which waits for the full response before returning
+**Options:** Keep `json` with polling, switch to `stream-json`, use Agent SDK WebSocket
+**Decision:** Switched to `--output-format stream-json` with `--verbose` flag, parsing stdout line-by-line
+**Rationale:** `stream-json` emits one JSON object per line as events arrive, enabling real-time streaming to the frontend via Tauri events. This replaces the batch-and-parse approach from Phase 2. The `--verbose` flag includes thinking events. Combined with a background thread that reads stdout and emits `elf:event`, this gives sub-second latency from Claude processing to UI update. No Agent SDK dependency needed.
+
+## 2026-02-27 — portable-pty for Embedded Terminal (not raw Command)
+**Context:** Need an embedded terminal for session resume and interactive Claude access
+**Options:** tokio::process::Command with pipe capture, portable-pty, wezterm-term, direct xterm.js WebSocket
+**Decision:** `portable-pty` crate (v0.8) with xterm.js frontend and Tauri event bridge
+**Rationale:** A real PTY is required for interactive programs (Claude CLI expects a terminal). `portable-pty` handles platform-specific PTY allocation (openpty on macOS). The architecture: Rust spawns PTY → background thread reads output → emits `pty:data:{id}` events → xterm.js renders. Write path: frontend → `write_pty` command → PTY stdin. This gives full terminal fidelity including colors, cursor movement, and interactive prompts.
+
+## 2026-02-27 — Native Save Dialog for Session Replay (not Blob+Anchor)
+**Context:** ShareButton was using browser `Blob` + `<a>` download pattern, which silently fails in Tauri WebView
+**Options:** Fix Blob approach with Tauri download plugin, use native save dialog, write to fixed path
+**Decision:** `tauri-plugin-dialog` native save dialog with file filter
+**Rationale:** Tauri WebView doesn't support the `<a download>` pattern reliably across all platforms. The native dialog gives users a familiar OS-level file picker with proper path validation. The HTML generation stays in Rust (reuses `export_session_html` logic), and writing happens in Rust too — no large string transfer across IPC.
+
+## 2026-02-27 — Claude Discovery via Filesystem Scan (not CLI introspection)
+**Context:** Need to surface user's Claude agents, models, permissions, and slash commands in the UI
+**Options:** Parse `claude --help` output, scan `~/.claude/` filesystem, require user configuration
+**Decision:** Direct filesystem scan of `~/.claude/` with YAML frontmatter parsing for agents and JSON parsing for settings
+**Rationale:** The `~/.claude/` directory is a stable, documented structure. Agents are markdown files with YAML frontmatter in `~/.claude/agents/`. Settings are in `~/.claude/settings.json`. Commands are in `~/.claude/commands/` and `.claude/commands/`. Filesystem scan is instant, works offline, needs no subprocess spawn. The inline YAML parser handles the simple frontmatter format without adding a `serde_yaml` dependency.
+
+## 2026-02-27 — Solo Terminal Mode for Single-Elf Sessions
+**Context:** Single-agent tasks were rendering in the team grid (ElfTheater) which wastes space for one card
+**Options:** Keep same layout, auto-expand single card, create dedicated solo view
+**Decision:** ElfTheater detects `elves.length === 1` and renders a full-height terminal-style card with `variant="terminal"`
+**Rationale:** Solo tasks are the most common case. A full-height card with always-visible output stream is more useful than a small card in a grid. The terminal variant shows a compact single-line header and fills remaining space with scrollable output. Team mode (2+ elves) is unchanged. The variant prop on ElfCard keeps both modes in one component.
+
+## 2026-02-27 — Resizable Panels via Mouse Drag (not Fixed Breakpoints)
+**Context:** Sidebar and activity feed widths were hardcoded; users on different screen sizes need flexibility
+**Options:** CSS resize property, fixed breakpoint toggles, custom drag handler
+**Decision:** `useResizable` hook with `requestAnimationFrame` throttled mouse tracking and `ResizeHandle` overlay component
+**Rationale:** CSS `resize` doesn't work well with the panel layout (no drag handle styling). Fixed breakpoints don't account for user preference. The custom hook is ~90 lines, stores width in Zustand (persists across view switches), clamps to min/max bounds, and uses rAF to avoid layout thrashing during drag. The handle is an 8px invisible overlay that highlights on hover.
+
+## 2026-02-27 — useSessionEvents Extracted from useTeamSession
+**Context:** Session event handling (Tauri listener, event parsing, status transitions) was growing large inside useTeamSession
+**Options:** Keep in useTeamSession, extract to separate hook, move to Shell.tsx
+**Decision:** Extracted to `useSessionEvents` hook mounted by Shell.tsx
+**Rationale:** useTeamSession was becoming a god-hook handling both deployment logic and event reception. Extracting event handling into its own hook follows the single-responsibility principle. The hook subscribes to four Tauri events (`elf:event`, `session:claude_id`, `session:completed`, `session:cancelled`) and contains the `parseClaudePayload` function that decomposes Claude's `stream-json` format. Shell mounts it unconditionally.
+
+## 2026-02-27 — stderr Drain Thread to Prevent Pipe Deadlock
+**Context:** Claude CLI writes warnings and logs to stderr; if the pipe buffer fills (~64KB on macOS), the process deadlocks
+**Options:** Redirect stderr to /dev/null, drain in same thread as stdout, drain in separate thread
+**Decision:** Spawn a dedicated `drain_stderr` background thread that reads stderr line-by-line and logs at warn level
+**Rationale:** Discarding stderr loses valuable diagnostic info. Draining in the same thread as stdout introduces ordering complexity. A separate thread is the simplest correct solution — it reads independently, never blocks stdout processing, and logs everything for debugging. The thread exits naturally when the process terminates and the pipe EOF is reached.

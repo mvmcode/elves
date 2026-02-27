@@ -23,6 +23,8 @@ pub struct SessionRow {
     pub tokens_used: i64,
     pub cost_estimate: f64,
     pub summary: Option<String>,
+    /// Claude Code's internal session ID, used for `claude --resume`.
+    pub claude_session_id: Option<String>,
 }
 
 /// Insert a new session into the database. Returns the created session row.
@@ -52,7 +54,7 @@ pub fn create_session(
 pub fn get_session(conn: &Connection, id: &str) -> Result<Option<SessionRow>, DbError> {
     let mut stmt = conn.prepare(
         "SELECT id, project_id, task, runtime, status, plan, agent_count,
-                started_at, ended_at, tokens_used, cost_estimate, summary
+                started_at, ended_at, tokens_used, cost_estimate, summary, claude_session_id
          FROM sessions WHERE id = ?1",
     )?;
 
@@ -71,6 +73,7 @@ pub fn get_session(conn: &Connection, id: &str) -> Result<Option<SessionRow>, Db
                 tokens_used: row.get(9)?,
                 cost_estimate: row.get(10)?,
                 summary: row.get(11)?,
+                claude_session_id: row.get(12)?,
             })
         })
         .optional()?;
@@ -85,7 +88,7 @@ pub fn list_sessions(
 ) -> Result<Vec<SessionRow>, DbError> {
     let mut stmt = conn.prepare(
         "SELECT id, project_id, task, runtime, status, plan, agent_count,
-                started_at, ended_at, tokens_used, cost_estimate, summary
+                started_at, ended_at, tokens_used, cost_estimate, summary, claude_session_id
          FROM sessions WHERE project_id = ?1 ORDER BY started_at DESC",
     )?;
 
@@ -104,6 +107,7 @@ pub fn list_sessions(
                 tokens_used: row.get(9)?,
                 cost_estimate: row.get(10)?,
                 summary: row.get(11)?,
+                claude_session_id: row.get(12)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -134,6 +138,49 @@ pub fn update_session_status(
     )?;
 
     Ok(rows_affected > 0)
+}
+
+/// Update a session's token usage and cost estimate. Called when the Claude process
+/// finishes and we extract usage data from the final `result` event.
+/// Returns true if a row was updated.
+pub fn update_session_usage(
+    conn: &Connection,
+    id: &str,
+    tokens_used: i64,
+    cost_estimate: f64,
+) -> Result<bool, DbError> {
+    let rows_affected = conn.execute(
+        "UPDATE sessions SET tokens_used = ?1, cost_estimate = ?2 WHERE id = ?3",
+        params![tokens_used, cost_estimate, id],
+    )?;
+    Ok(rows_affected > 0)
+}
+
+/// Store the Claude Code session ID for a session. Used for `claude --resume` support.
+/// Returns true if a row was updated.
+pub fn update_claude_session_id(
+    conn: &Connection,
+    id: &str,
+    claude_session_id: &str,
+) -> Result<bool, DbError> {
+    let rows = conn.execute(
+        "UPDATE sessions SET claude_session_id = ?1 WHERE id = ?2",
+        params![claude_session_id, id],
+    )?;
+    Ok(rows > 0)
+}
+
+/// Mark all "active" sessions as "failed" — called on app startup to clean up
+/// sessions from previous runs that were never completed (e.g., app crash, force quit).
+/// Returns the number of sessions cleaned up.
+pub fn cleanup_stale_sessions(conn: &Connection) -> Result<usize, DbError> {
+    let now = chrono::Utc::now().timestamp();
+    let rows = conn.execute(
+        "UPDATE sessions SET status = 'failed', ended_at = ?1, summary = 'Session interrupted (app restarted)'
+         WHERE status = 'active'",
+        params![now],
+    )?;
+    Ok(rows)
 }
 
 /// Use rusqlite's optional() extension for query_row.
@@ -300,6 +347,29 @@ mod tests {
         assert!(json.contains("agentCount"));
         assert!(json.contains("tokensUsed"));
         assert!(json.contains("costEstimate"));
+    }
+
+    #[test]
+    fn update_session_usage() {
+        let conn = test_conn();
+        seed_project(&conn, "proj-1");
+        create_session(&conn, "s1", "proj-1", "Task A", "claude-code").unwrap();
+
+        let updated = super::update_session_usage(&conn, "s1", 1500, 0.0342)
+            .expect("Should update usage");
+        assert!(updated);
+
+        let session = get_session(&conn, "s1").unwrap().unwrap();
+        assert_eq!(session.tokens_used, 1500);
+        assert!((session.cost_estimate - 0.0342).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn update_session_usage_nonexistent_returns_false() {
+        let conn = test_conn();
+        let updated = super::update_session_usage(&conn, "nope", 100, 0.01)
+            .expect("Should not error");
+        assert!(!updated);
     }
 
     #[test]

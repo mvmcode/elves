@@ -108,7 +108,7 @@ export function useSession(): {
 
     try {
       await invokeStopTask(activeSession.id);
-      endSession("Cancelled by user");
+      endSession("cancelled");
     } catch (error) {
       console.error("Failed to stop task:", error);
     }

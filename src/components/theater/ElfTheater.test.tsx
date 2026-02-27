@@ -1,4 +1,4 @@
-/* Tests for ElfTheater — verifies grid, heading, empty state, lead badge, progress bar, and chat bubbles. */
+/* Tests for ElfTheater — verifies grid, heading, empty state, lead badge, progress bar, chat bubbles, and solo mode. */
 
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
@@ -40,7 +40,7 @@ function createTestEvent(overrides?: Partial<ElfEvent>): ElfEvent {
 }
 
 describe("ElfTheater", () => {
-  it("renders correct number of ElfCards", () => {
+  it("renders correct number of ElfCards in team mode", () => {
     const elves = [
       createTestElf({ id: "e1", name: "Spark" }),
       createTestElf({ id: "e2", name: "Tinker" }),
@@ -51,26 +51,23 @@ describe("ElfTheater", () => {
     expect(cards).toHaveLength(3);
   });
 
-  it("shows session heading", () => {
-    const elves = [createTestElf()];
+  it("shows session heading in team mode", () => {
+    const elves = [
+      createTestElf({ id: "e1" }),
+      createTestElf({ id: "e2" }),
+    ];
     render(<ElfTheater elves={elves} events={[]} />);
     expect(screen.getByTestId("theater-heading")).toBeInTheDocument();
     expect(screen.getByText("Elf Workshop")).toBeInTheDocument();
   });
 
-  it("shows elf count badge", () => {
+  it("shows elf count badge in team mode", () => {
     const elves = [
       createTestElf({ id: "e1" }),
       createTestElf({ id: "e2" }),
     ];
     render(<ElfTheater elves={elves} events={[]} />);
     expect(screen.getByText("2 Elves")).toBeInTheDocument();
-  });
-
-  it("shows singular 'Elf' for single elf", () => {
-    const elves = [createTestElf()];
-    render(<ElfTheater elves={elves} events={[]} />);
-    expect(screen.getByText("1 Elf")).toBeInTheDocument();
   });
 
   it("shows empty state when no elves", () => {
@@ -126,7 +123,7 @@ describe("ElfTheater", () => {
     expect(screen.getByTestId("global-status")).toBeInTheDocument();
   });
 
-  it("shows lead badge on lead elf card", () => {
+  it("shows lead badge on lead elf card in team mode", () => {
     const elves = [
       createTestElf({ id: "e1", name: "Spark" }),
       createTestElf({ id: "e2", name: "Tinker" }),
@@ -138,13 +135,19 @@ describe("ElfTheater", () => {
   });
 
   it("does not show lead badge when leadElfId is not set", () => {
-    const elves = [createTestElf({ id: "e1" })];
+    const elves = [
+      createTestElf({ id: "e1" }),
+      createTestElf({ id: "e2" }),
+    ];
     render(<ElfTheater elves={elves} events={[]} />);
     expect(screen.queryByTestId("lead-badge")).not.toBeInTheDocument();
   });
 
-  it("renders chat bubbles for chat-type events", () => {
-    const elves = [createTestElf({ id: "e1", name: "Spark" })];
+  it("renders chat bubbles for chat-type events in team mode", () => {
+    const elves = [
+      createTestElf({ id: "e1", name: "Spark" }),
+      createTestElf({ id: "e2", name: "Tinker" }),
+    ];
     const events = [
       createTestEvent({
         id: "chat1",
@@ -178,9 +181,112 @@ describe("ElfTheater", () => {
     expect(screen.getByText("1 elf deployed")).toBeInTheDocument();
   });
 
-  it("renders the elf grid container", () => {
-    const elves = [createTestElf()];
+  it("renders the elf grid container in team mode", () => {
+    const elves = [
+      createTestElf({ id: "e1" }),
+      createTestElf({ id: "e2" }),
+    ];
     render(<ElfTheater elves={elves} events={[]} />);
     expect(screen.getByTestId("elf-grid")).toBeInTheDocument();
+  });
+
+  /* Timer freeze tests */
+  describe("timer freeze on completion", () => {
+    it("renders elapsed time when sessionStatus is active", () => {
+      const elves = [createTestElf()];
+      render(
+        <ElfTheater elves={elves} events={[]} startedAt={Date.now() - 5000} sessionStatus="active" />,
+      );
+      expect(screen.getByTestId("elapsed-time")).toBeInTheDocument();
+    });
+
+    it("still renders elapsed time when sessionStatus is completed (frozen value)", () => {
+      const elves = [createTestElf()];
+      render(
+        <ElfTheater elves={elves} events={[]} startedAt={Date.now() - 30000} sessionStatus="completed" />,
+      );
+      expect(screen.getByTestId("elapsed-time")).toBeInTheDocument();
+    });
+
+    it("accepts sessionStatus prop without error", () => {
+      const elves = [createTestElf()];
+      const { container } = render(
+        <ElfTheater elves={elves} events={[]} startedAt={Date.now()} sessionStatus="cancelled" />,
+      );
+      expect(container).toBeDefined();
+    });
+  });
+
+  /* Solo mode tests */
+  describe("solo mode (1 elf)", () => {
+    it("sets data-mode=solo on theater container", () => {
+      const elves = [createTestElf()];
+      render(<ElfTheater elves={elves} events={[]} />);
+      const theater = screen.getByTestId("elf-theater");
+      expect(theater.getAttribute("data-mode")).toBe("solo");
+    });
+
+    it("renders single ElfCard with terminal variant", () => {
+      const elves = [createTestElf()];
+      render(<ElfTheater elves={elves} events={[]} />);
+      const card = screen.getByTestId("elf-card");
+      /* Terminal variant has h-full class */
+      expect(card.className).toContain("h-full");
+    });
+
+    it("does not show Elf Workshop heading", () => {
+      const elves = [createTestElf()];
+      render(<ElfTheater elves={elves} events={[]} />);
+      expect(screen.queryByTestId("theater-heading")).not.toBeInTheDocument();
+    });
+
+    it("does not show elf grid", () => {
+      const elves = [createTestElf()];
+      render(<ElfTheater elves={elves} events={[]} />);
+      expect(screen.queryByTestId("elf-grid")).not.toBeInTheDocument();
+    });
+
+    it("does not show chat bubbles", () => {
+      const elves = [createTestElf()];
+      const events = [
+        createTestEvent({
+          id: "chat1",
+          type: "chat",
+          payload: { message: "Hello" },
+          timestamp: Date.now(),
+        }),
+      ];
+      render(<ElfTheater elves={elves} events={events} />);
+      expect(screen.queryByTestId("chat-bubble")).not.toBeInTheDocument();
+    });
+
+    it("still shows the progress bar", () => {
+      const elves = [createTestElf()];
+      render(<ElfTheater elves={elves} events={[]} startedAt={Date.now()} />);
+      expect(screen.getByTestId("progress-bar-global")).toBeInTheDocument();
+    });
+  });
+
+  /* Team mode tests */
+  describe("team mode (2+ elves)", () => {
+    it("sets data-mode=team on theater container", () => {
+      const elves = [
+        createTestElf({ id: "e1" }),
+        createTestElf({ id: "e2" }),
+      ];
+      render(<ElfTheater elves={elves} events={[]} />);
+      const theater = screen.getByTestId("elf-theater");
+      expect(theater.getAttribute("data-mode")).toBe("team");
+    });
+
+    it("renders cards with compact variant (expand toggle present)", () => {
+      const elves = [
+        createTestElf({ id: "e1" }),
+        createTestElf({ id: "e2" }),
+      ];
+      render(<ElfTheater elves={elves} events={[]} />);
+      const toggles = screen.getAllByTestId("expand-toggle");
+      expect(toggles).toHaveLength(2);
+    });
   });
 });

@@ -3,6 +3,7 @@
 use crate::db;
 use super::projects::DbState;
 use tauri::State;
+use tauri_plugin_dialog::DialogExt;
 
 /// Generate a self-contained HTML replay file for a session.
 ///
@@ -37,6 +38,60 @@ pub fn export_session_html(
 
     let html = build_replay_html(&session_json, &elves_json, &events_json);
     Ok(html)
+}
+
+/// Save a session replay as an HTML file using the native save dialog.
+///
+/// Generates the HTML replay (reusing `export_session_html` logic), shows a native save dialog
+/// for the user to choose a file path, and writes the HTML to disk. Returns `true` if the file
+/// was saved, `false` if the user cancelled the dialog.
+#[tauri::command]
+pub async fn save_session_replay(
+    app: tauri::AppHandle,
+    db: State<'_, DbState>,
+    session_id: String,
+) -> Result<bool, String> {
+    /* Generate the HTML string */
+    let html = {
+        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+
+        let session = db::sessions::get_session(&conn, &session_id)
+            .map_err(|e| format!("Database error: {e}"))?
+            .ok_or_else(|| format!("Session not found: {session_id}"))?;
+
+        let elves = db::elves::list_elves(&conn, &session_id)
+            .map_err(|e| format!("Database error: {e}"))?;
+
+        let events = db::events::list_events(&conn, &session_id)
+            .map_err(|e| format!("Database error: {e}"))?;
+
+        let session_json = serde_json::to_string(&session)
+            .map_err(|e| format!("Serialization error: {e}"))?;
+        let elves_json = serde_json::to_string(&elves)
+            .map_err(|e| format!("Serialization error: {e}"))?;
+        let events_json = serde_json::to_string(&events)
+            .map_err(|e| format!("Serialization error: {e}"))?;
+
+        build_replay_html(&session_json, &elves_json, &events_json)
+    };
+
+    /* Show native save dialog */
+    let file_path = app
+        .dialog()
+        .file()
+        .set_title("Save Session Replay")
+        .set_file_name(&format!("elves-replay-{}.html", &session_id[..8.min(session_id.len())]))
+        .add_filter("HTML", &["html"])
+        .blocking_save_file();
+
+    match file_path {
+        Some(path) => {
+            std::fs::write(path.as_path().expect("Invalid file path"), html.as_bytes())
+                .map_err(|e| format!("Failed to write file: {e}"))?;
+            Ok(true)
+        }
+        None => Ok(false),
+    }
 }
 
 /// Build the complete self-contained HTML string for the session replay.

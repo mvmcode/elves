@@ -19,6 +19,7 @@ export const SHORTCUT_DEFINITIONS: readonly ShortcutDef[] = [
   { keys: "⌘ M", description: "Toggle memory view" },
   { keys: "⌘ ,", description: "Toggle settings view" },
   { keys: "⌘ /", description: "Toggle shortcut help" },
+  { keys: "⌘ B", description: "Toggle activity feed" },
   { keys: "⌘ R", description: "Toggle runtime" },
   { keys: "Escape", description: "Close panel / unfocus" },
 ] as const;
@@ -41,6 +42,7 @@ export function useKeyboardShortcuts(
   const setTaskBarFocused = useUiStore((s) => s.setTaskBarFocused);
   const setActiveView = useUiStore((s) => s.setActiveView);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
+  const toggleActivityFeed = useUiStore((s) => s.toggleActivityFeed);
   const activeView = useUiStore((s) => s.activeView);
   const isTaskBarFocused = useUiStore((s) => s.isTaskBarFocused);
   const projects = useProjectStore((s) => s.projects);
@@ -84,6 +86,11 @@ export function useKeyboardShortcuts(
         case ".":
           event.preventDefault();
           options.onCancelTask?.();
+          break;
+
+        case "b":
+          event.preventDefault();
+          toggleActivityFeed();
           break;
 
         case "m":
@@ -136,6 +143,7 @@ export function useKeyboardShortcuts(
     setActiveProject,
     setSettingsOpen,
     toggleOverlay,
+    toggleActivityFeed,
   ]);
 
   return { shortcutOverlayOpen, toggleOverlay };

@@ -4,14 +4,20 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/shared/Badge";
 import { ElfAvatar, getAvatarId } from "@/components/theater/ElfAvatar";
+import { TerminalOutput } from "@/components/theater/TerminalOutput";
 import type { Elf, ElfEvent, ElfStatus } from "@/types/elf";
 import { getStatusMessage } from "@/lib/elf-names";
+
+/** Display variant: "compact" (default card) or "terminal" (full-height rich output). */
+export type ElfCardVariant = "compact" | "terminal";
 
 interface ElfCardProps {
   readonly elf: Elf;
   readonly events?: readonly ElfEvent[];
   readonly isExpanded?: boolean;
   readonly onToggleExpand?: () => void;
+  /** "compact" preserves current layout, "terminal" fills parent as rich terminal. */
+  readonly variant?: ElfCardVariant;
 }
 
 /** Maps elf status to Badge variant for consistent visual feedback. */
@@ -47,25 +53,25 @@ function estimateProgress(status: ElfStatus, eventCount: number): number {
   return Math.min(90, Math.max(10, eventCount * 15));
 }
 
-/** Formats a unix timestamp to a short time string (HH:MM:SS). */
-function formatTime(timestamp: number): string {
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
-}
-
 /**
  * Neo-brutalist card displaying an elf's live state including avatar, name,
  * status badge, funny status message, progress bar, and expandable event output.
- * Uses framer-motion for entrance animation and expand/collapse transitions.
+ *
+ * Supports two variants:
+ * - "compact" (default): traditional card with expand toggle for event list
+ * - "terminal": full-height card filling parent, always showing rich TerminalOutput
  */
 export function ElfCard({
   elf,
   events = [],
   isExpanded: controlledExpanded,
   onToggleExpand,
+  variant = "compact",
 }: ElfCardProps): React.JSX.Element {
   const [internalExpanded, setInternalExpanded] = useState(false);
+  const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
   const isExpanded = controlledExpanded ?? internalExpanded;
+  const isTerminal = variant === "terminal";
 
   const handleToggle = (): void => {
     if (onToggleExpand) {
@@ -78,6 +84,67 @@ export function ElfCard({
   const progress = estimateProgress(elf.status, events.length);
   const funnyStatus = getStatusMessage(elf.name, elf.status);
 
+  /* Terminal variant: full-height flex column filling parent */
+  if (isTerminal) {
+    return (
+      <div
+        className="flex h-full flex-col border-[3px] border-border bg-white shadow-brutal-lg"
+        style={{ borderLeftWidth: "4px", borderLeftColor: elf.color }}
+        data-testid="elf-card"
+      >
+        {/* Compact header — all info on one line */}
+        <div className="flex items-center gap-3 border-b-[2px] border-border px-4 py-2">
+          <ElfAvatar
+            avatarId={getAvatarId(elf.name)}
+            status={elf.status}
+            size="sm"
+            color={elf.color}
+          />
+          <span className="font-display text-sm font-bold uppercase tracking-wide">
+            {elf.name}
+          </span>
+          {elf.role && (
+            <span className="font-body text-xs text-gray-500">{elf.role}</span>
+          )}
+          <Badge variant={statusBadgeVariant[elf.status]}>
+            {statusLabel[elf.status]}
+          </Badge>
+          <span className="ml-auto font-body text-xs italic text-gray-500" data-testid="funny-status">
+            &ldquo;{funnyStatus}&rdquo;
+          </span>
+          {/* Inline progress bar */}
+          <div className="flex items-center gap-1" data-testid="progress-bar">
+            <div className="h-2 w-24 border-[2px] border-border bg-gray-200">
+              <div
+                className="h-full transition-all duration-300 ease-out"
+                style={{ width: `${progress}%`, backgroundColor: elf.color }}
+              />
+            </div>
+            <span className="font-mono text-xs font-bold">{progress}%</span>
+          </div>
+          {/* Collapse toggle for terminal output */}
+          <button
+            onClick={() => setIsOutputCollapsed((prev) => !prev)}
+            className="ml-2 cursor-pointer border-[2px] border-border bg-gray-100 px-2 py-0.5 font-body text-[10px] font-bold uppercase tracking-wider text-gray-600 transition-all duration-100 hover:bg-gray-200"
+            data-testid="output-collapse-toggle"
+          >
+            {isOutputCollapsed ? "Show Output" : "Hide Output"}
+          </button>
+        </div>
+
+        {/* Terminal output — fills remaining space, collapsible */}
+        {!isOutputCollapsed && (
+          <TerminalOutput
+            events={events as ElfEvent[]}
+            variant="terminal"
+            elfColor={elf.color}
+          />
+        )}
+      </div>
+    );
+  }
+
+  /* Compact variant: traditional card layout */
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -142,7 +209,7 @@ export function ElfCard({
         {isExpanded ? "Hide Output" : "Show Output"}
       </button>
 
-      {/* Expandable event list */}
+      {/* Expandable event output */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
@@ -150,29 +217,13 @@ export function ElfCard({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="overflow-hidden"
+            className="mt-2 overflow-hidden border-[2px] border-border"
           >
-            <div
-              className="mt-2 max-h-48 overflow-y-auto border-[2px] border-border bg-gray-900 p-3"
-              data-testid="event-list"
-            >
-              {events.length === 0 ? (
-                <p className="font-mono text-xs text-gray-400">No events yet...</p>
-              ) : (
-                events.map((event) => (
-                  <div key={event.id} className="font-mono text-xs text-gray-300">
-                    <span className="text-gray-500">[{formatTime(event.timestamp)}]</span>{" "}
-                    <span className="font-bold" style={{ color: elf.color }}>
-                      {event.type === "tool_call"
-                        ? `Using ${(event.payload as Record<string, unknown>).tool ?? event.type}`
-                        : event.type === "output"
-                          ? String((event.payload as Record<string, unknown>).text ?? "Output")
-                          : event.type.charAt(0).toUpperCase() + event.type.slice(1) + "..."}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
+            <TerminalOutput
+              events={events as ElfEvent[]}
+              variant="compact"
+              elfColor={elf.color}
+            />
           </motion.div>
         )}
       </AnimatePresence>

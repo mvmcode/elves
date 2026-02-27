@@ -56,6 +56,8 @@ export interface Session {
   readonly tokensUsed: number;
   readonly costEstimate: number;
   readonly summary: string | null;
+  /** Claude Code session ID for --resume support (null if not a Claude Code session). */
+  readonly claudeSessionId: string | null;
 }
 
 /**
