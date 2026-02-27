@@ -16,6 +16,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(DbState(Mutex::new(conn)))
         .manage(ProcessManager::new())
         .invoke_handler(tauri::generate_handler![
@@ -55,6 +56,7 @@ pub fn run() {
             commands::templates::delete_template,
             commands::templates::load_template,
             commands::templates::seed_templates,
+            commands::export::export_session_html,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");

@@ -13,6 +13,7 @@ Type a task. Watch your elves bicker, collaborate, and craft the solution — al
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-FFD93D.svg" alt="License: MIT" /></a>
   <a href="https://github.com/mvmcode/elves"><img src="https://img.shields.io/badge/macOS-13%2B-000000.svg" alt="macOS" /></a>
   <a href="https://tauri.app"><img src="https://img.shields.io/badge/Built%20with-Tauri%20v2-24C8DB.svg" alt="Built with Tauri" /></a>
+  <a href="https://github.com/mvmcode/elves/actions/workflows/ci.yml"><img src="https://github.com/mvmcode/elves/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
 ---
@@ -87,29 +88,11 @@ Every session records a full event log. Step through past sessions event-by-even
 
 ## Screenshots
 
-> **Coming Soon** — the elves are still setting up the workshop.
-
-```
-┌─────┬──────────────────────────────────────────────────┐
-│     │  TASK: "Research competitors & write report"      │
-│  P  │━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│
-│  R  │                                                   │
-│  O  │  ┌────────────┐  ┌────────────┐  ┌────────────┐ │
-│  J  │  │  TINKER    │  │  JINGLE    │  │  SPROCKET  │ │
-│  E  │  │  Lead      │  │  Research  │  │  Writer    │ │
-│  C  │  │  [avatar]  │  │  [avatar]  │  │  [avatar]  │ │
-│  T  │  │ "Assigning │  │ "Speed-    │  │ "Waiting   │ │
-│  S  │  │  tasks..." │  │  reading   │  │  for data  │ │
-│     │  │ ████░░ 40% │  │ ██████ 60% │  │ ░░░░░░ 0%  │ │
-│     │  └────────────┘  └────────────┘  └────────────┘ │
-│     │                                                   │
-│     │  ┌─────── ACTIVITY FEED ───────────────────────┐ │
-│     │  │ [12:03] Tinker spawned as Lead              │ │
-│     │  │ [12:03] Jingle → "Found 7 competitors"      │ │
-│     │  │ [12:04] Sprocket creating report template... │ │
-│     │  └─────────────────────────────────────────────┘ │
-└─────┴──────────────────────────────────────────────────┘
-```
+> Screenshots and GIFs coming soon. In the meantime, here's what you'll see:
+> - **Elf Theater** — animated elf cards with live status messages
+> - **Multi-Elf Teams** — task graph visualization with dependency arrows
+> - **Memory Explorer** — searchable timeline of project memories
+> - **Session Replay** — step through past sessions event-by-event
 
 ---
 
@@ -121,6 +104,20 @@ Every session records a full event log. Step through past sessions event-by-even
 - At least one AI runtime:
   - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) — `npm install -g @anthropic-ai/claude-code`
   - [Codex CLI](https://github.com/openai/codex) — `npm install -g @openai/codex`
+
+---
+
+## Quick Start
+
+### Install via Homebrew
+
+```bash
+brew install --cask elves
+```
+
+### Or Download
+
+Download the latest `.dmg` from [GitHub Releases](https://github.com/mvmcode/elves/releases).
 
 ---
 
@@ -304,7 +301,7 @@ elves/
 - [x] **Phase 4: Memory & Intelligence** — Persistent memory with FTS5, auto-learning, context injection, memory explorer, settings
 - [x] **Phase 5: Visual Editors & Polish** — Skills editor, MCP manager, context editor, 15 SVG elf avatars, Web Audio sounds, funny copy engine, keyboard shortcuts, shortcut overlay
 - [x] **Phase 6: Codex Full Support** — Codex adapter with JSONL normalization, interop layer, runtime picker, template library (5 built-in), session history
-- [ ] **Phase 7: Distribution** — Signed .dmg, auto-updater, Homebrew cask, landing page at elves.dev
+- [x] **Phase 7: Distribution** — CI/CD, auto-updater, session replay export, Homebrew cask, landing page
 
 ---
 
@@ -323,6 +320,15 @@ Contributions are welcome! Before diving in:
 - Types are documentation — no `any`, no implicit returns.
 - Commit format: `type(scope): description` (e.g., `feat(workshop): add ElfCard component`)
 - One commit per coherent change. No WIP commits.
+
+---
+
+## Community
+
+- [Contributing Guide](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security Policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
 
 ---
 

@@ -215,3 +215,31 @@
 **Options:** Add useSounds to useTeamSession, add useSounds to Shell, create a SoundMiddleware
 **Decision:** Shell.tsx calls `useSounds()` and triggers `play("deploy")` in the `handleDeploy` callback. Sound triggers for session lifecycle events (spawn, complete, error) will be added via useEffect watchers on session store state.
 **Rationale:** Shell is the top-level component that already orchestrates all views and lifecycle. Adding sounds here keeps useTeamSession focused on IPC and state management. The `play` function is synchronous and fire-and-forget, so it adds zero complexity to callback chains.
+
+---
+
+## Phase 7: Distribution & Virality — Decisions
+
+## 2026-02-26 — Self-Contained HTML for Session Replay Export
+**Context:** Need shareable session replays that work without the ELVES app
+**Options:** Animated GIF, video export (ffmpeg), standalone HTML, hosted replay service
+**Decision:** Self-contained HTML with inline CSS/JS and embedded session data
+**Rationale:** Zero dependencies — works offline in any browser. Preserves full interactivity (play/pause/speed/seek). No hosting cost. GIF loses interactivity. Video requires ffmpeg dependency. Hosted service adds infrastructure and costs. The HTML template uses the same neo-brutalist design language as the app.
+
+## 2026-02-26 — GitHub Actions for CI/CD
+**Context:** Need automated build/test/release pipeline for open-source distribution
+**Options:** GitHub Actions, CircleCI, self-hosted runners
+**Decision:** GitHub Actions with separate CI (ci.yml) and Release (release.yml) workflows
+**Rationale:** Native GitHub integration, free for open source. Tauri has an official GitHub Action (tauri-apps/tauri-action) that handles macOS DMG building, signing, and notarization. CI runs on every push/PR; Release triggers on version tags and creates GitHub Releases with DMG assets.
+
+## 2026-02-26 — Contributor Covenant for Code of Conduct
+**Context:** Need community guidelines for the open-source project
+**Options:** Custom code of conduct, Contributor Covenant v2.1, minimal "be nice" policy
+**Decision:** Contributor Covenant v2.1 with ELVES branding
+**Rationale:** Industry standard adopted by major projects (React, VS Code, Ruby on Rails). Provides a clear enforcement ladder. Widely recognized by contributors. Adding light ELVES branding ("The Workshop Code") keeps it consistent with the product's personality.
+
+## 2026-02-26 — Static Landing Page (No Framework)
+**Context:** Need a marketing site at elves.dev
+**Options:** Next.js static export, Astro, plain HTML/CSS, Docusaurus
+**Decision:** Single self-contained HTML file with inline CSS and minimal vanilla JS
+**Rationale:** Zero build step, instant deploy to any static host (GitHub Pages, Vercel, Netlify). No dependency maintenance. Page loads in <1s. The page is simple enough (7 sections, no dynamic content) that a framework adds complexity without value. Neo-brutalist styling is CSS-only — no component library needed.
