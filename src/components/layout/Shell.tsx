@@ -7,22 +7,24 @@ import { TopBar } from "./TopBar";
 import { TaskBar } from "./TaskBar";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ElfTheater } from "@/components/theater/ElfTheater";
+import { SessionControlCard } from "@/components/session/SessionControlCard";
 import { ActivityFeed } from "@/components/feed/ActivityFeed";
 import { PlanPreview } from "@/components/theater/PlanPreview";
 import { TaskGraph } from "@/components/theater/TaskGraph";
 import { ThinkingPanel } from "@/components/theater/ThinkingPanel";
 import { MemoryExplorer } from "@/components/memory/MemoryExplorer";
 import { MemorySettings } from "@/components/settings/MemorySettings";
+import ThemePicker from "@/components/settings/ThemePicker";
 import { SkillEditor } from "@/components/editors/SkillEditor";
 import { McpManager } from "@/components/editors/McpManager";
 import { SessionHistory } from "@/components/project/SessionHistory";
-import { SessionTerminal } from "@/components/terminal/SessionTerminal";
+import { BottomTerminalPanel } from "@/components/terminal/BottomTerminalPanel";
 import { ShortcutOverlay } from "@/components/shared/ShortcutOverlay";
 import { NewProjectDialog } from "@/components/project/NewProjectDialog";
+import { FloorBar } from "@/components/layout/FloorBar";
 import { ResizeHandle } from "@/components/shared/ResizeHandle";
 import { useSessionStore } from "@/stores/session";
 import { useUiStore } from "@/stores/ui";
-import { useProjectStore } from "@/stores/project";
 import { useTeamSession } from "@/hooks/useTeamSession";
 import { useMemoryActions } from "@/hooks/useMemoryActions";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -53,10 +55,10 @@ export function Shell(): React.JSX.Element {
   const thinkingStream = useSessionStore((state) => state.thinkingStream);
   const isPlanPreview = useSessionStore((state) => state.isPlanPreview);
   const pendingPlan = useSessionStore((state) => state.pendingPlan);
-  const terminalSessionId = useUiStore((state) => state.terminalSessionId);
-  const setTerminalSessionId = useUiStore((state) => state.setTerminalSessionId);
-  const projects = useProjectStore((state) => state.projects);
-  const activeProjectId = useProjectStore((state) => state.activeProjectId);
+  const isHistoricalFloor = useSessionStore(
+    (state) => (state.activeFloorId ? state.floors[state.activeFloorId]?.isHistorical : false) ?? false,
+  );
+  const isTerminalPanelOpen = useUiStore((state) => state.isTerminalPanelOpen);
   const { deployWithPlan, stopSession } = useTeamSession();
   const {
     handleCreateMemory,
@@ -65,6 +67,8 @@ export function Shell(): React.JSX.Element {
     handleDeleteMemory,
     handleSearch,
     handleClearAll,
+    handleExportMemories,
+    handleImportMemories,
   } = useMemoryActions();
   const { play } = useSounds();
   const { shortcutOverlayOpen, toggleOverlay } = useKeyboardShortcuts({
@@ -73,45 +77,6 @@ export function Shell(): React.JSX.Element {
 
   /* Subscribe to Tauri backend events (elf:event, session:completed) */
   useSessionEvents();
-
-  /** Resolved session info for the embedded terminal (looked up when terminalSessionId changes). */
-  interface TerminalTarget {
-    readonly sessionId: string;
-    readonly claudeSessionId: string;
-    readonly projectPath: string;
-    readonly taskLabel: string;
-  }
-  const [terminalTarget, setTerminalTarget] = useState<TerminalTarget | null>(null);
-
-  /** Look up session details when terminalSessionId changes. */
-  useEffect(() => {
-    if (!terminalSessionId) {
-      setTerminalTarget(null);
-      return;
-    }
-    /* Look up session from Tauri backend */
-    import("@/lib/tauri").then(({ listSessions }) => {
-      if (!activeProjectId) return;
-      listSessions(activeProjectId).then((sessions) => {
-        const session = sessions.find((s) => s.id === terminalSessionId);
-        if (!session?.claudeSessionId) {
-          setTerminalTarget(null);
-          return;
-        }
-        const project = projects.find((p) => p.id === session.projectId);
-        setTerminalTarget({
-          sessionId: session.id,
-          claudeSessionId: session.claudeSessionId,
-          projectPath: project?.path ?? "",
-          taskLabel: session.task,
-        });
-      }).catch(() => setTerminalTarget(null));
-    }).catch(() => setTerminalTarget(null));
-  }, [terminalSessionId, activeProjectId, projects]);
-
-  const handleCloseTerminal = useCallback((): void => {
-    setTerminalSessionId(null);
-  }, [setTerminalSessionId]);
 
   const sidebarResize = useResizable({
     initialWidth: sidebarWidth,
@@ -238,30 +203,18 @@ export function Shell(): React.JSX.Element {
             <McpManager />
           </div>
         ) : activeView === "history" ? (
-          terminalTarget ? (
-            /* Split layout: session list (30%) + terminal (70%) */
-            <div className="flex flex-1 overflow-hidden">
-              <div className="flex w-[30%] min-w-[240px] shrink-0 flex-col overflow-y-auto border-r-[3px] border-border">
-                <SessionHistory />
-              </div>
-              <div className="flex flex-1 flex-col overflow-hidden">
-                <SessionTerminal
-                  sessionId={terminalTarget.sessionId}
-                  claudeSessionId={terminalTarget.claudeSessionId}
-                  projectPath={terminalTarget.projectPath}
-                  taskLabel={terminalTarget.taskLabel}
-                  onClose={handleCloseTerminal}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-1 flex-col overflow-y-auto">
-              <SessionHistory />
-            </div>
-          )
+          <div className="flex flex-1 flex-col overflow-y-auto">
+            <SessionHistory />
+          </div>
         ) : activeView === "settings" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
-            <MemorySettings onClearAll={handleClearAll} />
+            <ThemePicker />
+            <div className="border-t-token-normal border-border" />
+            <MemorySettings
+              onClearAll={handleClearAll}
+              onExport={handleExportMemories}
+              onImport={handleImportMemories}
+            />
           </div>
         ) : (
           <>
@@ -272,9 +225,9 @@ export function Shell(): React.JSX.Element {
               </div>
             )}
 
-            {/* Active session — show ElfTheater, TaskGraph, ThinkingPanel, ActivityFeed */}
+            {/* Active session — show ElfTheater, TaskGraph, ThinkingPanel, SessionControlCard */}
             {!isPlanPreview && activeSession ? (
-              <div className="flex flex-1 overflow-hidden">
+              <div className="relative flex flex-1 overflow-hidden">
                 {/* Center — elf workshop + task graph + thinking panel */}
                 <div className="flex flex-1 flex-col overflow-y-auto">
                   {/* Celebration banner on completion */}
@@ -285,11 +238,11 @@ export function Shell(): React.JSX.Element {
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.2, ease: "easeOut" }}
-                        className="border-b-[3px] border-border bg-success px-6 py-3 text-center"
+                        className="border-b-token-normal border-border bg-success px-6 py-3 text-center"
                         data-testid="celebration-banner"
                       >
-                        <p className="font-display text-xl font-bold uppercase tracking-wide text-white">
-                          ALL DONE!
+                        <p className="font-display text-xl text-heading tracking-wide text-white">
+                          All Done!
                         </p>
                       </motion.div>
                     )}
@@ -301,12 +254,13 @@ export function Shell(): React.JSX.Element {
                     leadElfId={leadElfId}
                     startedAt={activeSession.startedAt}
                     sessionStatus={activeSession.status}
+                    isHistorical={isHistoricalFloor}
                   />
 
                   {/* Task Graph — shown for team sessions */}
                   {hasTaskGraph && activeSession.plan && (
-                    <div className="border-t-[3px] border-border px-4 py-4">
-                      <h3 className="mb-2 font-display text-sm font-bold uppercase tracking-wider text-gray-500">
+                    <div className="border-t-token-normal border-border px-4 py-4">
+                      <h3 className="mb-2 font-display text-sm text-label text-text-muted-light">
                         Task Graph
                       </h3>
                       <TaskGraph nodes={activeSession.plan.taskGraph} />
@@ -315,7 +269,7 @@ export function Shell(): React.JSX.Element {
 
                   {/* Thinking Panel — shown for team sessions */}
                   {hasTaskGraph && (
-                    <div className="border-t-[3px] border-border px-4 py-3">
+                    <div className="border-t-token-normal border-border px-4 py-3">
                       <ThinkingPanel
                         thoughts={thinkingStream}
                         isVisible={isThinkingVisible}
@@ -325,10 +279,10 @@ export function Shell(): React.JSX.Element {
                   )}
                 </div>
 
-                {/* Right panel — activity feed (resizable + collapsible) */}
-                {isActivityFeedVisible ? (
+                {/* Activity feed overlay (Cmd+B) — absolute positioned, does not push layout */}
+                {isActivityFeedVisible && (
                   <div
-                    className="relative shrink-0 border-l-[3px] border-border"
+                    className="absolute right-0 top-0 z-20 h-full border-l-token-normal border-border bg-surface-elevated shadow-brutal-lg"
                     style={{ width: activityFeedWidth }}
                   >
                     <ResizeHandle
@@ -337,29 +291,25 @@ export function Shell(): React.JSX.Element {
                       isDragging={feedResize.isDragging}
                     />
                     <div className="flex h-full flex-col">
-                      <div className="flex items-center justify-end border-b-[3px] border-border px-3 py-1">
+                      <div className="flex items-center justify-between border-b-token-normal border-border px-3 py-2">
+                        <h3 className="font-display text-xs text-label">Activity</h3>
                         <button
                           onClick={toggleActivityFeed}
                           className="cursor-pointer border-none bg-transparent p-1 font-mono text-xs font-bold text-text-light/40 hover:text-text-light"
-                          title="Collapse activity feed (Cmd+B)"
+                          title="Close activity feed (Cmd+B)"
                         >
                           {"\u00BB"}
                         </button>
                       </div>
-                      <ActivityFeed events={events} maxHeight="100%" />
+                      <div className="flex-1 overflow-y-auto">
+                        <ActivityFeed events={events} maxHeight="100%" />
+                      </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="flex w-6 shrink-0 flex-col items-center border-l-[3px] border-border bg-white pt-2">
-                    <button
-                      onClick={toggleActivityFeed}
-                      className="cursor-pointer border-none bg-transparent p-1 font-mono text-xs font-bold text-text-light/40 hover:text-text-light"
-                      title="Expand activity feed (Cmd+B)"
-                    >
-                      {"\u00AB"}
-                    </button>
-                  </div>
                 )}
+
+                {/* Floating session control card */}
+                <SessionControlCard />
               </div>
             ) : (
               /* Empty state — no session and not in plan preview */
@@ -373,14 +323,14 @@ export function Shell(): React.JSX.Element {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
                         transition={{ duration: 0.2, ease: "easeOut" }}
-                        className="mx-auto mt-8 w-full max-w-md border-[3px] border-border bg-white p-6 shadow-brutal-lg"
+                        className="mx-auto mt-8 w-full max-w-md border-token-normal border-border bg-surface-elevated p-6 shadow-brutal-lg rounded-token-md"
                         data-testid="completion-summary"
                       >
-                        <div className="mb-4 border-b-[3px] border-border pb-3 text-center">
-                          <p className="font-display text-3xl font-black uppercase tracking-tight text-success">
-                            ALL DONE!
+                        <div className="mb-4 border-b-token-normal border-border pb-3 text-center">
+                          <p className="font-display text-3xl text-heading tracking-tight text-success">
+                            All Done!
                           </p>
-                          <p className="mt-1 font-body text-sm text-gray-600">
+                          <p className="mt-1 font-body text-sm text-text-muted">
                             The elves have spoken. Task completed successfully.
                           </p>
                         </div>
@@ -388,8 +338,8 @@ export function Shell(): React.JSX.Element {
                           {completedSummary.task}
                         </p>
                         <div className="mb-4 flex gap-4">
-                          <div className="border-[2px] border-border/30 px-3 py-1">
-                            <p className="font-mono text-xs text-gray-500">Elapsed</p>
+                          <div className="border-token-thin border-border/30 px-3 py-1">
+                            <p className="font-mono text-xs text-text-muted-light">Elapsed</p>
                             <p className="font-mono text-sm font-bold">
                               {completedSummary.elapsed < 60
                                 ? `${completedSummary.elapsed}s`
@@ -400,14 +350,14 @@ export function Shell(): React.JSX.Element {
                         <div className="flex gap-3">
                           <button
                             onClick={handleViewInHistory}
-                            className="flex-1 cursor-pointer border-[3px] border-border bg-elf-gold px-4 py-2 font-display text-xs font-bold uppercase tracking-wider shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                            className="flex-1 cursor-pointer border-token-normal border-border bg-accent text-accent-contrast px-4 py-2 font-display text-xs text-label shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none rounded-token-md"
                             data-testid="view-in-history-btn"
                           >
                             View in History
                           </button>
                           <button
                             onClick={handleNewTask}
-                            className="flex-1 cursor-pointer border-[3px] border-border bg-white px-4 py-2 font-display text-xs font-bold uppercase tracking-wider shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                            className="flex-1 cursor-pointer border-token-normal border-border bg-surface-elevated px-4 py-2 font-display text-xs text-label shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none rounded-token-md"
                             data-testid="new-task-btn"
                           >
                             New Task
@@ -428,8 +378,14 @@ export function Shell(): React.JSX.Element {
           </>
         )}
 
+        {/* Bottom terminal panel — slides up when toggled from SessionControlCard */}
+        {isTerminalPanelOpen && <BottomTerminalPanel />}
+
         {/* Shortcut overlay — toggled via Cmd+/ */}
         <ShortcutOverlay isOpen={shortcutOverlayOpen} onClose={toggleOverlay} />
+
+        {/* Floor bar — tab bar at bottom of main content */}
+        <FloorBar />
       </main>
 
       {/* New project creation dialog */}

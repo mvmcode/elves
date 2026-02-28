@@ -1,46 +1,346 @@
-/* ELVES global styles — neo-brutalist design system tokens via Tailwind v4. */
+/*
+ * ELVES Theme System
+ * ==================
+ *
+ * Architecture:
+ *   @theme      — Defines ALL design tokens with neo-brutalist defaults.
+ *                  Each token generates a Tailwind utility class (e.g. bg-surface, shadow-md).
+ *   @layer base — Per-theme overrides via [data-theme="..."] attribute selectors.
+ *                  Changing data-theme on <html> instantly swaps all visuals — no reload.
+ *
+ * Theme activation:
+ *   - No data-theme attr OR data-theme="neo-brutalist" → neo-brutalist (default)
+ *   - data-theme="modern" → Notion/Linear-inspired clean aesthetic
+ *
+ * Token naming convention:
+ *   SEMANTIC (use in new code)             LEGACY ALIAS (backward compat)
+ *   ─────────────────────────              ──────────────────────────────
+ *   --color-surface                        --color-surface-light
+ *   --color-text                           --color-text-light
+ *   --color-accent / accent-light / dark   --color-elf-gold / elf-gold-light / dark
+ *   --shadow-sm / md / lg / xl             --shadow-brutal-sm / brutal / brutal-lg / xl
+ *   --border-width / thin / thick          --border-brutal / brutal-thin / brutal-thick
+ *   --radius-sm / md / lg / xl             (new — no legacy equivalent)
+ *   --color-surface-elevated / hover / active  (new — no legacy equivalent)
+ *   --color-text-muted                     (new — no legacy equivalent)
+ *   --transition-speed                     (new — set in @layer base, not @theme)
+ *
+ * Adding a new theme:
+ *   1. Add a [data-theme="your-theme"] block in @layer base below
+ *   2. Override every semantic token AND its legacy alias
+ *   3. Register the theme ID in src/types/settings.ts ThemeId union
+ */
 @import "tailwindcss";
 
 @theme {
-  /* Neo-brutalist color palette */
-  --color-elf-gold: #FFD93D;
-  --color-elf-gold-light: #FFF0B3;
-  --color-elf-gold-dark: #E6C235;
+  /* ================================================================
+   * SEMANTIC TOKENS — Primary API for components.
+   * Values here are NEO-BRUTALIST defaults.
+   * ================================================================ */
 
-  --color-surface-light: #FFFDF7;
-  --color-surface-dark: #1A1A2E;
+  /* Surfaces */
+  --color-surface: #FFFDF7;
+  --color-surface-elevated: #FFFFFF;
+  --color-surface-hover: #FFF5D6;
+  --color-surface-active: #FFECB3;
 
+  /* Text */
+  --color-text: #000000;
+  --color-text-muted: #4A5568;
+
+  /* Accent — brand color that shifts per theme */
+  --color-accent: #FFD93D;
+  --color-accent-light: #FFF0B3;
+  --color-accent-dark: #E6C235;
+
+  /* Borders */
+  --color-border: #000000;
+
+  /* Status colors */
   --color-error: #FF6B6B;
   --color-success: #6BCB77;
   --color-info: #4D96FF;
   --color-warning: #FF8B3D;
 
-  --color-border: #000000;
-  --color-text-light: #000000;
-  --color-text-dark: #FFFDF7;
+  /* Shadows — hard-edged, zero blur (neo-brutalist) */
+  --shadow-sm: 2px 2px 0px 0px #000;
+  --shadow-md: 4px 4px 0px 0px #000;
+  --shadow-lg: 6px 6px 0px 0px #000;
+  --shadow-xl: 8px 8px 0px 0px #000;
 
-  /* Typography scale */
+  /* Border radius — sharp corners (neo-brutalist) */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+
+  /* Typography */
   --font-display: "Space Grotesk", "DM Sans", system-ui, sans-serif;
   --font-body: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Neo-brutalist shadows — hard-edged, no blur */
+  /* Accent contrast — text color that works on the accent background */
+  --color-accent-contrast: #000000;
+
+  /* Focus shadow */
+  --shadow-focus: 4px 4px 0px 0px #FFD93D;
+
+  /* Dark surface tokens (terminal/code areas) */
+  --color-surface-inset: #111827;
+  --color-surface-inset-alt: #1F2937;
+  --color-text-inset: #D1D5DB;
+  --color-border-inset: #374151;
+  --color-text-muted-light: #9CA3AF;
+  --color-surface-muted: #F3F4F6;
+
+  /* ================================================================
+   * LEGACY ALIASES — Keep existing Tailwind classes working.
+   * e.g. bg-surface-light, text-text-light, shadow-brutal-sm, etc.
+   * Remove once all components migrate to semantic token names.
+   * ================================================================ */
+
+  /* Surface aliases */
+  --color-surface-light: #FFFDF7;
+  --color-surface-dark: #1A1A2E;
+
+  /* Text aliases */
+  --color-text-light: #000000;
+  --color-text-dark: #FFFDF7;
+
+  /* Accent aliases */
+  --color-elf-gold: #FFD93D;
+  --color-elf-gold-light: #FFF0B3;
+  --color-elf-gold-dark: #E6C235;
+
+  /* Shadow aliases */
   --shadow-brutal-sm: 2px 2px 0px 0px #000;
   --shadow-brutal: 4px 4px 0px 0px #000;
   --shadow-brutal-lg: 6px 6px 0px 0px #000;
   --shadow-brutal-xl: 8px 8px 0px 0px #000;
 
-  /* Border widths */
+  /* Border width tokens (CSS custom properties — @utility rules below generate classes) */
+  --border-width: 3px;
+  --border-width-thin: 2px;
+  --border-width-thick: 4px;
   --border-brutal: 3px;
   --border-brutal-thin: 2px;
   --border-brutal-thick: 4px;
 }
 
-/* Base styles */
+/* ================================================================
+ * BORDER-WIDTH UTILITY CLASSES
+ * Tailwind v4 does not auto-generate border-width utilities from
+ * --border-width-* custom properties. Define them explicitly so
+ * components can use semantic token classes like border-token-normal.
+ * ================================================================ */
+
+/* All-sides variants */
+@utility border-token-normal {
+  border-width: var(--border-width);
+  border-style: solid;
+}
+@utility border-token-thin {
+  border-width: var(--border-width-thin);
+  border-style: solid;
+}
+@utility border-token-thick {
+  border-width: var(--border-width-thick);
+  border-style: solid;
+}
+
+/* Directional: bottom */
+@utility border-b-token-normal {
+  border-bottom-width: var(--border-width);
+  border-bottom-style: solid;
+}
+@utility border-b-token-thin {
+  border-bottom-width: var(--border-width-thin);
+  border-bottom-style: solid;
+}
+
+/* Directional: top */
+@utility border-t-token-normal {
+  border-top-width: var(--border-width);
+  border-top-style: solid;
+}
+@utility border-t-token-thin {
+  border-top-width: var(--border-width-thin);
+  border-top-style: solid;
+}
+
+/* Directional: left */
+@utility border-l-token-normal {
+  border-left-width: var(--border-width);
+  border-left-style: solid;
+}
+@utility border-l-token-thick {
+  border-left-width: var(--border-width-thick);
+  border-left-style: solid;
+}
+
+/* Directional: right */
+@utility border-r-token-normal {
+  border-right-width: var(--border-width);
+  border-right-style: solid;
+}
+
+/* ================================================================
+ * TYPOGRAPHY UTILITY CLASSES
+ * Theme-aware text-transform, font-weight, and letter-spacing for
+ * headings and labels. Neo-brutalist: bold uppercase. Modern: normal-case, lighter.
+ * ================================================================ */
+@utility text-heading {
+  text-transform: var(--text-transform-heading, uppercase);
+  font-weight: var(--font-weight-heading, 700);
+  letter-spacing: var(--letter-spacing-heading, 0.05em);
+}
+@utility text-label {
+  text-transform: var(--text-transform-label, uppercase);
+  font-weight: var(--font-weight-label, 700);
+  letter-spacing: var(--letter-spacing-label, 0.05em);
+}
+
+/* ================================================================
+ * BORDER-RADIUS UTILITY CLASSES
+ * Maps semantic radius tokens to border-radius. Sharp in neo-brutalist,
+ * rounded in modern theme.
+ * ================================================================ */
+@utility rounded-token-sm {
+  border-radius: var(--radius-sm);
+}
+@utility rounded-token-md {
+  border-radius: var(--radius-md);
+}
+@utility rounded-token-lg {
+  border-radius: var(--radius-lg);
+}
+@utility rounded-token-xl {
+  border-radius: var(--radius-xl);
+}
+
+/* ================================================================
+ * FOCUS RING UTILITY
+ * Theme-aware focus shadow: hard yellow shadow in neo-brutalist,
+ * 2px indigo ring in modern.
+ * ================================================================ */
+@utility focus-ring {
+  box-shadow: var(--shadow-focus);
+}
+
+/* ================================================================
+ * THEME OVERRIDES
+ * Each [data-theme] block overrides semantic tokens AND legacy
+ * aliases so every existing class updates automatically.
+ * ================================================================ */
+@layer base {
+  /* Neo-brutalist is the default — @theme values already match.
+   * :root only sets properties not expressible in @theme. */
+  :root {
+    --transition-speed: 0ms;
+
+    /* Typography tokens — neo-brutalist: bold uppercase */
+    --text-transform-heading: uppercase;
+    --font-weight-heading: 700;
+    --letter-spacing-heading: 0.05em;
+    --text-transform-label: uppercase;
+    --font-weight-label: 700;
+    --letter-spacing-label: 0.05em;
+  }
+
+  /* Modern theme — Notion/Linear inspired.
+   * Clean whites, subtle blurred shadows, thin gray borders,
+   * rounded corners, Inter everywhere, smooth transitions. */
+  [data-theme="modern"] {
+    /* Typography tokens — modern: normal-case, lighter weight */
+    --text-transform-heading: none;
+    --font-weight-heading: 600;
+    --letter-spacing-heading: -0.01em;
+    --text-transform-label: none;
+    --font-weight-label: 500;
+    --letter-spacing-label: 0;
+
+    /* Surfaces */
+    --color-surface: #FFFFFF;
+    --color-surface-light: #FFFFFF;
+    --color-surface-elevated: #FAFAFA;
+    --color-surface-hover: #F5F5F5;
+    --color-surface-active: #EBEBEB;
+    --color-surface-dark: #18181B;
+
+    /* Text */
+    --color-text: #1A1A1A;
+    --color-text-light: #1A1A1A;
+    --color-text-dark: #FAFAFA;
+    --color-text-muted: #6B7280;
+
+    /* Accent — muted indigo (Linear-inspired) */
+    --color-accent: #5B5BD6;
+    --color-accent-light: #E8E8FC;
+    --color-accent-dark: #4747A1;
+    --color-elf-gold: #5B5BD6;
+    --color-elf-gold-light: #E8E8FC;
+    --color-elf-gold-dark: #4747A1;
+
+    /* Borders — thin, light gray */
+    --color-border: #E2E8F0;
+    --border-width: 1px;
+    --border-width-thin: 1px;
+    --border-width-thick: 1.5px;
+    --border-brutal: 1px;
+    --border-brutal-thin: 1px;
+    --border-brutal-thick: 1.5px;
+
+    /* Shadows — subtle with blur */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    --shadow-brutal-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-brutal: 0 4px 6px -1px rgba(0, 0, 0, 0.07);
+    --shadow-brutal-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+    --shadow-brutal-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+
+    /* Radius — rounded corners */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+
+    /* Typography — Inter for display too (cleaner feel) */
+    --font-display: "Inter", system-ui, sans-serif;
+
+    /* Status colors — refined palette */
+    --color-error: #EF4444;
+    --color-success: #22C55E;
+    --color-info: #3B82F6;
+    --color-warning: #F59E0B;
+
+    /* Accent contrast — white text on indigo */
+    --color-accent-contrast: #FFFFFF;
+
+    /* Focus shadow — ring style */
+    --shadow-focus: 0 0 0 2px #5B5BD6;
+
+    /* Dark surface tokens (terminal/code areas) */
+    --color-surface-inset: #18181B;
+    --color-surface-inset-alt: #27272A;
+    --color-text-inset: #D4D4D8;
+    --color-border-inset: #3F3F46;
+    --color-text-muted-light: #A1A1AA;
+    --color-surface-muted: #F4F4F5;
+
+    /* Transitions — smooth */
+    --transition-speed: 200ms;
+  }
+}
+
+/* ================================================================
+ * BASE STYLES
+ * ================================================================ */
 html {
   font-family: var(--font-body);
-  background: var(--color-surface-light);
-  color: var(--color-text-light);
+  background: var(--color-surface);
+  color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -51,7 +351,10 @@ html {
   user-select: none;
 }
 
-/* Elf avatar animations — driven by ElfStatus */
+/* ================================================================
+ * ELF AVATAR ANIMATIONS — Theme-agnostic. Do not modify per theme.
+ * Driven by ElfStatus: idle, working, thinking, done, error, sleeping.
+ * ================================================================ */
 @keyframes elf-bounce {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-3px); }
@@ -113,7 +416,9 @@ html {
   animation: elf-sway 3s ease-in-out infinite;
 }
 
-/* Scrollbar styling */
+/* ================================================================
+ * SCROLLBAR
+ * ================================================================ */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -124,5 +429,5 @@ html {
 
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
-  border: 2px solid var(--color-surface-light);
+  border: 2px solid var(--color-surface);
 }

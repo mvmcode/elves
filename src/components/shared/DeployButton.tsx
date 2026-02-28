@@ -1,4 +1,4 @@
-/* The SUMMON THE ELVES button — the primary action trigger. */
+/* The Summon the Elves button — the primary action trigger. */
 
 import { Button } from "./Button";
 import type { ButtonHTMLAttributes } from "react";
@@ -19,7 +19,7 @@ export function DeployButton(props: DeployButtonProps): React.JSX.Element {
       className="px-8 py-4 font-display text-lg tracking-widest"
       {...props}
     >
-      SUMMON THE ELVES
+      Summon the Elves
     </Button>
   );
 }

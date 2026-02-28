@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSessionHistory } from "@/hooks/useSessionHistory";
 import { useUiStore } from "@/stores/ui";
+import { useSessionStore } from "@/stores/session";
+import type { ActiveSession } from "@/stores/session";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ShareButton } from "@/components/project/ShareButton";
 import { getEmptyState } from "@/lib/funny-copy";
 import { listSessionEvents } from "@/lib/tauri";
 import type { SessionEvent } from "@/lib/tauri";
+import type { ElfEvent } from "@/types/elf";
 import type { Session, SessionStatus } from "@/types/session";
 
 /** Status dot color — 8px circle color-coded by session status. */
@@ -114,7 +117,7 @@ function SessionEventViewer({ sessionId }: { readonly sessionId: string }): Reac
 
   if (isLoading) {
     return (
-      <div className="border-[2px] border-border/20 p-3">
+      <div className="border-token-thin border-border/20 p-3">
         <p className="font-mono text-xs text-text-light/40">Loading events...</p>
       </div>
     );
@@ -122,16 +125,16 @@ function SessionEventViewer({ sessionId }: { readonly sessionId: string }): Reac
 
   if (events.length === 0) {
     return (
-      <div className="border-[2px] border-border/20 p-3">
+      <div className="border-token-thin border-border/20 p-3">
         <p className="font-mono text-xs italic text-text-light/40">No events recorded.</p>
       </div>
     );
   }
 
   return (
-    <div className="border-[2px] border-border/20" data-testid="session-events">
-      <div className="border-b-[2px] border-border/20 px-3 py-2">
-        <p className="font-body text-xs font-bold uppercase tracking-wider text-text-light/50">
+    <div className="border-token-thin border-border/20" data-testid="session-events">
+      <div className="border-b-token-thin border-border/20 px-3 py-2">
+        <p className="font-body text-xs text-label text-text-light/50">
           Session Output ({events.length} events)
         </p>
       </div>
@@ -139,7 +142,7 @@ function SessionEventViewer({ sessionId }: { readonly sessionId: string }): Reac
         {events.map((event) => (
           <div key={event.id} className="flex items-start gap-2 border-b border-border/10 px-3 py-2 last:border-b-0">
             <span
-              className="mt-0.5 shrink-0 border-[2px] border-border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase"
+              className="mt-0.5 shrink-0 border-token-thin border-border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase"
               style={{ backgroundColor: EVENT_TYPE_COLOR[event.eventType] ?? "#EEE" }}
             >
               {event.eventType.replace(/_/g, " ")}
@@ -164,7 +167,8 @@ export function SessionHistory(): React.JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const highlightedSessionId = useUiStore((state) => state.highlightedSessionId);
   const setHighlightedSessionId = useUiStore((state) => state.setHighlightedSessionId);
-  const setTerminalSessionId = useUiStore((state) => state.setTerminalSessionId);
+  const setActiveView = useUiStore((state) => state.setActiveView);
+  const openHistoricalFloor = useSessionStore((state) => state.openHistoricalFloor);
   const highlightRef = useRef<HTMLDivElement>(null);
 
   /** Auto-expand and scroll to the highlighted session (navigated from completion card). */
@@ -180,12 +184,41 @@ export function SessionHistory(): React.JSX.Element {
     }
   }, [highlightedSessionId, isLoading, sessions, setHighlightedSessionId]);
 
-  /** Open the embedded terminal for a session with a Claude session ID. */
-  const handleResume = useCallback(
-    (sessionId: string): void => {
-      setTerminalSessionId(sessionId);
+  /** Open a historical session as a new floor tab. */
+  const handleOpenAsFloor = useCallback(
+    async (session: Session): Promise<void> => {
+      try {
+        const dbEvents = await listSessionEvents(session.id);
+        /* Convert DB events to ElfEvent format for the floor */
+        const elfEvents: ElfEvent[] = dbEvents.map((event: SessionEvent) => ({
+          id: `hist-event-${event.id}`,
+          timestamp: event.timestamp,
+          elfId: event.elfId ?? "system",
+          elfName: event.elfId ?? "System",
+          runtime: session.runtime,
+          type: event.eventType as ElfEvent["type"],
+          payload: (() => { try { return JSON.parse(event.payload) as Record<string, unknown>; } catch { return {}; } })(),
+          funnyStatus: event.funnyStatus ?? undefined,
+        }));
+
+        const activeSession: ActiveSession = {
+          id: session.id,
+          projectId: session.projectId,
+          task: session.task,
+          runtime: session.runtime,
+          status: session.status,
+          startedAt: session.startedAt,
+          plan: session.plan,
+          claudeSessionId: session.claudeSessionId ?? undefined,
+        };
+
+        openHistoricalFloor(activeSession, elfEvents);
+        setActiveView("session");
+      } catch (error) {
+        console.error("Failed to open session as floor:", error);
+      }
     },
-    [setTerminalSessionId],
+    [openHistoricalFloor, setActiveView],
   );
 
   if (isLoading) {
@@ -208,15 +241,14 @@ export function SessionHistory(): React.JSX.Element {
   return (
     <div className="p-4" data-testid="session-history">
       {/* Header */}
-      <h2 className="mb-4 font-display text-2xl font-black uppercase tracking-tight">
+      <h2 className="mb-4 font-display text-2xl text-heading tracking-tight">
         Session History
       </h2>
 
       {/* Session table container — brutalist chrome on the container, not individual rows */}
-      <div className="border-[3px] border-border bg-white shadow-brutal-lg">
+      <div className="border-token-normal border-border bg-surface-elevated rounded-token-md shadow-brutal-lg">
         {sessions.map((session: Session) => {
           const isExpanded = expandedId === session.id;
-          const hasClaudeSession = session.claudeSessionId != null;
           return (
             <div
               key={session.id}
@@ -228,8 +260,8 @@ export function SessionHistory(): React.JSX.Element {
                 onClick={() => setExpandedId(isExpanded ? null : session.id)}
                 className={[
                   "flex w-full cursor-pointer items-center gap-2 border-none bg-transparent px-3 py-2 text-left transition-colors duration-75",
-                  "border-b-[2px] border-border/20",
-                  isExpanded ? "bg-elf-gold/10" : "hover:bg-surface-light",
+                  "border-b-token-thin border-border/20",
+                  isExpanded ? "bg-accent/10" : "hover:bg-surface-light",
                 ].join(" ")}
                 data-testid="session-card-header"
               >
@@ -247,7 +279,7 @@ export function SessionHistory(): React.JSX.Element {
                 </span>
 
                 {/* Runtime badge */}
-                <span className="shrink-0 border-[2px] border-border px-1 py-0 font-mono text-[10px] font-bold">
+                <span className="shrink-0 border-token-thin border-border px-1 py-0 font-mono text-[10px] font-bold">
                   {RUNTIME_BADGE[session.runtime] ?? "??"}
                 </span>
 
@@ -274,11 +306,11 @@ export function SessionHistory(): React.JSX.Element {
 
               {/* Expanded inline detail */}
               {isExpanded && (
-                <div className="border-b-[2px] border-border/20 bg-white p-3" data-testid="session-detail">
+                <div className="border-b-token-thin border-border/20 bg-surface-elevated p-3" data-testid="session-detail">
                   {/* Summary */}
                   {session.summary ? (
                     <div className="mb-3">
-                      <p className="mb-1 font-body text-xs font-bold uppercase tracking-wider text-text-light/50">Summary</p>
+                      <p className="mb-1 font-body text-xs text-label text-text-light/50">Summary</p>
                       <p className="font-body text-sm">{session.summary}</p>
                     </div>
                   ) : (
@@ -289,11 +321,11 @@ export function SessionHistory(): React.JSX.Element {
 
                   {/* Stats row */}
                   <div className="mb-3 flex gap-4">
-                    <div className="border-[2px] border-border/20 px-3 py-1">
+                    <div className="border-token-thin border-border/20 px-3 py-1">
                       <p className="font-mono text-xs text-text-light/50">Tokens</p>
                       <p className="font-mono text-sm font-bold">{session.tokensUsed.toLocaleString()}</p>
                     </div>
-                    <div className="border-[2px] border-border/20 px-3 py-1">
+                    <div className="border-token-thin border-border/20 px-3 py-1">
                       <p className="font-mono text-xs text-text-light/50">Cost</p>
                       <p className="font-mono text-sm font-bold">${session.costEstimate.toFixed(4)}</p>
                     </div>
@@ -307,18 +339,16 @@ export function SessionHistory(): React.JSX.Element {
                   {/* Action buttons row */}
                   <div className="flex items-center gap-2">
                     <ShareButton sessionId={session.id} sessionTask={session.task} />
-                    {hasClaudeSession && (
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleResume(session.id);
-                        }}
-                        className="cursor-pointer border-[3px] border-border bg-info/20 px-3 py-1 font-display text-xs font-bold uppercase tracking-wider shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
-                        data-testid="resume-button"
-                      >
-                        Resume
-                      </button>
-                    )}
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleOpenAsFloor(session);
+                      }}
+                      className="cursor-pointer border-token-normal border-border bg-info/20 rounded-token-sm px-3 py-1 font-display text-xs text-label shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                      data-testid="open-floor-button"
+                    >
+                      Open as Floor
+                    </button>
                   </div>
                 </div>
               )}

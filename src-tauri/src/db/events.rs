@@ -89,6 +89,7 @@ pub fn list_events(
 }
 
 /// Count the total number of events in a session.
+#[allow(dead_code)]
 pub fn count_events(conn: &Connection, session_id: &str) -> Result<i64, DbError> {
     let count: i64 = conn.query_row(
         "SELECT COUNT(*) FROM events WHERE session_id = ?1",

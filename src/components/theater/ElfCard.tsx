@@ -88,33 +88,33 @@ export function ElfCard({
   if (isTerminal) {
     return (
       <div
-        className="flex h-full flex-col border-[3px] border-border bg-white shadow-brutal-lg"
+        className="flex h-full flex-col border-token-normal border-border bg-surface-elevated shadow-brutal-lg rounded-token-md"
         style={{ borderLeftWidth: "4px", borderLeftColor: elf.color }}
         data-testid="elf-card"
       >
         {/* Compact header — all info on one line */}
-        <div className="flex items-center gap-3 border-b-[2px] border-border px-4 py-2">
+        <div className="flex items-center gap-3 border-b-token-thin border-border px-4 py-2">
           <ElfAvatar
             avatarId={getAvatarId(elf.name)}
             status={elf.status}
             size="sm"
             color={elf.color}
           />
-          <span className="font-display text-sm font-bold uppercase tracking-wide">
+          <span className="font-display text-sm text-heading">
             {elf.name}
           </span>
           {elf.role && (
-            <span className="font-body text-xs text-gray-500">{elf.role}</span>
+            <span className="font-body text-xs text-text-muted-light">{elf.role}</span>
           )}
           <Badge variant={statusBadgeVariant[elf.status]}>
             {statusLabel[elf.status]}
           </Badge>
-          <span className="ml-auto font-body text-xs italic text-gray-500" data-testid="funny-status">
+          <span className="ml-auto font-body text-xs italic text-text-muted-light" data-testid="funny-status">
             &ldquo;{funnyStatus}&rdquo;
           </span>
           {/* Inline progress bar */}
           <div className="flex items-center gap-1" data-testid="progress-bar">
-            <div className="h-2 w-24 border-[2px] border-border bg-gray-200">
+            <div className="h-2 w-24 border-token-thin border-border bg-surface-muted rounded-token-sm">
               <div
                 className="h-full transition-all duration-300 ease-out"
                 style={{ width: `${progress}%`, backgroundColor: elf.color }}
@@ -125,7 +125,7 @@ export function ElfCard({
           {/* Collapse toggle for terminal output */}
           <button
             onClick={() => setIsOutputCollapsed((prev) => !prev)}
-            className="ml-2 cursor-pointer border-[2px] border-border bg-gray-100 px-2 py-0.5 font-body text-[10px] font-bold uppercase tracking-wider text-gray-600 transition-all duration-100 hover:bg-gray-200"
+            className="ml-2 cursor-pointer border-token-thin border-border bg-surface-muted px-2 py-0.5 font-body text-[10px] text-label text-text-muted transition-all duration-100 hover:bg-surface-hover rounded-token-sm"
             data-testid="output-collapse-toggle"
           >
             {isOutputCollapsed ? "Show Output" : "Hide Output"}
@@ -150,7 +150,7 @@ export function ElfCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 400, damping: 25 }}
-      className="border-[3px] border-border bg-white p-5 shadow-brutal-lg"
+      className="border-token-normal border-border bg-surface-elevated p-5 shadow-brutal-lg rounded-token-md"
       style={{ borderLeftWidth: "4px", borderLeftColor: elf.color }}
       data-testid="elf-card"
     >
@@ -163,7 +163,7 @@ export function ElfCard({
             size="md"
             color={elf.color}
           />
-          <span className="font-display text-lg font-bold uppercase tracking-wide">
+          <span className="font-display text-lg text-heading">
             {elf.name}
           </span>
         </div>
@@ -174,20 +174,20 @@ export function ElfCard({
 
       {/* Role */}
       {elf.role && (
-        <p className="mt-1 font-body text-sm text-gray-600">
+        <p className="mt-1 font-body text-sm text-text-muted">
           Role: {elf.role}
         </p>
       )}
 
       {/* Funny status message */}
-      <p className="mt-3 font-body text-sm italic text-gray-700" data-testid="funny-status">
+      <p className="mt-3 font-body text-sm italic text-text-muted" data-testid="funny-status">
         &ldquo;{funnyStatus}&rdquo;
       </p>
 
       {/* Progress bar — chunky segmented */}
       <div className="mt-4" data-testid="progress-bar">
         <div className="flex items-center justify-between">
-          <div className="h-4 flex-1 border-[2px] border-border bg-gray-200">
+          <div className="h-4 flex-1 border-token-thin border-border bg-surface-muted rounded-token-sm">
             <div
               className="h-full transition-all duration-300 ease-out"
               style={{ width: `${progress}%`, backgroundColor: elf.color }}
@@ -200,7 +200,7 @@ export function ElfCard({
       {/* Expand toggle */}
       <button
         onClick={handleToggle}
-        className="mt-3 flex w-full cursor-pointer items-center gap-1 border-none bg-transparent p-0 font-body text-xs font-bold uppercase tracking-wider text-gray-500 hover:text-text-light"
+        className="mt-3 flex w-full cursor-pointer items-center gap-1 border-none bg-transparent p-0 font-body text-xs text-label text-text-muted-light hover:text-text-light"
         data-testid="expand-toggle"
       >
         <span className="transition-transform duration-100" style={{ display: "inline-block", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>
@@ -217,7 +217,7 @@ export function ElfCard({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="mt-2 overflow-hidden border-[2px] border-border"
+            className="mt-2 overflow-hidden border-token-thin border-border"
           >
             <TerminalOutput
               events={events as ElfEvent[]}

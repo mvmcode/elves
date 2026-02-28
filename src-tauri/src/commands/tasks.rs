@@ -2,6 +2,8 @@
 
 use crate::agents::analyzer::{self, TaskPlan};
 use crate::agents::claude_adapter::{self, ClaudeSpawnOptions};
+use crate::agents::codex_adapter;
+use crate::agents::interop;
 use crate::agents::process::ProcessManager;
 use crate::commands::projects::DbState;
 use crate::db;
@@ -70,19 +72,49 @@ pub async fn start_task(
         }),
     );
 
-    // 5. Parse spawn options and spawn Claude process
-    let spawn_options: ClaudeSpawnOptions = match options {
-        Some(ref json) => match serde_json::from_str(json) {
-            Ok(opts) => opts,
-            Err(e) => {
-                log::warn!("Failed to parse spawn options: {e}, json={json}");
-                ClaudeSpawnOptions::default()
-            }
-        },
-        None => ClaudeSpawnOptions::default(),
+    // 5. Build runtime-specific memory context for injection
+    let memory_context = {
+        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+        interop::prepare_context_for_runtime(&conn, &project_id, &runtime)
+            .unwrap_or_else(|e| {
+                log::warn!("Failed to prepare memory context: {e}");
+                String::new()
+            })
     };
-    let mut child = claude_adapter::spawn_claude(&task, &working_dir, &spawn_options)
-        .map_err(|e| format!("Failed to spawn claude: {e}"))?;
+
+    // 6. Spawn the agent process — branch on runtime
+    let is_codex = runtime == "codex";
+
+    let mut child = if is_codex {
+        // For Codex, prepend memory context to the task prompt
+        let codex_task = if memory_context.is_empty() {
+            task.clone()
+        } else {
+            format!("{memory_context}\n\n---\n\n{task}")
+        };
+        codex_adapter::spawn_codex(&codex_task, &working_dir)
+            .map_err(|e| format!("Failed to spawn codex: {e}"))?
+    } else {
+        // For Claude Code, inject memory via append_system_prompt
+        let mut spawn_options: ClaudeSpawnOptions = match options {
+            Some(ref json) => match serde_json::from_str(json) {
+                Ok(opts) => opts,
+                Err(e) => {
+                    log::warn!("Failed to parse spawn options: {e}, json={json}");
+                    ClaudeSpawnOptions::default()
+                }
+            },
+            None => ClaudeSpawnOptions::default(),
+        };
+        if !memory_context.is_empty() {
+            spawn_options.append_system_prompt = Some(match spawn_options.append_system_prompt {
+                Some(existing) => format!("{existing}\n\n{memory_context}"),
+                None => memory_context,
+            });
+        }
+        claude_adapter::spawn_claude(&task, &working_dir, &spawn_options)
+            .map_err(|e| format!("Failed to spawn claude: {e}"))?
+    };
 
     // Take stdout and stderr before registering — we read them in background threads
     let stdout = child.stdout.take();
@@ -102,9 +134,15 @@ pub async fn start_task(
     if let Some(stdout) = stdout {
         let app_handle = app.clone();
         let sid = session_id.clone();
-        std::thread::spawn(move || {
-            stream_claude_output(stdout, &app_handle, &sid);
-        });
+        if is_codex {
+            std::thread::spawn(move || {
+                stream_codex_output(stdout, &app_handle, &sid);
+            });
+        } else {
+            std::thread::spawn(move || {
+                stream_claude_output(stdout, &app_handle, &sid);
+            });
+        }
     }
 
     Ok(session_id)
@@ -122,8 +160,13 @@ pub async fn stop_task(
     session_id: String,
 ) -> Result<bool, String> {
     let killed = process_mgr.kill(&session_id);
+    let is_interactive = process_mgr.is_interactive(&session_id);
 
-    if killed {
+    // Process killed OR session is in interactive mode (PTY owns the process,
+    // so ProcessManager won't find it — but we still need to cancel the session).
+    if killed || is_interactive {
+        process_mgr.clear_interactive(&session_id);
+
         let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
         db::sessions::update_session_status(
             &conn,
@@ -141,7 +184,7 @@ pub async fn stop_task(
         );
     }
 
-    Ok(killed)
+    Ok(killed || is_interactive)
 }
 
 /// Analyze a task to determine deployment strategy (solo vs team).
@@ -250,26 +293,56 @@ pub async fn start_team_task(
         elf_ids.push(elf_id);
     }
 
-    // 4. Parse spawn options and spawn Claude in team mode
-    let spawn_options: ClaudeSpawnOptions = match options {
-        Some(ref json) => match serde_json::from_str(json) {
-            Ok(opts) => opts,
-            Err(e) => {
-                log::warn!("Failed to parse team spawn options: {e}, json={json}");
-                ClaudeSpawnOptions::default()
-            }
-        },
-        None => ClaudeSpawnOptions::default(),
+    // 4. Build runtime-specific memory context for injection
+    let memory_context = {
+        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+        interop::prepare_context_for_runtime(&conn, &project_id, &runtime)
+            .unwrap_or_else(|e| {
+                log::warn!("Failed to prepare team memory context: {e}");
+                String::new()
+            })
     };
-    let mut child = claude_adapter::spawn_claude_team(&task, &working_dir, &plan, &spawn_options)
-        .map_err(|e| format!("Failed to spawn claude team: {e}"))?;
+
+    // 5. Spawn the agent process — branch on runtime
+    let is_codex = runtime == "codex";
+
+    let mut child = if is_codex {
+        // For Codex team, prepend memory context to the task prompt
+        let codex_task = if memory_context.is_empty() {
+            task.clone()
+        } else {
+            format!("{memory_context}\n\n---\n\n{task}")
+        };
+        codex_adapter::spawn_codex_team(&codex_task, &working_dir, &plan)
+            .map_err(|e| format!("Failed to spawn codex team: {e}"))?
+    } else {
+        // For Claude Code team, inject memory via append_system_prompt
+        let mut spawn_options: ClaudeSpawnOptions = match options {
+            Some(ref json) => match serde_json::from_str(json) {
+                Ok(opts) => opts,
+                Err(e) => {
+                    log::warn!("Failed to parse team spawn options: {e}, json={json}");
+                    ClaudeSpawnOptions::default()
+                }
+            },
+            None => ClaudeSpawnOptions::default(),
+        };
+        if !memory_context.is_empty() {
+            spawn_options.append_system_prompt = Some(match spawn_options.append_system_prompt {
+                Some(existing) => format!("{existing}\n\n{memory_context}"),
+                None => memory_context,
+            });
+        }
+        claude_adapter::spawn_claude_team(&task, &working_dir, &plan, &spawn_options)
+            .map_err(|e| format!("Failed to spawn claude team: {e}"))?
+    };
 
     // Take stdout and stderr before registering
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
     process_mgr.register(&session_id, child);
 
-    // 5. Drain stderr to prevent pipe buffer deadlock
+    // 6. Drain stderr to prevent pipe buffer deadlock
     if let Some(stderr) = stderr {
         let sid_err = session_id.clone();
         std::thread::spawn(move || {
@@ -277,13 +350,19 @@ pub async fn start_team_task(
         });
     }
 
-    // 6. Stream stdout events to the frontend in a background thread
+    // 7. Stream stdout events to the frontend in a background thread
     if let Some(stdout) = stdout {
         let app_handle = app.clone();
         let sid = session_id.clone();
-        std::thread::spawn(move || {
-            stream_claude_output(stdout, &app_handle, &sid);
-        });
+        if is_codex {
+            std::thread::spawn(move || {
+                stream_codex_output(stdout, &app_handle, &sid);
+            });
+        } else {
+            std::thread::spawn(move || {
+                stream_claude_output(stdout, &app_handle, &sid);
+            });
+        }
     }
 
     Ok(session_id)
@@ -303,9 +382,12 @@ pub async fn stop_team_task(
     // Try both single-process and team kill paths
     let single_killed = process_mgr.kill(&session_id);
     let team_killed = process_mgr.kill_team(&session_id);
-    let any_killed = single_killed || team_killed > 0;
+    let is_interactive = process_mgr.is_interactive(&session_id);
+    let should_cancel = single_killed || team_killed > 0 || is_interactive;
 
-    if any_killed {
+    if should_cancel {
+        process_mgr.clear_interactive(&session_id);
+
         let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
         db::sessions::update_session_status(
             &conn,
@@ -323,7 +405,118 @@ pub async fn stop_team_task(
         );
     }
 
-    Ok(any_killed)
+    Ok(should_cancel)
+}
+
+/// Continue a completed session with a follow-up message.
+///
+/// Resumes the Claude Code session via `--print --resume <claudeSessionId> "<message>"`.
+/// The new process streams events into the same session, and the session transitions
+/// back to "active" status. This enables multi-turn conversations where Claude asks
+/// a question and the user replies.
+///
+/// Returns true if the continue process was spawned successfully.
+#[tauri::command]
+pub async fn continue_task(
+    app: AppHandle,
+    db: State<'_, DbState>,
+    process_mgr: State<'_, ProcessManager>,
+    session_id: String,
+    message: String,
+    options: Option<String>,
+) -> Result<bool, String> {
+    // 1. Look up the Claude session ID from the database
+    let (claude_session_id, working_dir) = {
+        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+        let session = db::sessions::get_session(&conn, &session_id)
+            .map_err(|e| format!("Database error: {e}"))?
+            .ok_or("Session not found")?;
+        let claude_sid = session.claude_session_id
+            .ok_or("No Claude session ID — cannot resume")?;
+        let project = db::projects::get_project(&conn, &session.project_id)
+            .map_err(|e| format!("Database error: {e}"))?
+            .ok_or("Project not found")?;
+        (claude_sid, project.path.clone())
+    };
+
+    // 2. Parse spawn options
+    let spawn_options: ClaudeSpawnOptions = match options {
+        Some(ref json) => serde_json::from_str(json).unwrap_or_default(),
+        None => ClaudeSpawnOptions::default(),
+    };
+
+    // 3. Spawn the resume process
+    let mut child = claude_adapter::spawn_claude_resume(
+        &claude_session_id,
+        &message,
+        &working_dir,
+        &spawn_options,
+    ).map_err(|e| format!("Failed to resume claude: {e}"))?;
+
+    // 4. Update session status back to active
+    {
+        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+        let _ = db::sessions::update_session_status(&conn, &session_id, "active", None);
+    }
+
+    // 5. Take stdout/stderr and register
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    process_mgr.register(&session_id, child);
+
+    if let Some(stderr) = stderr {
+        let sid_err = session_id.clone();
+        std::thread::spawn(move || {
+            drain_stderr(stderr, &sid_err);
+        });
+    }
+
+    if let Some(stdout) = stdout {
+        let app_handle = app.clone();
+        let sid = session_id.clone();
+        std::thread::spawn(move || {
+            stream_claude_output(stdout, &app_handle, &sid);
+        });
+    }
+
+    // 6. Emit event so frontend knows the session is active again
+    let _ = app.emit(
+        "session:continued",
+        serde_json::json!({
+            "sessionId": &session_id,
+        }),
+    );
+
+    log::info!("[session {session_id}] Continued with follow-up message");
+    Ok(true)
+}
+
+/// Transition a session from non-interactive `--print` mode to interactive terminal.
+///
+/// Marks the session as interactive (so the stdout reader suppresses the false
+/// `session:completed` event), then kills the `--print` child process. After this,
+/// the frontend spawns `claude --resume <claudeSessionId>` in a PTY for the user
+/// to interact with directly.
+///
+/// Emits `session:interactive` to the frontend so the UI can switch to terminal mode.
+#[tauri::command]
+pub async fn transition_to_interactive(
+    app: AppHandle,
+    process_mgr: State<'_, ProcessManager>,
+    session_id: String,
+) -> Result<bool, String> {
+    process_mgr.mark_interactive(&session_id);
+    let killed = process_mgr.kill(&session_id);
+
+    let _ = app.emit(
+        "session:interactive",
+        serde_json::json!({
+            "sessionId": &session_id,
+        }),
+    );
+
+    log::info!("[session {session_id}] Transitioned to interactive mode (process killed: {killed})");
+    Ok(killed)
 }
 
 /// Drain stderr from the Claude process to prevent pipe buffer deadlock.
@@ -448,6 +641,28 @@ fn stream_claude_output(
     eprintln!("[ELVES] stdout closed for session {session_id} after {event_count} events");
     log::info!("[session {session_id}] stdout closed after {event_count} events");
 
+    // If this session transitioned to interactive terminal mode, the process was
+    // killed intentionally. Do NOT emit session:completed — the PTY terminal
+    // now owns the session lifecycle.
+    let process_mgr = app.state::<ProcessManager>();
+    if process_mgr.is_interactive(session_id) {
+        log::info!("[session {session_id}] Skipping completion — session transitioned to interactive mode");
+        process_mgr.clear_interactive(session_id);
+        return;
+    }
+
+    // Check if session was already cancelled by stop_task (prevents double-event race).
+    // Without this guard, stop_task emits session:cancelled and then this function
+    // sees EOF and emits session:completed — leaving the frontend in an inconsistent state.
+    if let Ok(conn) = db_state.0.lock() {
+        if let Ok(Some(session)) = db::sessions::get_session(&conn, session_id) {
+            if session.status == "cancelled" {
+                log::info!("[session {session_id}] Skipping completion — session already cancelled");
+                return;
+            }
+        }
+    }
+
     // stdout closed — the Claude process has finished.
     if let Ok(conn) = db_state.0.lock() {
         // Extract token/cost data from the result event if available
@@ -492,6 +707,100 @@ fn stream_claude_output(
             session_id,
             "completed",
             summary.as_deref().or(Some("Task completed")),
+        );
+    }
+
+    let _ = app.emit(
+        "session:completed",
+        serde_json::json!({
+            "sessionId": session_id,
+        }),
+    );
+}
+
+/// Read Codex's stdout line-by-line, parse and normalize events, emit to frontend.
+///
+/// Runs in a background thread. For each parsed line:
+/// 1. Parses the JSONL output into a CodexEvent via `parse_codex_output`
+/// 2. Normalizes into the unified ElfEvent format via `normalize_codex_event`
+/// 3. Emits `elf:event` to the frontend for real-time display
+/// 4. Persists the event to SQLite for history and replay
+///
+/// When stdout closes (process finished), marks the session as completed.
+fn stream_codex_output(
+    stdout: std::process::ChildStdout,
+    app: &AppHandle,
+    session_id: &str,
+) {
+    use std::io::BufRead;
+
+    eprintln!("[ELVES] Starting Codex stdout stream for session {session_id}");
+    log::info!("[session {session_id}] Starting Codex stdout stream reader");
+
+    let db_state = app.state::<DbState>();
+    let reader = std::io::BufReader::new(stdout);
+    let mut event_count: u32 = 0;
+
+    for line in reader.lines() {
+        match line {
+            Ok(line) => {
+                if let Some(codex_event) = codex_adapter::parse_codex_output(&line) {
+                    let normalized = codex_adapter::normalize_codex_event(codex_event);
+                    event_count += 1;
+
+                    if event_count <= 3 || normalized.event_type == "error" {
+                        log::info!(
+                            "[session {session_id}] Codex event #{event_count}: type={}, payload_len={}",
+                            normalized.event_type,
+                            line.len(),
+                        );
+                    }
+
+                    // 1. Emit to frontend for real-time display
+                    let _ = app.emit(
+                        "elf:event",
+                        serde_json::json!({
+                            "sessionId": session_id,
+                            "eventType": &normalized.event_type,
+                            "payload": &normalized.payload,
+                            "timestamp": normalized.timestamp,
+                            "runtime": "codex",
+                        }),
+                    );
+
+                    // 2. Persist to SQLite for history and replay
+                    if let Ok(conn) = db_state.0.lock() {
+                        let payload_str = serde_json::to_string(&normalized.payload).unwrap_or_default();
+                        if let Err(e) = db::events::insert_event(
+                            &conn,
+                            session_id,
+                            None,
+                            &normalized.event_type,
+                            &payload_str,
+                            None,
+                        ) {
+                            log::warn!("Failed to store Codex event for session {session_id}: {e}");
+                        }
+                    }
+                }
+            }
+            Err(error) => {
+                log::warn!("[session {session_id}] Codex stdout read error: {error}");
+                break;
+            }
+        }
+    }
+
+    eprintln!("[ELVES] Codex stdout closed for session {session_id} after {event_count} events");
+    log::info!("[session {session_id}] Codex stdout closed after {event_count} events");
+
+    // stdout closed — the Codex process has finished.
+    if let Ok(conn) = db_state.0.lock() {
+        let _ = db::sessions::update_session_status(
+            &conn,
+            session_id,
+            "completed",
+            Some("Task completed"),
         );
     }
 

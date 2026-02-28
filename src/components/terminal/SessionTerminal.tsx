@@ -17,6 +17,8 @@ interface SessionTerminalProps {
   readonly taskLabel: string;
   /** Called when the user closes the terminal panel. */
   readonly onClose: () => void;
+  /** Called when the PTY process exits — allows the parent to update session state. */
+  readonly onPtyExit?: () => void;
 }
 
 /** Tauri IPC: spawn a new PTY process. Returns a unique pty_id. */
@@ -55,6 +57,7 @@ export function SessionTerminal({
   projectPath,
   taskLabel,
   onClose,
+  onPtyExit,
 }: SessionTerminalProps): React.JSX.Element {
   const terminalRef = useRef<XTerminalHandle>(null);
   const ptyIdRef = useRef<string | null>(null);
@@ -101,13 +104,14 @@ export function SessionTerminal({
           terminalRef.current?.write(event.payload);
         });
 
-        /* Listen for PTY process exit → show message */
+        /* Listen for PTY process exit → show message and notify parent */
         unlistenExit = await listen<number>(`pty:exit:${ptyId}`, (event) => {
           terminalRef.current?.writeln("");
           terminalRef.current?.writeln(
             `\x1b[33m--- Session ended (exit code: ${event.payload}) ---\x1b[0m`,
           );
           setHasExited(true);
+          onPtyExit?.();
         });
       } catch (error) {
         console.error("Failed to spawn PTY:", error);
@@ -135,12 +139,15 @@ export function SessionTerminal({
   }, [claudeSessionId, projectPath, sessionId]);
 
   return (
-    <div className="flex h-full flex-col border-[3px] border-border bg-[#1A1A2E]" data-testid="session-terminal">
+    <div className="flex h-full flex-col border-token-normal border-border bg-[#1A1A2E]" data-testid="session-terminal">
       {/* Header bar */}
-      <div className="flex items-center justify-between border-b-[3px] border-border bg-white px-3 py-2">
+      <div className="flex items-center justify-between border-b-token-normal border-border bg-surface-elevated px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 border-[2px] border-border bg-info/20 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase">
-            RESUME
+          <span className={[
+            "shrink-0 border-token-thin border-border px-1.5 py-0.5 font-mono text-[10px] text-label",
+            hasExited ? "bg-gray-300" : "bg-success/20",
+          ].join(" ")}>
+            {hasExited ? "ENDED" : "LIVE"}
           </span>
           <span className="min-w-0 truncate font-body text-xs font-bold" title={taskLabel}>
             {taskLabel}
@@ -148,10 +155,10 @@ export function SessionTerminal({
         </div>
         <button
           onClick={onClose}
-          className="shrink-0 cursor-pointer border-[2px] border-border bg-white px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-widest transition-all duration-100 hover:bg-error hover:text-white"
+          className="shrink-0 cursor-pointer border-token-thin border-border bg-surface-elevated rounded-token-sm px-2 py-0.5 font-display text-[10px] text-label transition-all duration-100 hover:bg-error hover:text-white"
           data-testid="terminal-close-button"
         >
-          CLOSE
+          Close
         </button>
       </div>
 
@@ -162,7 +169,7 @@ export function SessionTerminal({
 
       {/* Exited footer */}
       {hasExited && (
-        <div className="border-t-[2px] border-border/30 bg-[#1A1A2E] px-3 py-1 text-center">
+        <div className="border-t-token-thin border-border/30 bg-[#1A1A2E] px-3 py-1 text-center">
           <span className="font-mono text-xs text-elf-gold">Session ended. Close this panel when done.</span>
         </div>
       )}

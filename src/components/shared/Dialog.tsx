@@ -49,7 +49,7 @@ export function Dialog({
           data-testid="dialog-overlay"
         >
           <motion.div
-            className="w-full max-w-md border-[3px] border-border bg-white p-6 shadow-brutal-lg"
+            className="w-full max-w-md border-token-normal border-border bg-surface-elevated p-6 shadow-brutal-lg rounded-token-lg"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
@@ -57,7 +57,7 @@ export function Dialog({
             onClick={(event) => event.stopPropagation()}
             data-testid="dialog-content"
           >
-            <h2 className="mb-4 font-display text-xl font-black uppercase tracking-tight">
+            <h2 className="mb-4 font-display text-xl text-heading tracking-tight">
               {title}
             </h2>
             {children}

@@ -95,6 +95,26 @@ export async function stopTeamTask(sessionId: string): Promise<boolean> {
   return invoke<boolean>("stop_team_task", { sessionId });
 }
 
+/** Continue a completed session with a follow-up message.
+ * Resumes the Claude session via `--print --resume` with the new message.
+ * The session transitions back to "active" and events stream into the same feed. */
+export async function continueTask(
+  sessionId: string,
+  message: string,
+  spawnOptions?: ClaudeSpawnOptions,
+): Promise<boolean> {
+  const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
+  return invoke<boolean>("continue_task", { sessionId, message, options });
+}
+
+/** Transition a session from non-interactive print mode to interactive terminal.
+ * Kills the --print process and marks the session so the backend suppresses
+ * the false session:completed event. The frontend then spawns a PTY terminal
+ * via `claude --resume` for direct user interaction. */
+export async function transitionToInteractive(sessionId: string): Promise<boolean> {
+  return invoke<boolean>("transition_to_interactive", { sessionId });
+}
+
 /* ── Memory commands ───────────────────────────────────────────── */
 
 /** List memories for a project with optional filtering. */
@@ -177,7 +197,7 @@ export async function listSkills(projectId?: string): Promise<Skill[]> {
   return invoke<Skill[]>("list_skills", { projectId });
 }
 
-/** Create a new skill. */
+/** Create a new skill. Generates a UUID for the skill ID. */
 export async function createSkill(
   name: string,
   content: string,
@@ -185,7 +205,8 @@ export async function createSkill(
   description?: string,
   triggerPattern?: string,
 ): Promise<Skill> {
-  return invoke<Skill>("create_skill", { name, content, projectId, description, triggerPattern });
+  const id = `skill-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return invoke<Skill>("create_skill", { id, name, content, projectId, description, triggerPattern });
 }
 
 /** Update an existing skill. */

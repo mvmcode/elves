@@ -81,6 +81,49 @@ pub fn spawn_claude(
     cmd.spawn()
 }
 
+/// Spawn a Claude Code CLI process that resumes an existing session with a follow-up message.
+///
+/// Runs: `claude --print --verbose --output-format stream-json --resume <claude_session_id> "<message>"`
+/// This continues the conversation from where it left off, allowing the user to reply
+/// to questions or provide additional instructions.
+///
+/// Returns the child process handle. The caller manages stdout/stderr and streams events.
+pub fn spawn_claude_resume(
+    claude_session_id: &str,
+    message: &str,
+    working_dir: &str,
+    options: &ClaudeSpawnOptions,
+) -> Result<std::process::Child, std::io::Error> {
+    log::info!("Resuming claude session {claude_session_id} in {working_dir} with message: {}", &message[..message.len().min(100)]);
+
+    let mut cmd = std::process::Command::new("claude");
+    cmd.arg("--print")
+        .arg("--verbose")
+        .arg("--output-format")
+        .arg("stream-json")
+        .arg("--resume")
+        .arg(claude_session_id);
+
+    // Apply optional flags (model, budget, etc.) but skip resume/continue since we set them above
+    if let Some(ref model) = options.model {
+        cmd.arg("--model").arg(model);
+    }
+    if let Some(ref mode) = options.permission_mode {
+        cmd.arg("--permission-mode").arg(mode);
+    }
+    if let Some(budget) = options.max_budget_usd {
+        cmd.arg("--max-budget-usd").arg(budget.to_string());
+    }
+
+    cmd.arg(message)
+        .current_dir(working_dir)
+        .env_remove("CLAUDECODE")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+
+    cmd.spawn()
+}
+
 /// Parse a single line of output from the Claude Code CLI into a ClaudeEvent.
 ///
 /// Claude Code in `--print --output-format stream-json` mode emits one JSON

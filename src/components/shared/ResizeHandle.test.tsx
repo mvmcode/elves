@@ -20,7 +20,7 @@ describe("ResizeHandle", () => {
   it("applies active highlight class when dragging", () => {
     render(<ResizeHandle onMouseDown={vi.fn()} isDragging={true} side="right" />);
     const handle = screen.getByTestId("resize-handle");
-    expect(handle.className).toContain("bg-elf-gold");
+    expect(handle.className).toContain("bg-accent");
   });
 
   it("positions on right edge for side=right", () => {

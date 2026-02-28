@@ -14,10 +14,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       <input
         ref={ref}
         className={[
-          "w-full border-[3px] border-border bg-white px-4 py-3",
+          "w-full border-token-normal border-border bg-surface-elevated px-4 py-3 rounded-token-md",
           "font-body text-base text-text-light outline-none",
           "placeholder:text-text-light/40",
-          "focus:shadow-brutal focus:shadow-elf-gold",
+          "focus:focus-ring",
           className,
         ].join(" ")}
         {...props}

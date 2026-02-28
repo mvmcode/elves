@@ -3,6 +3,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSkillStore } from "@/stores/skills";
 import { useSkillActions } from "@/hooks/useSkillActions";
+import { useAppStore } from "@/stores/app";
+import { getRuntimeControlConfig } from "@/lib/runtime-controls";
 import { Button } from "@/components/shared/Button";
 import { Badge } from "@/components/shared/Badge";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -32,6 +34,9 @@ Example usage here
  * shows the editor for the active skill with metadata fields and a textarea.
  */
 export function SkillEditor(): React.JSX.Element {
+  const defaultRuntime = useAppStore((s) => s.defaultRuntime);
+  const controlConfig = getRuntimeControlConfig(defaultRuntime);
+
   const skills = useSkillStore((s) => s.skills);
   const activeSkillId = useSkillStore((s) => s.activeSkillId);
   const setActiveSkillId = useSkillStore((s) => s.setActiveSkillId);
@@ -108,6 +113,17 @@ export function SkillEditor(): React.JSX.Element {
   const globalSkills = skills.filter((s) => s.projectId === null);
   const projectSkills = skills.filter((s) => s.projectId !== null);
 
+  if (!controlConfig.supportsSkills) {
+    return (
+      <div className="flex h-full items-center justify-center" data-testid="skill-editor-unsupported">
+        <EmptyState
+          message="Skills are not available for Codex"
+          submessage="Skills are a Claude Code feature. Switch to Claude Code to manage custom skills."
+        />
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
@@ -119,11 +135,11 @@ export function SkillEditor(): React.JSX.Element {
   return (
     <div className="flex h-full" data-testid="skill-editor">
       {/* Left panel — skill list */}
-      <div className="flex w-64 shrink-0 flex-col border-r-[3px] border-border bg-white">
+      <div className="flex w-64 shrink-0 flex-col border-r-token-normal border-border bg-surface-elevated">
         {/* List header */}
-        <div className="flex flex-col gap-2 border-b-[3px] border-border p-3">
+        <div className="flex flex-col gap-2 border-b-token-normal border-border p-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-lg font-black uppercase tracking-tight">Skills</h2>
+            <h2 className="font-display text-lg text-heading tracking-tight">Skills</h2>
             <Button variant="primary" className="px-3 py-1 text-xs" onClick={handleNewSkill}>
               + New
             </Button>
@@ -149,7 +165,7 @@ export function SkillEditor(): React.JSX.Element {
               {/* Global skills */}
               {globalSkills.length > 0 && (
                 <div>
-                  <p className="border-b-[2px] border-border/20 px-3 py-2 font-body text-xs font-bold uppercase tracking-wider text-text-light/50">
+                  <p className="border-b-token-thin border-border/20 px-3 py-2 font-body text-xs text-label text-text-light/50">
                     Global
                   </p>
                   {globalSkills.map((skill) => (
@@ -166,7 +182,7 @@ export function SkillEditor(): React.JSX.Element {
               {/* Project skills */}
               {projectSkills.length > 0 && (
                 <div>
-                  <p className="border-b-[2px] border-border/20 px-3 py-2 font-body text-xs font-bold uppercase tracking-wider text-text-light/50">
+                  <p className="border-b-token-thin border-border/20 px-3 py-2 font-body text-xs text-label text-text-light/50">
                     Project
                   </p>
                   {projectSkills.map((skill) => (
@@ -189,13 +205,13 @@ export function SkillEditor(): React.JSX.Element {
         {activeSkill ? (
           <>
             {/* Metadata header */}
-            <div className="border-b-[3px] border-border p-4">
+            <div className="border-b-token-normal border-border p-4">
               <div className="flex items-center gap-3">
                 <input
                   type="text"
                   value={editName}
                   onChange={handleFieldChange(setEditName)}
-                  className="flex-1 border-[2px] border-border bg-white px-3 py-2 font-display text-lg font-bold outline-none focus:shadow-[3px_3px_0px_0px_#FFD93D]"
+                  className="flex-1 border-token-thin border-border bg-surface-elevated rounded-token-md px-3 py-2 font-display text-lg font-bold outline-none focus:focus-ring"
                   placeholder="Skill name"
                   data-testid="skill-name-input"
                 />
@@ -205,7 +221,7 @@ export function SkillEditor(): React.JSX.Element {
                 type="text"
                 value={editDescription}
                 onChange={handleFieldChange(setEditDescription)}
-                className="mt-2 w-full border-[2px] border-border/40 bg-white px-3 py-2 font-body text-sm outline-none focus:border-border focus:shadow-[3px_3px_0px_0px_#FFD93D]"
+                className="mt-2 w-full border-token-thin border-border/40 bg-surface-elevated rounded-token-md px-3 py-2 font-body text-sm outline-none focus:border-border focus:focus-ring"
                 placeholder="Description (optional)"
                 data-testid="skill-description-input"
               />
@@ -213,7 +229,7 @@ export function SkillEditor(): React.JSX.Element {
                 type="text"
                 value={editTrigger}
                 onChange={handleFieldChange(setEditTrigger)}
-                className="mt-2 w-full border-[2px] border-border/40 bg-white px-3 py-2 font-mono text-sm outline-none focus:border-border focus:shadow-[3px_3px_0px_0px_#FFD93D]"
+                className="mt-2 w-full border-token-thin border-border/40 bg-surface-elevated rounded-token-md px-3 py-2 font-mono text-sm outline-none focus:border-border focus:focus-ring"
                 placeholder="Trigger pattern (e.g., /deploy)"
                 data-testid="skill-trigger-input"
               />
@@ -224,14 +240,14 @@ export function SkillEditor(): React.JSX.Element {
               <textarea
                 value={editContent}
                 onChange={handleFieldChange(setEditContent)}
-                className="flex-1 resize-none border-[3px] border-border bg-white p-4 font-mono text-sm leading-relaxed outline-none focus:shadow-[4px_4px_0px_0px_#FFD93D]"
+                className="flex-1 resize-none border-token-normal border-border bg-surface-elevated rounded-token-md p-4 font-mono text-sm leading-relaxed outline-none focus:focus-ring"
                 placeholder="Write your skill content in markdown..."
                 data-testid="skill-content-editor"
               />
             </div>
 
             {/* Action bar */}
-            <div className="flex items-center gap-2 border-t-[3px] border-border p-3">
+            <div className="flex items-center gap-2 border-t-token-normal border-border p-3">
               <Button variant="primary" onClick={handleSave} disabled={!isDirty}>
                 Save
               </Button>
@@ -274,10 +290,10 @@ function SkillListItem({
     <button
       onClick={onClick}
       className={[
-        "w-full border-b-[2px] border-border/10 px-3 py-3 text-left transition-all duration-100",
+        "w-full border-b-token-thin border-border/10 px-3 py-3 text-left transition-all duration-100 rounded-token-sm",
         isActive
-          ? "border-l-[4px] border-l-elf-gold bg-elf-gold-light"
-          : "cursor-pointer hover:bg-elf-gold-light/50",
+          ? "border-l-token-thick border-l-accent bg-accent-light"
+          : "cursor-pointer hover:bg-accent-light/50",
       ].join(" ")}
       data-testid="skill-list-item"
     >

@@ -86,6 +86,7 @@ pub fn list_projects(conn: &Connection) -> Result<Vec<ProjectRow>, DbError> {
 }
 
 /// Delete a project by ID. Returns true if a row was deleted.
+#[allow(dead_code)]
 pub fn delete_project(conn: &Connection, id: &str) -> Result<bool, DbError> {
     let rows_affected = conn.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
     Ok(rows_affected > 0)

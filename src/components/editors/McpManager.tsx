@@ -3,6 +3,8 @@
 import { useState, useCallback } from "react";
 import { useMcpStore } from "@/stores/mcp";
 import { useMcpActions } from "@/hooks/useMcpActions";
+import { useAppStore } from "@/stores/app";
+import { getRuntimeControlConfig } from "@/lib/runtime-controls";
 import { Button } from "@/components/shared/Button";
 import { Badge } from "@/components/shared/Badge";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -14,6 +16,9 @@ import type { McpServer } from "@/types/mcp";
  * Each card shows server name, command, status indicator, toggle switch, and actions.
  */
 export function McpManager(): React.JSX.Element {
+  const defaultRuntime = useAppStore((s) => s.defaultRuntime);
+  const controlConfig = getRuntimeControlConfig(defaultRuntime);
+
   const servers = useMcpStore((s) => s.servers);
   const isLoading = useMcpStore((s) => s.isLoading);
   const {
@@ -61,6 +66,17 @@ export function McpManager(): React.JSX.Element {
     void handleImportFromClaude();
   }, [handleImportFromClaude]);
 
+  if (!controlConfig.supportsMcp) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8" data-testid="mcp-manager-unsupported">
+        <EmptyState
+          message="MCP servers are not available for Codex"
+          submessage="MCP is a Claude Code feature. Switch to Claude Code to manage MCP server connections."
+        />
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
@@ -73,7 +89,7 @@ export function McpManager(): React.JSX.Element {
     <div className="p-4" data-testid="mcp-manager">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-display text-2xl font-black uppercase tracking-tight">
+        <h2 className="font-display text-2xl text-heading tracking-tight">
           MCP Servers
         </h2>
         <div className="flex gap-2">
@@ -89,16 +105,16 @@ export function McpManager(): React.JSX.Element {
       {/* Add server form */}
       {isAddFormOpen && (
         <div
-          className="mb-4 border-[3px] border-border bg-white p-4 shadow-brutal"
+          className="mb-4 border-token-normal border-border bg-surface-elevated rounded-token-md p-4 shadow-brutal"
           data-testid="mcp-add-form"
         >
-          <h3 className="mb-3 font-display text-lg font-bold uppercase">Add MCP Server</h3>
+          <h3 className="mb-3 font-display text-lg text-heading">Add MCP Server</h3>
           <div className="flex flex-col gap-3">
             <input
               type="text"
               value={addName}
               onChange={(event) => setAddName(event.target.value)}
-              className="border-[3px] border-border bg-white px-3 py-2 font-body text-sm outline-none focus:shadow-[3px_3px_0px_0px_#FFD93D]"
+              className="border-token-normal border-border bg-surface-elevated rounded-token-md px-3 py-2 font-body text-sm outline-none focus:focus-ring"
               placeholder="Server name"
               data-testid="mcp-add-name"
             />
@@ -106,7 +122,7 @@ export function McpManager(): React.JSX.Element {
               type="text"
               value={addCommand}
               onChange={(event) => setAddCommand(event.target.value)}
-              className="border-[3px] border-border bg-white px-3 py-2 font-mono text-sm outline-none focus:shadow-[3px_3px_0px_0px_#FFD93D]"
+              className="border-token-normal border-border bg-surface-elevated rounded-token-md px-3 py-2 font-mono text-sm outline-none focus:focus-ring"
               placeholder="Command (e.g., npx -y @modelcontextprotocol/server-github)"
               data-testid="mcp-add-command"
             />
@@ -114,7 +130,7 @@ export function McpManager(): React.JSX.Element {
               type="text"
               value={addArgs}
               onChange={(event) => setAddArgs(event.target.value)}
-              className="border-[3px] border-border/60 bg-white px-3 py-2 font-mono text-sm outline-none focus:border-border focus:shadow-[3px_3px_0px_0px_#FFD93D]"
+              className="border-token-normal border-border/60 bg-surface-elevated rounded-token-md px-3 py-2 font-mono text-sm outline-none focus:border-border focus:focus-ring"
               placeholder="Args (optional, comma-separated)"
               data-testid="mcp-add-args"
             />
@@ -122,7 +138,7 @@ export function McpManager(): React.JSX.Element {
               type="text"
               value={addEnv}
               onChange={(event) => setAddEnv(event.target.value)}
-              className="border-[3px] border-border/60 bg-white px-3 py-2 font-mono text-sm outline-none focus:border-border focus:shadow-[3px_3px_0px_0px_#FFD93D]"
+              className="border-token-normal border-border/60 bg-surface-elevated rounded-token-md px-3 py-2 font-mono text-sm outline-none focus:border-border focus:focus-ring"
               placeholder="Env vars (optional, KEY=VALUE,KEY2=VALUE2)"
               data-testid="mcp-add-env"
             />
@@ -154,7 +170,7 @@ export function McpManager(): React.JSX.Element {
               <div
                 key={server.id}
                 className={[
-                  "border-[3px] border-border bg-white p-4 shadow-brutal-lg transition-all duration-100",
+                  "border-token-normal border-border bg-surface-elevated rounded-token-md p-4 shadow-brutal-lg transition-all duration-100",
                   server.enabled ? "" : "opacity-60",
                 ].join(" ")}
                 data-testid="mcp-server-card"
@@ -164,7 +180,7 @@ export function McpManager(): React.JSX.Element {
                   <div className="flex items-center gap-2">
                     {/* Status dot */}
                     <span
-                      className="inline-block h-3 w-3 border-[2px] border-border"
+                      className="inline-block h-3 w-3 border-token-thin border-border"
                       style={{
                         backgroundColor: !server.enabled
                           ? "#9CA3AF"
@@ -176,7 +192,7 @@ export function McpManager(): React.JSX.Element {
                       }}
                       data-testid="mcp-status-dot"
                     />
-                    <h3 className="font-display text-base font-bold uppercase">{server.name}</h3>
+                    <h3 className="font-display text-base text-heading">{server.name}</h3>
                   </div>
                   <Badge variant={server.scope === "global" ? "info" : "default"}>
                     {server.scope}
@@ -194,8 +210,8 @@ export function McpManager(): React.JSX.Element {
                   <button
                     onClick={() => handleToggleServer(server.id, !server.enabled)}
                     className={[
-                      "relative h-6 w-11 cursor-pointer border-[2px] border-border transition-colors duration-100",
-                      server.enabled ? "bg-success" : "bg-gray-300",
+                      "relative h-6 w-11 cursor-pointer rounded-token-sm border-token-thin border-border transition-colors duration-100",
+                      server.enabled ? "bg-success" : "bg-surface-muted",
                     ].join(" ")}
                     data-testid="mcp-toggle"
                     role="switch"

@@ -92,7 +92,7 @@ export function NewProjectDialog({
         <div>
           <label
             htmlFor="project-name"
-            className="mb-1 block font-body text-sm font-bold uppercase tracking-wider"
+            className="mb-1 block font-body text-sm text-label"
           >
             Name
           </label>
@@ -108,7 +108,7 @@ export function NewProjectDialog({
         <div>
           <label
             htmlFor="project-path"
-            className="mb-1 block font-body text-sm font-bold uppercase tracking-wider"
+            className="mb-1 block font-body text-sm text-label"
           >
             Path
           </label>
@@ -132,7 +132,7 @@ export function NewProjectDialog({
         </div>
 
         {error && (
-          <p className="border-[2px] border-border bg-error/10 px-3 py-2 font-body text-sm font-bold text-error">
+          <p className="border-token-thin border-border bg-error/10 px-3 py-2 font-body text-sm font-bold text-error">
             {error}
           </p>
         )}

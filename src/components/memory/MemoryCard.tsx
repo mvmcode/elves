@@ -80,7 +80,7 @@ export function MemoryCard({
 
   return (
     <div
-      className="border-[3px] border-border bg-white p-5 shadow-brutal"
+      className="border-token-normal border-border bg-surface-elevated rounded-token-md p-5 shadow-brutal"
       data-testid="memory-card"
     >
       {/* Top row — category badge + timestamp */}
@@ -89,7 +89,7 @@ export function MemoryCard({
           {categoryStyle.label}
         </Badge>
         <span
-          className="font-mono text-xs text-gray-500"
+          className="font-mono text-xs text-text-muted-light"
           data-testid="memory-timestamp"
         >
           {formatRelativeTime(memory.createdAt)}
@@ -106,11 +106,11 @@ export function MemoryCard({
 
       {/* Source label */}
       <div className="mt-3 flex items-center gap-2">
-        <span className="font-body text-xs font-bold uppercase tracking-wider text-gray-500">
+        <span className="font-body text-xs text-label text-text-muted-light">
           Source:
         </span>
         <span
-          className="font-mono text-xs text-gray-600"
+          className="font-mono text-xs text-text-muted"
           data-testid="memory-source"
         >
           {formatSource(memory.source)}
@@ -120,7 +120,7 @@ export function MemoryCard({
       {/* Relevance score bar */}
       <div className="mt-3" data-testid="memory-relevance">
         <div className="flex items-center justify-between">
-          <span className="font-body text-xs font-bold uppercase tracking-wider text-gray-500">
+          <span className="font-body text-xs text-label text-text-muted-light">
             Relevance
           </span>
           <span className="font-mono text-xs font-bold">
@@ -135,7 +135,7 @@ export function MemoryCard({
                 key={index}
                 className={[
                   "flex-1 border border-border",
-                  filled ? "bg-elf-gold" : "bg-gray-200",
+                  filled ? "bg-accent" : "bg-surface-muted",
                 ].join(" ")}
                 data-testid="relevance-segment"
               />
@@ -151,14 +151,14 @@ export function MemoryCard({
             <span className="font-body text-xs font-bold text-error">Are you sure?</span>
             <button
               onClick={handleConfirmDelete}
-              className="cursor-pointer border-[2px] border-border bg-error px-3 py-1 font-body text-xs font-bold text-white transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px]"
+              className="cursor-pointer border-token-thin border-border bg-error rounded-token-sm px-3 py-1 font-body text-xs font-bold text-white transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px]"
               data-testid="delete-confirm-yes"
             >
               Yes
             </button>
             <button
               onClick={handleCancelDelete}
-              className="cursor-pointer border-[2px] border-border bg-white px-3 py-1 font-body text-xs font-bold text-text-light transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px]"
+              className="cursor-pointer border-token-thin border-border bg-surface-elevated rounded-token-sm px-3 py-1 font-body text-xs font-bold text-text-light transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px]"
               data-testid="delete-confirm-no"
             >
               No
@@ -168,7 +168,7 @@ export function MemoryCard({
           <>
             <button
               onClick={() => onEdit(memory)}
-              className="cursor-pointer border-[2px] border-border bg-white px-3 py-1 font-body text-xs font-bold uppercase tracking-wider text-text-light shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+              className="cursor-pointer border-token-thin border-border bg-surface-elevated rounded-token-sm px-3 py-1 font-body text-xs text-label text-text-light shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
               data-testid="memory-edit"
             >
               Edit
@@ -176,8 +176,8 @@ export function MemoryCard({
             <button
               onClick={() => onPin(memory)}
               className={[
-                "cursor-pointer border-[2px] border-border px-3 py-1 font-body text-xs font-bold uppercase tracking-wider shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none",
-                isPinned ? "bg-elf-gold text-text-light" : "bg-white text-text-light",
+                "cursor-pointer border-token-thin border-border rounded-token-sm px-3 py-1 font-body text-xs text-label shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none",
+                isPinned ? "bg-accent text-accent-contrast" : "bg-surface-elevated text-text-light",
               ].join(" ")}
               data-testid="memory-pin"
             >
@@ -185,7 +185,7 @@ export function MemoryCard({
             </button>
             <button
               onClick={handleDelete}
-              className="cursor-pointer border-[2px] border-border bg-white px-3 py-1 font-body text-xs font-bold uppercase tracking-wider text-error shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+              className="cursor-pointer border-token-thin border-border bg-surface-elevated rounded-token-sm px-3 py-1 font-body text-xs text-label text-error shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
               data-testid="memory-delete"
             >
               X Delete

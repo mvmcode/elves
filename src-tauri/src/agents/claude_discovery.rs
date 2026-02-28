@@ -272,32 +272,57 @@ pub fn discover_commands(project_path: Option<&str>) -> Vec<DiscoveredSkill> {
     skills
 }
 
-/// Scan a single commands directory and parse each .md file into a DiscoveredSkill.
+/// Recursively scan a commands directory and parse each .md file into a DiscoveredSkill.
+///
+/// Claude Code supports nested subdirectories: `.claude/commands/review/pr.md` becomes
+/// trigger `/review:pr`. This function walks the full directory tree.
 fn scan_commands_dir(dir: &std::path::Path, scope: &str) -> Vec<DiscoveredSkill> {
     if !dir.is_dir() {
         return vec![];
     }
 
-    let entries = match std::fs::read_dir(dir) {
+    let mut skills = Vec::new();
+    scan_commands_dir_recursive(dir, dir, scope, &mut skills);
+    skills
+}
+
+/// Recursive helper that walks subdirectories and builds trigger patterns from relative paths.
+fn scan_commands_dir_recursive(
+    root: &std::path::Path,
+    current: &std::path::Path,
+    scope: &str,
+    out: &mut Vec<DiscoveredSkill>,
+) {
+    let entries = match std::fs::read_dir(current) {
         Ok(entries) => entries,
         Err(e) => {
-            log::warn!("Failed to read commands directory {}: {e}", dir.display());
-            return vec![];
+            log::warn!("Failed to read commands directory {}: {e}", current.display());
+            return;
         }
     };
 
-    entries
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "md"))
-        .filter_map(|entry| parse_command_file(&entry.path(), scope))
-        .collect()
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_dir() {
+            scan_commands_dir_recursive(root, &path, scope, out);
+        } else if path.extension().is_some_and(|ext| ext == "md") {
+            if let Some(skill) = parse_command_file_with_root(root, &path, scope) {
+                out.push(skill);
+            }
+        }
+    }
 }
 
-/// Parse a single command .md file into a DiscoveredSkill.
+/// Parse a command .md file into a DiscoveredSkill, building the trigger pattern
+/// from the file's path relative to the commands root directory.
 ///
-/// Supports optional YAML frontmatter with `name` and `description` fields.
-/// Falls back to filename stem for name and empty string for description.
-fn parse_command_file(path: &std::path::Path, scope: &str) -> Option<DiscoveredSkill> {
+/// For nested files like `commands/review/pr.md`, the trigger becomes `/review:pr`.
+/// For top-level files like `commands/deploy.md`, the trigger is `/deploy`.
+fn parse_command_file_with_root(
+    root: &std::path::Path,
+    path: &std::path::Path,
+    scope: &str,
+) -> Option<DiscoveredSkill> {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
         Err(e) => {
@@ -308,7 +333,10 @@ fn parse_command_file(path: &std::path::Path, scope: &str) -> Option<DiscoveredS
 
     let slug = path.file_stem()?.to_str()?.to_string();
     let file_path = path.to_string_lossy().to_string();
-    let trigger_pattern = format!("/{slug}");
+
+    /* Build trigger pattern from relative path: review/pr.md → /review:pr */
+    let relative = path.strip_prefix(root).ok()?;
+    let trigger_pattern = build_trigger_pattern(relative)?;
 
     let (frontmatter, body) = split_frontmatter(&content);
 
@@ -326,6 +354,42 @@ fn parse_command_file(path: &std::path::Path, scope: &str) -> Option<DiscoveredS
         file_path,
         scope: scope.to_string(),
     })
+}
+
+/// Parse a single top-level command .md file into a DiscoveredSkill.
+///
+/// Supports optional YAML frontmatter with `name` and `description` fields.
+/// Falls back to filename stem for name and empty string for description.
+#[cfg(test)]
+fn parse_command_file(path: &std::path::Path, scope: &str) -> Option<DiscoveredSkill> {
+    let parent = path.parent()?;
+    parse_command_file_with_root(parent, path, scope)
+}
+
+/// Build a trigger pattern from a relative path inside the commands directory.
+///
+/// `deploy.md` → `/deploy`
+/// `review/pr.md` → `/review:pr`
+/// `ci/build/run.md` → `/ci:build:run`
+fn build_trigger_pattern(relative: &std::path::Path) -> Option<String> {
+    let stem = relative.file_stem()?.to_str()?;
+    let parent = relative.parent();
+
+    let prefix_parts: Vec<&str> = match parent {
+        Some(p) if p.as_os_str().is_empty() => vec![],
+        Some(p) => p.iter().filter_map(|c| c.to_str()).collect(),
+        None => vec![],
+    };
+
+    if prefix_parts.is_empty() {
+        Some(format!("/{stem}"))
+    } else {
+        let mut pattern = String::from("/");
+        pattern.push_str(&prefix_parts.join(":"));
+        pattern.push(':');
+        pattern.push_str(stem);
+        Some(pattern)
+    }
 }
 
 /// Read ~/.claude/settings.json and extract model + permission mode.
@@ -606,5 +670,43 @@ description: "A helpful agent for testing""#;
         assert_eq!(skill.trigger_pattern, "/simple");
         assert_eq!(skill.description, "");
         assert!(skill.content.contains("Just do the thing"));
+    }
+
+    #[test]
+    fn build_trigger_pattern_top_level() {
+        let p = std::path::Path::new("deploy.md");
+        assert_eq!(build_trigger_pattern(p), Some("/deploy".into()));
+    }
+
+    #[test]
+    fn build_trigger_pattern_nested_one_level() {
+        let p = std::path::Path::new("review/pr.md");
+        assert_eq!(build_trigger_pattern(p), Some("/review:pr".into()));
+    }
+
+    #[test]
+    fn build_trigger_pattern_nested_two_levels() {
+        let p = std::path::Path::new("ci/build/run.md");
+        assert_eq!(build_trigger_pattern(p), Some("/ci:build:run".into()));
+    }
+
+    #[test]
+    fn scan_commands_dir_recursive_discovers_nested() {
+        let dir = tempfile::tempdir().unwrap();
+        let cmds_dir = dir.path().join("commands");
+        let sub_dir = cmds_dir.join("review");
+        std::fs::create_dir_all(&sub_dir).unwrap();
+
+        std::fs::write(cmds_dir.join("deploy.md"), "Deploy steps.").unwrap();
+        std::fs::write(sub_dir.join("pr.md"), "Review a PR.").unwrap();
+        std::fs::write(sub_dir.join("code.md"), "Review code.").unwrap();
+
+        let skills = scan_commands_dir(&cmds_dir, "global");
+        assert_eq!(skills.len(), 3);
+
+        let triggers: Vec<&str> = skills.iter().map(|s| s.trigger_pattern.as_str()).collect();
+        assert!(triggers.contains(&"/deploy"));
+        assert!(triggers.contains(&"/review:pr"));
+        assert!(triggers.contains(&"/review:code"));
     }
 }
