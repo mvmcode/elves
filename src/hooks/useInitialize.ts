@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useAppStore } from "@/stores/app";
 import { useProjectStore } from "@/stores/project";
+import { useSettingsStore } from "@/stores/settings";
 import { detectRuntimes, listProjects, decayMemories, discoverClaude } from "@/lib/tauri";
 
 /**
@@ -17,6 +18,10 @@ export function useInitialize(): void {
   const setProjects = useProjectStore((s) => s.setProjects);
 
   useEffect(() => {
+    /* Apply persisted theme before first paint */
+    const theme = useSettingsStore.getState().theme;
+    document.documentElement.setAttribute("data-theme", theme);
+
     async function initialize(): Promise<void> {
       try {
         const [runtimes, projects, claudeWorld] = await Promise.all([

@@ -139,30 +139,30 @@ export function ActivityFeed({
 
   return (
     <div
-      className="flex flex-col border-[3px] border-border bg-gray-900"
+      className="flex flex-col border-token-normal border-border bg-surface-inset"
       style={{ maxHeight }}
       data-testid="activity-feed"
     >
       {/* Header */}
-      <div className="border-b-[2px] border-border bg-gray-800 px-4 py-2">
-        <h3 className="font-display text-sm font-bold uppercase tracking-wider text-gray-300">
+      <div className="border-b-token-thin border-border bg-surface-inset-alt px-4 py-2">
+        <h3 className="font-display text-sm text-label text-text-inset">
           Activity Feed
         </h3>
       </div>
 
       {/* Filter bar */}
-      <div className="flex gap-2 border-b-[2px] border-gray-700 bg-gray-800 px-4 py-2" data-testid="filter-bar">
+      <div className="flex gap-2 border-b-token-thin border-border-inset bg-surface-inset-alt px-4 py-2" data-testid="filter-bar">
         {filters.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setActiveFilter(key)}
             className={[
-              "cursor-pointer border-[2px] border-border px-3 py-1",
-              "font-body text-xs font-bold uppercase tracking-wider",
-              "transition-all duration-100",
+              "cursor-pointer border-token-thin border-border px-3 py-1",
+              "font-body text-xs text-label",
+              "transition-all duration-100 rounded-token-sm",
               activeFilter === key
-                ? "bg-elf-gold text-text-light"
-                : "bg-gray-700 text-gray-300 hover:bg-gray-600",
+                ? "bg-accent text-accent-contrast"
+                : "bg-surface-inset-alt text-text-inset hover:bg-surface-inset",
             ].join(" ")}
             data-testid={`filter-${key}`}
           >
@@ -180,7 +180,7 @@ export function ActivityFeed({
         data-testid="event-list"
       >
         {filteredEvents.length === 0 ? (
-          <p className="p-4 text-center font-mono text-sm text-gray-500" data-testid="empty-state">
+          <p className="p-4 text-center font-mono text-sm text-text-muted-light" data-testid="empty-state">
             {events.length === 0 ? "No events yet. Summon elves to get started." : "No events match this filter."}
           </p>
         ) : (
@@ -193,11 +193,11 @@ export function ActivityFeed({
             return (
               <div key={event.id} data-testid="event-row">
                 <div
-                  className="flex items-start gap-2 border-b border-gray-800 px-2 py-1.5"
+                  className="flex items-start gap-2 border-b border-border-inset px-2 py-1.5"
                   style={{ borderLeftWidth: "4px", borderLeftColor: elfColor }}
                 >
                   {/* Timestamp */}
-                  <span className="shrink-0 font-mono text-xs text-gray-500">
+                  <span className="shrink-0 font-mono text-xs text-text-muted-light">
                     {formatTimestamp(event.timestamp)}
                   </span>
 
@@ -205,7 +205,7 @@ export function ActivityFeed({
                   <span className="shrink-0 text-sm">{eventEmoji(event.type)}</span>
 
                   {/* Content */}
-                  <span className="flex-1 font-mono text-xs text-gray-300">
+                  <span className="flex-1 font-mono text-xs text-text-inset">
                     <span className="font-bold" style={{ color: elfColor }}>
                       {event.elfName}
                     </span>
@@ -219,7 +219,7 @@ export function ActivityFeed({
                   {isExpandable && (
                     <button
                       onClick={() => toggleExpand(event.id)}
-                      className="shrink-0 cursor-pointer border-none bg-transparent p-0 font-mono text-xs text-gray-500 hover:text-gray-300"
+                      className="shrink-0 cursor-pointer border-none bg-transparent p-0 font-mono text-xs text-text-muted-light hover:text-text-inset"
                       data-testid="expand-event"
                     >
                       {isEventExpanded ? "▲" : "▼"}
@@ -230,11 +230,11 @@ export function ActivityFeed({
                 {/* Expanded payload for tool calls */}
                 {isEventExpanded && (
                   <div
-                    className="border-b border-gray-800 bg-gray-950 px-6 py-2"
+                    className="border-b border-border-inset bg-surface-inset px-6 py-2"
                     style={{ borderLeftWidth: "4px", borderLeftColor: elfColor }}
                     data-testid="event-payload"
                   >
-                    <pre className="overflow-x-auto font-mono text-xs text-gray-400">
+                    <pre className="overflow-x-auto font-mono text-xs text-text-muted-light">
                       {JSON.stringify(event.payload, null, 2)}
                     </pre>
                   </div>

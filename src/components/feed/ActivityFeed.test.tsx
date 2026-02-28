@@ -124,14 +124,14 @@ describe("ActivityFeed", () => {
     expect(nameElement.style.color).toBe("rgb(255, 217, 61)");
   });
 
-  it("highlights active filter in gold", () => {
+  it("highlights active filter with accent color", () => {
     render(<ActivityFeed events={[]} />);
     const allButton = screen.getByTestId("filter-all");
-    expect(allButton.className).toContain("bg-elf-gold");
+    expect(allButton.className).toContain("bg-accent");
 
     fireEvent.click(screen.getByTestId("filter-tools"));
     const toolsButton = screen.getByTestId("filter-tools");
-    expect(toolsButton.className).toContain("bg-elf-gold");
+    expect(toolsButton.className).toContain("bg-accent");
   });
 
   it("shows spawn events with role info", () => {

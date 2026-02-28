@@ -123,7 +123,7 @@ export function PlanPreview({
     >
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-3xl font-bold uppercase tracking-wide">
+        <h2 className="font-display text-3xl text-heading">
           Deployment Plan
         </h2>
         <div className="flex items-center gap-3">
@@ -133,7 +133,7 @@ export function PlanPreview({
       </div>
 
       {/* Runtime recommendation */}
-      <p className="font-body text-sm text-gray-600" data-testid="runtime-recommendation">
+      <p className="font-body text-sm text-text-muted" data-testid="runtime-recommendation">
         Recommended runtime: <strong>{editedPlan.runtimeRecommendation}</strong>
       </p>
 
@@ -152,7 +152,7 @@ export function PlanPreview({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8, x: -20 }}
                 transition={{ duration: 0.15, ease: "easeOut" }}
-                className="relative border-[3px] border-border bg-white p-5 shadow-brutal"
+                className="relative border-token-normal border-border bg-surface-elevated p-5 shadow-brutal rounded-token-md"
                 style={{ borderTopWidth: "4px", borderTopColor: color }}
                 data-testid="role-card"
               >
@@ -160,7 +160,7 @@ export function PlanPreview({
                 {editedPlan.roles.length > 1 && (
                   <button
                     onClick={() => handleRemoveRole(index)}
-                    className="absolute right-2 top-2 flex h-6 w-6 cursor-pointer items-center justify-center border-[2px] border-border bg-error font-bold text-white transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+                    className="absolute right-2 top-2 flex h-6 w-6 cursor-pointer items-center justify-center border-token-thin border-border bg-error font-bold text-white transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
                     style={{ boxShadow: "2px 2px 0px 0px #000" }}
                     aria-label={`Remove ${role.name}`}
                     data-testid="remove-role"
@@ -175,10 +175,10 @@ export function PlanPreview({
                     {avatar}
                   </span>
                   <div>
-                    <span className="font-display text-base font-bold uppercase tracking-wide">
+                    <span className="font-display text-base text-heading">
                       {elfName}
                     </span>
-                    <p className="font-body text-xs text-gray-500">{role.name}</p>
+                    <p className="font-body text-xs text-text-muted-light">{role.name}</p>
                   </div>
                 </div>
 
@@ -194,14 +194,14 @@ export function PlanPreview({
                         if (event.key === "Enter") handleCommitEdit(index);
                         if (event.key === "Escape") setEditingIndex(null);
                       }}
-                      className="w-full border-[2px] border-border bg-elf-gold-light px-2 py-1 font-body text-sm outline-none focus:shadow-brutal-sm"
+                      className="w-full border-token-thin border-border bg-accent-light px-2 py-1 font-body text-sm outline-none focus:focus-ring"
                       data-testid="role-focus-input"
                       autoFocus
                     />
                   ) : (
                     <p
                       onClick={() => handleStartEdit(index, role.focus)}
-                      className="cursor-pointer font-body text-sm text-gray-700 hover:bg-elf-gold-light hover:px-2 hover:py-1"
+                      className="cursor-pointer font-body text-sm text-text-muted hover:bg-accent-light hover:px-2 hover:py-1"
                       title="Click to edit"
                       data-testid="role-focus-text"
                     >
@@ -215,7 +215,7 @@ export function PlanPreview({
                   <select
                     value={role.runtime}
                     onChange={(event) => handleRuntimeChange(index, event.target.value as Runtime)}
-                    className="w-full border-[2px] border-border bg-white px-2 py-1 font-body text-xs font-bold uppercase tracking-wider outline-none"
+                    className="w-full border-token-thin border-border bg-surface-elevated px-2 py-1 font-body text-xs text-label outline-none rounded-token-sm"
                     data-testid="runtime-select"
                   >
                     {RUNTIME_OPTIONS.map((option) => (
@@ -235,7 +235,7 @@ export function PlanPreview({
           onClick={handleAddRole}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex min-h-[160px] cursor-pointer items-center justify-center border-[3px] border-dashed border-border bg-surface-light p-5 font-display text-2xl font-bold text-gray-400 transition-all duration-100 hover:border-solid hover:bg-elf-gold-light hover:text-text-light hover:shadow-brutal"
+          className="flex min-h-[160px] cursor-pointer items-center justify-center border-token-normal border-dashed border-border bg-surface-light p-5 font-display text-2xl font-bold text-gray-400 transition-all duration-100 hover:border-solid hover:bg-accent-light hover:text-text-light hover:shadow-brutal rounded-token-md"
           data-testid="add-role"
         >
           + Add Agent
@@ -245,7 +245,7 @@ export function PlanPreview({
       {/* Task dependency flow visualization */}
       {editedPlan.taskGraph.length > 0 && (
         <div className="mt-2" data-testid="task-flow">
-          <h3 className="mb-3 font-display text-sm font-bold uppercase tracking-wider text-gray-500">
+          <h3 className="mb-3 font-display text-sm text-label text-text-muted-light">
             Task Flow
           </h3>
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
@@ -254,7 +254,7 @@ export function PlanPreview({
                 {/* Node dot with label */}
                 <div className="flex flex-col items-center gap-1">
                   <div
-                    className="h-6 w-6 border-[2px] border-border"
+                    className="h-6 w-6 border-token-thin border-border"
                     style={{
                       backgroundColor: STATUS_DOT_COLOR[node.status],
                       borderRadius: "50%",
@@ -262,7 +262,7 @@ export function PlanPreview({
                     title={`${node.label} (${node.status})`}
                     data-testid="task-flow-dot"
                   />
-                  <span className="max-w-[80px] truncate font-mono text-[10px] text-gray-600">
+                  <span className="max-w-[80px] truncate font-mono text-[10px] text-text-muted">
                     {node.label}
                   </span>
                 </div>
@@ -294,7 +294,7 @@ export function PlanPreview({
           onClick={handleDeploy}
           data-testid="deploy-button"
         >
-          SUMMON THE ELVES
+          Summon the Elves
         </Button>
       </div>
     </motion.div>

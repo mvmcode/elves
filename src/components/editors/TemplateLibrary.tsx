@@ -54,7 +54,7 @@ export function TemplateLibrary({
   return (
     <div className="p-4" data-testid="template-library">
       {/* Header */}
-      <h2 className="mb-4 font-display text-2xl font-black uppercase tracking-tight">
+      <h2 className="mb-4 font-display text-2xl text-heading tracking-tight">
         Templates
       </h2>
 
@@ -63,12 +63,12 @@ export function TemplateLibrary({
         {templates.map((template) => (
           <div
             key={template.id}
-            className="border-[3px] border-border bg-white p-4 shadow-brutal-lg transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm"
+            className="border-token-normal border-border bg-surface-elevated rounded-token-md p-4 shadow-brutal-lg transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm"
             data-testid="template-card"
           >
             {/* Card header */}
             <div className="mb-2 flex items-start justify-between">
-              <h3 className="font-display text-lg font-bold uppercase">{template.name}</h3>
+              <h3 className="font-display text-lg text-heading">{template.name}</h3>
               {template.builtIn && (
                 <Badge variant="info">Built-in</Badge>
               )}
@@ -83,7 +83,7 @@ export function TemplateLibrary({
 
             {/* Plan info */}
             <div className="mb-3 flex items-center gap-3">
-              <span className="border-[2px] border-border bg-elf-gold-light px-2 py-0.5 font-mono text-xs font-bold">
+              <span className="border-token-thin border-border bg-accent-light rounded-token-sm px-2 py-0.5 font-mono text-xs text-label">
                 {template.plan.agentCount} {template.plan.agentCount === 1 ? "elf" : "elves"}
               </span>
               <span className="font-body text-xs text-text-light/50">
@@ -96,7 +96,7 @@ export function TemplateLibrary({
               {template.plan.roles.slice(0, 4).map((role, index) => (
                 <span
                   key={index}
-                  className="border-[2px] border-border/40 bg-white px-2 py-0.5 font-body text-xs"
+                  className="border-token-thin border-border/40 bg-surface-elevated rounded-token-sm px-2 py-0.5 font-body text-xs"
                 >
                   {role.name}
                 </span>

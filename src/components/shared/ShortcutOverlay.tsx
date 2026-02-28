@@ -24,18 +24,18 @@ export function ShortcutOverlay({
       data-testid="shortcut-overlay"
     >
       <div
-        className="w-full max-w-md border-[3px] border-border bg-white p-6 shadow-brutal-xl"
+        className="w-full max-w-md border-token-normal border-border bg-surface-elevated rounded-token-lg p-6 shadow-brutal-xl"
         onClick={(event) => event.stopPropagation()}
         data-testid="shortcut-card"
       >
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="font-display text-2xl font-black uppercase tracking-tight">
+          <h2 className="font-display text-2xl text-heading tracking-tight">
             Keyboard Shortcuts
           </h2>
           <button
             onClick={onClose}
-            className="flex h-8 w-8 cursor-pointer items-center justify-center border-[2px] border-border bg-error font-display text-sm font-black text-white shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+            className="flex h-8 w-8 cursor-pointer items-center justify-center border-token-thin border-border bg-error font-display text-sm font-black text-white shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
             data-testid="close-overlay"
           >
             ×
@@ -47,10 +47,10 @@ export function ShortcutOverlay({
           {SHORTCUT_DEFINITIONS.map((shortcut) => (
             <div
               key={shortcut.keys}
-              className="flex items-center justify-between border-b-[2px] border-border/20 py-2 last:border-b-0"
+              className="flex items-center justify-between border-b-token-thin border-border/20 py-2 last:border-b-0"
             >
               <span className="font-body text-sm">{shortcut.description}</span>
-              <kbd className="border-[2px] border-border bg-elf-gold-light px-2 py-1 font-mono text-xs font-bold">
+              <kbd className="border-token-thin border-border bg-accent-light rounded-token-sm px-2 py-1 font-mono text-xs font-bold">
                 {shortcut.keys}
               </kbd>
             </div>

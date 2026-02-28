@@ -19,8 +19,8 @@ export function Panel({
   return (
     <div
       className={[
-        "bg-white p-4",
-        bordered ? "border-[3px] border-border" : "",
+        "bg-surface-elevated p-4 rounded-token-md",
+        bordered ? "border-token-normal border-border" : "",
         className,
       ].join(" ")}
       {...props}

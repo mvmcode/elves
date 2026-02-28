@@ -64,22 +64,22 @@ export function TerminalOutput({
   return (
     <div className={containerClass} data-testid="terminal-output">
       {/* Header strip */}
-      <div className="flex items-center justify-between border-b-[2px] border-gray-700 bg-gray-800 px-3 py-1.5">
-        <span className="font-mono text-xs font-bold text-gray-400">
+      <div className="flex items-center justify-between border-b-token-thin border-border-inset bg-surface-inset-alt px-3 py-1.5">
+        <span className="font-mono text-xs font-bold text-text-muted-light">
           Live Output
         </span>
         <div className="flex items-center gap-3">
-          <span className="font-mono text-xs text-gray-500" data-testid="event-count">
+          <span className="font-mono text-xs text-text-muted-light" data-testid="event-count">
             {events.length} {events.length === 1 ? "event" : "events"}
           </span>
           <button
             onClick={() => setUserScrolled((prev) => !prev)}
             className={[
-              "cursor-pointer border-[2px] border-gray-600 px-2 py-0.5",
+              "cursor-pointer border-token-thin border-border-inset px-2 py-0.5",
               "font-mono text-xs font-bold transition-colors duration-100",
               userScrolled
-                ? "bg-gray-700 text-gray-300"
-                : "bg-gray-800 text-gray-500",
+                ? "bg-surface-inset-alt text-text-inset"
+                : "bg-surface-inset text-text-muted-light",
             ].join(" ")}
             title={userScrolled ? "Resume auto-scroll" : "Auto-scroll active"}
             data-testid="autoscroll-toggle"
@@ -94,14 +94,14 @@ export function TerminalOutput({
         ref={scrollRef}
         onScroll={handleScroll}
         onMouseLeave={handleMouseLeave}
-        className="flex-1 overflow-y-auto bg-gray-900"
+        className="flex-1 overflow-y-auto bg-surface-inset"
         data-testid="terminal-scroll"
       >
         {/* Overflow indicator */}
         {hasOverflow && (
           <button
             onClick={() => setShowAll(true)}
-            className="w-full cursor-pointer border-b-[2px] border-gray-700 bg-gray-800 px-3 py-2 text-center font-mono text-xs font-bold text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+            className="w-full cursor-pointer border-b-token-thin border-border-inset bg-surface-inset-alt px-3 py-2 text-center font-mono text-xs font-bold text-text-muted-light hover:bg-surface-inset hover:text-text-inset"
             data-testid="load-earlier"
           >
             Load {events.length - MAX_VISIBLE_EVENTS} earlier events
@@ -109,7 +109,7 @@ export function TerminalOutput({
         )}
 
         {visibleEvents.length === 0 ? (
-          <p className="p-4 font-mono text-xs text-gray-500" data-testid="terminal-empty">
+          <p className="p-4 font-mono text-xs text-text-muted-light" data-testid="terminal-empty">
             No events yet...
           </p>
         ) : (

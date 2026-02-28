@@ -13,7 +13,7 @@ describe("Button", () => {
   it("applies primary variant styles by default", () => {
     render(<Button>Click me</Button>);
     const button = screen.getByRole("button");
-    expect(button.className).toContain("bg-elf-gold");
+    expect(button.className).toContain("bg-accent");
   });
 
   it("applies danger variant styles", () => {
@@ -25,7 +25,7 @@ describe("Button", () => {
   it("has neo-brutalist border and shadow classes", () => {
     render(<Button>Test</Button>);
     const button = screen.getByRole("button");
-    expect(button.className).toContain("border-[3px]");
+    expect(button.className).toContain("border-token-normal");
     expect(button.className).toContain("shadow-brutal");
   });
 

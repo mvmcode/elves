@@ -146,10 +146,10 @@ export function ElfTheater({
   if (elves.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center p-8" data-testid="theater-empty">
-        <p className="font-display text-2xl font-bold uppercase tracking-wide text-gray-300">
+        <p className="font-display text-2xl text-heading text-text-muted-light">
           No Elves Active
         </p>
-        <p className="mt-2 font-body text-sm text-gray-400">
+        <p className="mt-2 font-body text-sm text-text-muted-light">
           Summon a task to call the elves.
         </p>
       </div>
@@ -165,7 +165,7 @@ export function ElfTheater({
       <div className="flex flex-1 flex-col" data-testid="elf-theater" data-mode="solo">
         {/* Slim progress bar for solo mode */}
         <div
-          className="flex items-center gap-4 border-b-[2px] border-border bg-white px-4 py-2"
+          className="flex items-center gap-4 border-b-token-thin border-border bg-surface-elevated px-4 py-2"
           data-testid="progress-bar-global"
         >
           <Badge variant="info">
@@ -177,12 +177,12 @@ export function ElfTheater({
             </span>
           )}
           {costEstimate > 0 && (
-            <span className="font-mono text-sm text-gray-600" data-testid="cost-estimate">
+            <span className="font-mono text-sm text-text-muted" data-testid="cost-estimate">
               {formatCost(costEstimate)}
             </span>
           )}
           <span
-            className="ml-auto font-body text-xs italic text-gray-500"
+            className="ml-auto font-body text-xs italic text-text-muted-light"
             data-testid="global-status"
           >
             {GLOBAL_STATUS_MESSAGES[globalStatusIndex]}
@@ -208,7 +208,7 @@ export function ElfTheater({
     <div className="flex flex-1 flex-col gap-4 p-4" data-testid="elf-theater" data-mode="team">
       {/* Global progress top bar */}
       <div
-        className="flex items-center justify-between border-[3px] border-border bg-white px-4 py-3 shadow-brutal"
+        className="flex items-center justify-between border-token-normal border-border bg-surface-elevated px-4 py-3 shadow-brutal rounded-token-md"
         data-testid="progress-bar-global"
       >
         <div className="flex items-center gap-4">
@@ -221,13 +221,13 @@ export function ElfTheater({
             </span>
           )}
           {costEstimate > 0 && (
-            <span className="font-mono text-sm text-gray-600" data-testid="cost-estimate">
+            <span className="font-mono text-sm text-text-muted" data-testid="cost-estimate">
               {formatCost(costEstimate)}
             </span>
           )}
         </div>
         <span
-          className="font-body text-xs italic text-gray-500"
+          className="font-body text-xs italic text-text-muted-light"
           data-testid="global-status"
         >
           {GLOBAL_STATUS_MESSAGES[globalStatusIndex]}
@@ -236,10 +236,10 @@ export function ElfTheater({
 
       {/* Session heading */}
       <div className="flex items-center justify-between">
-        <h2 className="font-display text-2xl font-bold uppercase tracking-wide" data-testid="theater-heading">
+        <h2 className="font-display text-2xl text-heading" data-testid="theater-heading">
           Elf Workshop
         </h2>
-        <span className="border-[2px] border-border bg-elf-gold px-3 py-1 font-body text-xs font-bold uppercase">
+        <span className="border-token-thin border-border bg-accent text-accent-contrast px-3 py-1 font-body text-xs text-label rounded-token-sm">
           {elves.length} {elves.length === 1 ? "Elf" : "Elves"}
         </span>
       </div>
@@ -253,13 +253,13 @@ export function ElfTheater({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.9 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="flex items-start gap-2 border-[2px] border-border bg-elf-gold-light px-3 py-2 shadow-brutal-sm"
+            className="flex items-start gap-2 border-token-thin border-border bg-accent-light px-3 py-2 shadow-brutal-sm rounded-token-md"
             data-testid="chat-bubble"
           >
-            <span className="font-display text-xs font-bold uppercase">
+            <span className="font-display text-xs text-label">
               {bubble.senderName}:
             </span>
-            <span className="font-body text-xs text-gray-700">
+            <span className="font-body text-xs text-text-muted">
               {bubble.message}
             </span>
           </motion.div>
@@ -273,7 +273,7 @@ export function ElfTheater({
             {/* Lead agent crown badge */}
             {leadElfId === elf.id && (
               <div
-                className="absolute -left-2 -top-2 z-10 flex h-8 w-8 items-center justify-center border-[2px] border-border bg-elf-gold shadow-brutal-sm"
+                className="absolute -left-2 -top-2 z-10 flex h-8 w-8 items-center justify-center border-token-thin border-border bg-accent shadow-brutal-sm"
                 style={{ borderRadius: "50%" }}
                 title="Lead Agent"
                 data-testid="lead-badge"

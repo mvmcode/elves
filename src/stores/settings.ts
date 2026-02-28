@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+export type ThemeName = "neo-brutalist" | "modern";
 type DecayRate = "slow" | "normal" | "fast";
 
 interface SettingsState {
@@ -14,11 +15,15 @@ interface SettingsState {
   readonly maxMemoriesPerProject: number;
   /** Maximum number of memories injected into agent context per task */
   readonly maxContextInjection: number;
+  /** Active UI theme */
+  readonly theme: ThemeName;
   /** Whether sound effects are enabled */
   readonly soundEnabled: boolean;
   /** Sound effect volume (0.0 to 1.0) */
   readonly soundVolume: number;
 
+  /** Set the active theme and apply it to the document */
+  setTheme: (theme: ThemeName) => void;
   /** Toggle auto-learn on or off */
   setAutoLearn: (enabled: boolean) => void;
   /** Set the decay rate */
@@ -40,9 +45,14 @@ export const useSettingsStore = create<SettingsState>()(
       decayRate: "normal",
       maxMemoriesPerProject: 500,
       maxContextInjection: 20,
+      theme: "neo-brutalist",
       soundEnabled: true,
       soundVolume: 0.5,
 
+      setTheme: (theme: ThemeName) => {
+        document.documentElement.setAttribute("data-theme", theme);
+        set({ theme });
+      },
       setAutoLearn: (autoLearn: boolean) => set({ autoLearn }),
       setDecayRate: (decayRate: DecayRate) => set({ decayRate }),
       setMaxMemories: (maxMemoriesPerProject: number) => set({ maxMemoriesPerProject }),

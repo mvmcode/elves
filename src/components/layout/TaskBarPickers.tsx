@@ -46,20 +46,20 @@ function AgentPicker(): React.JSX.Element {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={[
-          "flex cursor-pointer items-center gap-1 border-[2px] border-border px-2 py-1 font-mono text-xs font-bold transition-all duration-100",
+          "flex cursor-pointer items-center gap-1 border-token-thin border-border rounded-token-sm px-2 py-1 font-mono text-xs font-bold transition-all duration-100",
           selectedAgent !== null
             ? "bg-info/20 shadow-[2px_2px_0px_0px_#000]"
-            : "bg-white hover:bg-surface-light",
+            : "bg-surface-elevated hover:bg-surface-light",
         ].join(" ")}
       >
-        <span className="text-[10px] uppercase text-text-light/50">Agent:</span>
+        <span className="text-[10px] text-label text-text-light/50">Agent:</span>
         <span className="max-w-[120px] truncate">
           {selectedAgent !== null ? selectedAgent.slug : "Default"}
         </span>
         <span className="text-[8px]">{isOpen ? "\u25B2" : "\u25BC"}</span>
       </button>
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1 min-w-[220px] border-[3px] border-border bg-white shadow-brutal-sm">
+        <div className="absolute left-0 top-full z-50 mt-1 min-w-[220px] border-token-normal border-border bg-surface-elevated shadow-brutal-sm rounded-token-md">
           <DropdownItem
             label="Default"
             description="No custom agent"
@@ -105,18 +105,18 @@ function ModelPicker(): React.JSX.Element {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={[
-          "flex cursor-pointer items-center gap-1 border-[2px] border-border px-2 py-1 font-mono text-xs font-bold transition-all duration-100",
+          "flex cursor-pointer items-center gap-1 border-token-thin border-border rounded-token-sm px-2 py-1 font-mono text-xs font-bold transition-all duration-100",
           selectedModel !== null
-            ? "bg-elf-gold/30 shadow-[2px_2px_0px_0px_#000]"
-            : "bg-white hover:bg-surface-light",
+            ? "bg-accent/30 shadow-[2px_2px_0px_0px_#000]"
+            : "bg-surface-elevated hover:bg-surface-light",
         ].join(" ")}
       >
-        <span className="text-[10px] uppercase text-text-light/50">Model:</span>
+        <span className="text-[10px] text-label text-text-light/50">Model:</span>
         <span>{selectedModel ?? defaultModel}</span>
         <span className="text-[8px]">{isOpen ? "\u25B2" : "\u25BC"}</span>
       </button>
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1 min-w-[200px] border-[3px] border-border bg-white shadow-brutal-sm">
+        <div className="absolute left-0 top-full z-50 mt-1 min-w-[200px] border-token-normal border-border bg-surface-elevated shadow-brutal-sm rounded-token-md">
           <DropdownItem
             label={`Default (${defaultModel})`}
             description="Use settings default"
@@ -166,18 +166,18 @@ function ModePicker(): React.JSX.Element {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={[
-          "flex cursor-pointer items-center gap-1 border-[2px] border-border px-2 py-1 font-mono text-xs font-bold transition-all duration-100",
+          "flex cursor-pointer items-center gap-1 border-token-thin border-border rounded-token-sm px-2 py-1 font-mono text-xs font-bold transition-all duration-100",
           selectedMode !== null
             ? "bg-success/20 shadow-[2px_2px_0px_0px_#000]"
-            : "bg-white hover:bg-surface-light",
+            : "bg-surface-elevated hover:bg-surface-light",
         ].join(" ")}
       >
-        <span className="text-[10px] uppercase text-text-light/50">Mode:</span>
+        <span className="text-[10px] text-label text-text-light/50">Mode:</span>
         <span>{modeDisplayName(selectedMode)}</span>
         <span className="text-[8px]">{isOpen ? "\u25B2" : "\u25BC"}</span>
       </button>
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1 min-w-[200px] border-[3px] border-border bg-white shadow-brutal-sm">
+        <div className="absolute left-0 top-full z-50 mt-1 min-w-[200px] border-token-normal border-border bg-surface-elevated shadow-brutal-sm rounded-token-md">
           <DropdownItem
             label="Default"
             description="Use settings default"
@@ -214,13 +214,13 @@ function TeamToggle(): React.JSX.Element {
     <button
       onClick={() => setForceTeamMode(!forceTeamMode)}
       className={[
-        "flex cursor-pointer items-center gap-1 border-[2px] border-border px-2 py-1 font-mono text-xs font-bold transition-all duration-100",
+        "flex cursor-pointer items-center gap-1 border-token-thin border-border rounded-token-sm px-2 py-1 font-mono text-xs font-bold transition-all duration-100",
         forceTeamMode
           ? "bg-[#E0C3FC]/30 shadow-[2px_2px_0px_0px_#000]"
-          : "bg-white hover:bg-surface-light",
+          : "bg-surface-elevated hover:bg-surface-light",
       ].join(" ")}
     >
-      <span className="text-[10px] uppercase text-text-light/50">Team:</span>
+      <span className="text-[10px] text-label text-text-light/50">Team:</span>
       <span>{forceTeamMode ? "ON" : "OFF"}</span>
     </button>
   );
@@ -255,14 +255,14 @@ function DropdownItem(props: {
       className={[
         "flex w-full cursor-pointer flex-col px-3 py-2 text-left transition-colors duration-75",
         props.isSelected
-          ? "bg-elf-gold/20 font-bold"
+          ? "bg-accent/20 font-bold"
           : "hover:bg-surface-light",
       ].join(" ")}
     >
       <div className="flex items-center gap-2">
         <span className="font-mono text-xs font-bold">{props.label}</span>
         {props.badge !== undefined && (
-          <span className="border-[1.5px] border-border bg-elf-gold/30 px-1 py-0 font-mono text-[9px] font-bold uppercase">
+          <span className="border-[1.5px] border-border bg-accent/30 px-1 py-0 font-mono text-[9px] font-bold uppercase">
             {props.badge}
           </span>
         )}

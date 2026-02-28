@@ -9,7 +9,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: "bg-elf-gold text-text-light",
+  primary: "bg-accent text-accent-contrast",
   secondary: "bg-white text-text-light",
   danger: "bg-error text-white",
   ghost: "bg-transparent text-text-light border-transparent shadow-none",
@@ -29,8 +29,8 @@ export function Button({
   return (
     <button
       className={[
-        "cursor-pointer border-[3px] border-border px-6 py-3",
-        "font-body text-sm font-bold uppercase tracking-wider",
+        "cursor-pointer border-token-normal border-border rounded-token-md px-6 py-3",
+        "font-body text-sm text-label",
         "shadow-brutal transition-all duration-100 ease-out",
         "hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm",
         "active:translate-x-[4px] active:translate-y-[4px] active:shadow-none",

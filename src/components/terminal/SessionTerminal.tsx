@@ -135,12 +135,12 @@ export function SessionTerminal({
   }, [claudeSessionId, projectPath, sessionId]);
 
   return (
-    <div className="flex h-full flex-col border-[3px] border-border bg-[#1A1A2E]" data-testid="session-terminal">
+    <div className="flex h-full flex-col border-token-normal border-border bg-[#1A1A2E]" data-testid="session-terminal">
       {/* Header bar */}
-      <div className="flex items-center justify-between border-b-[3px] border-border bg-white px-3 py-2">
+      <div className="flex items-center justify-between border-b-token-normal border-border bg-surface-elevated px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 border-[2px] border-border bg-info/20 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase">
-            RESUME
+          <span className="shrink-0 border-token-thin border-border bg-info/20 px-1.5 py-0.5 font-mono text-[10px] text-label">
+            Resume
           </span>
           <span className="min-w-0 truncate font-body text-xs font-bold" title={taskLabel}>
             {taskLabel}
@@ -148,10 +148,10 @@ export function SessionTerminal({
         </div>
         <button
           onClick={onClose}
-          className="shrink-0 cursor-pointer border-[2px] border-border bg-white px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-widest transition-all duration-100 hover:bg-error hover:text-white"
+          className="shrink-0 cursor-pointer border-token-thin border-border bg-surface-elevated rounded-token-sm px-2 py-0.5 font-display text-[10px] text-label transition-all duration-100 hover:bg-error hover:text-white"
           data-testid="terminal-close-button"
         >
-          CLOSE
+          Close
         </button>
       </div>
 
@@ -162,7 +162,7 @@ export function SessionTerminal({
 
       {/* Exited footer */}
       {hasExited && (
-        <div className="border-t-[2px] border-border/30 bg-[#1A1A2E] px-3 py-1 text-center">
+        <div className="border-t-token-thin border-border/30 bg-[#1A1A2E] px-3 py-1 text-center">
           <span className="font-mono text-xs text-elf-gold">Session ended. Close this panel when done.</span>
         </div>
       )}
