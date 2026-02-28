@@ -3,7 +3,6 @@
 
 import { useCallback, useEffect } from "react";
 import { save, open } from "@tauri-apps/plugin-dialog";
-import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { useProjectStore } from "@/stores/project";
 import { useMemoryStore } from "@/stores/memory";
 import {
@@ -14,6 +13,8 @@ import {
   pinMemory as invokePinMemory,
   unpinMemory as invokeUnpinMemory,
   searchMemories,
+  writeTextToFile,
+  readTextFromFile,
 } from "@/lib/tauri";
 import type { MemoryEntry, MemoryCategory } from "@/types/memory";
 
@@ -204,7 +205,7 @@ export function useMemoryActions(): {
         });
 
         if (filePath) {
-          await writeTextFile(filePath, JSON.stringify(exportData, null, 2));
+          await writeTextToFile(filePath, JSON.stringify(exportData, null, 2));
         }
       } catch (error) {
         console.error("Failed to export memories:", error);
@@ -225,7 +226,7 @@ export function useMemoryActions(): {
 
         if (!filePath) return;
 
-        const raw = await readTextFile(filePath as string);
+        const raw = await readTextFromFile(filePath as string);
         const data = JSON.parse(raw) as {
           version?: number;
           memories?: readonly {

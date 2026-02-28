@@ -168,3 +168,22 @@ pub fn build_project_context(
     context_builder::build_context(&conn, &project_id)
         .map_err(|e| format!("Context build error: {e}"))
 }
+
+/// Write a string to a file at the given path. Used for memory export.
+#[tauri::command]
+pub fn write_text_to_file(
+    file_path: String,
+    content: String,
+) -> Result<(), String> {
+    std::fs::write(&file_path, content)
+        .map_err(|e| format!("Failed to write file {file_path}: {e}"))
+}
+
+/// Read a file as a string. Used for memory import.
+#[tauri::command]
+pub fn read_text_from_file(
+    file_path: String,
+) -> Result<String, String> {
+    std::fs::read_to_string(&file_path)
+        .map_err(|e| format!("Failed to read file {file_path}: {e}"))
+}

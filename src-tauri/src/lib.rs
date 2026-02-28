@@ -29,7 +29,6 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(DbState(Mutex::new(conn)))
         .manage(ProcessManager::new())
@@ -62,6 +61,8 @@ pub fn run() {
             commands::memory::get_memory_count,
             commands::memory::extract_session_memories,
             commands::memory::build_project_context,
+            commands::memory::write_text_to_file,
+            commands::memory::read_text_from_file,
             commands::skills::list_skills,
             commands::skills::create_skill,
             commands::skills::update_skill,

@@ -182,6 +182,16 @@ export async function getMemoryCount(projectId: string): Promise<number> {
   return invoke<number>("get_memory_count", { projectId });
 }
 
+/** Write a string to a file at the given path. */
+export async function writeTextToFile(filePath: string, content: string): Promise<void> {
+  return invoke<void>("write_text_to_file", { filePath, content });
+}
+
+/** Read a file as a string from the given path. */
+export async function readTextFromFile(filePath: string): Promise<string> {
+  return invoke<string>("read_text_from_file", { filePath });
+}
+
 /* ── Terminal commands ────────────────────────────────────────── */
 
 /** Open Terminal.app cd'd into the given project directory (macOS).

@@ -28,7 +28,6 @@ env_logger = "0.11"
 dirs = "6"
 tauri-plugin-updater = "2"
 tauri-plugin-dialog = "2.6.0"
-tauri-plugin-fs = "2"
 portable-pty = "0.8"
 
 [dev-dependencies]
