@@ -48,6 +48,8 @@ pub fn run() {
             commands::tasks::analyze_task,
             commands::tasks::start_team_task,
             commands::tasks::stop_team_task,
+            commands::tasks::transition_to_interactive,
+            commands::tasks::continue_task,
             commands::memory::list_memories,
             commands::memory::create_memory,
             commands::memory::update_memory,

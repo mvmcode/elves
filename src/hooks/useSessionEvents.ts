@@ -1,4 +1,6 @@
-/* Session event listener — bridges Tauri backend events to the frontend session store. */
+/* Session event listener — global subscriber that routes Tauri backend events to the correct floor.
+ * Unlike the single-session version, this subscribes once on mount and routes incoming events
+ * to floors by matching the event's sessionId to floor state via getFloorBySessionId(). */
 
 import { useEffect, useRef } from "react";
 import { useSessionStore } from "@/stores/session";
@@ -35,10 +37,10 @@ interface ParsedEvent {
  * Parse a raw Claude stream-json event into one or more typed ElfEvents.
  *
  * Claude's `--verbose --output-format stream-json` emits structured events:
- * - `assistant` → message.content[] with text, tool_use, and thinking blocks
- * - `user` → message.content[] with tool_result blocks
- * - `result` → final output with cost/token data
- * - `system` → initialization metadata (skipped)
+ * - `assistant` -> message.content[] with text, tool_use, and thinking blocks
+ * - `user` -> message.content[] with tool_result blocks
+ * - `result` -> final output with cost/token data
+ * - `system` -> initialization metadata (skipped)
  *
  * A single `assistant` event may produce multiple parsed events (e.g. text + tool_use).
  */
@@ -142,50 +144,41 @@ function eventTypeToElfStatus(eventType: string): ElfStatus | null {
 }
 
 /**
- * Subscribes to Tauri events from the Rust backend and updates the session store.
+ * Global event subscriber that routes Tauri backend events to the correct floor.
  *
- * Listens for:
- * - `elf:event` — parsed Claude stdout lines, adds events to the feed and
- *   updates elf status based on event type
- * - `session:completed` — emitted when the Claude process exits, adds a celebration
- *   event, triggers memory extraction, marks session completed, and transitions
- *   elves to sleeping after a delay
- * - `session:cancelled` — emitted when user stops a task, transitions to cancelled state
+ * Subscribes once on mount (always active) and for each incoming event:
+ * 1. Extracts sessionId from the event payload
+ * 2. Looks up the target floor via getFloorBySessionId()
+ * 3. Calls floor-scoped store actions (addEventToFloor, endSessionOnFloor, etc.)
+ * 4. If the target floor IS the active floor, snapshot sync auto-updates the UI
  *
- * Automatically cleans up listeners and timers when the session changes or component unmounts.
+ * This means events for non-focused running floors accumulate correctly in their
+ * floor's state. When the user switches to that floor, events are already there.
  */
 export function useSessionEvents(): void {
-  const activeSession = useSessionStore((s) => s.activeSession);
-  const elves = useSessionStore((s) => s.elves);
-  const addEvent = useSessionStore((s) => s.addEvent);
-  const updateElfStatus = useSessionStore((s) => s.updateElfStatus);
-  const updateAllElfStatus = useSessionStore((s) => s.updateAllElfStatus);
-  const endSession = useSessionStore((s) => s.endSession);
-
-  /* Use refs for values accessed in callbacks to avoid stale closures */
-  const elvesRef = useRef(elves);
-  elvesRef.current = elves;
+  const mounted = useRef(true);
 
   useEffect(() => {
-    if (!activeSession || activeSession.status !== "active") return undefined;
-
-    const sessionId = activeSession.id;
-    const runtime = activeSession.runtime;
+    mounted.current = true;
     const cleanups: Array<() => void> = [];
 
     /* Listen for individual agent events (stdout lines from Claude) */
     const elfEventPromise = onEvent<ElfEventPayload>("elf:event", (data) => {
-      if (data.sessionId !== sessionId) return;
+      const store = useSessionStore.getState();
+      const floorId = store.getFloorBySessionId(data.sessionId);
+      if (!floorId) return;
+
+      const floor = store.floors[floorId];
+      if (!floor) return;
 
       /* Determine the elf to attribute this event to */
-      const currentElves = elvesRef.current;
-      const targetElf = currentElves[0];
+      const targetElf = floor.elves[0];
       if (!targetElf) return;
 
       /* Parse the raw Claude event into one or more typed ElfEvents */
       const parsed = parseClaudePayload(data.eventType, data.payload);
       for (const entry of parsed) {
-        addEvent({
+        store.addEventToFloor(floorId, {
           id: `event-${entry.type}-${data.timestamp}-${Math.random().toString(36).slice(2, 6)}`,
           timestamp: data.timestamp * 1000,
           elfId: targetElf.id,
@@ -200,7 +193,7 @@ export function useSessionEvents(): void {
       /* Update elf status based on raw event type */
       const newStatus = eventTypeToElfStatus(data.eventType);
       if (newStatus && targetElf.status !== newStatus) {
-        updateElfStatus(targetElf.id, newStatus);
+        store.updateElfStatusOnFloor(floorId, targetElf.id, newStatus);
       }
     });
 
@@ -214,26 +207,73 @@ export function useSessionEvents(): void {
       readonly claudeSessionId: string;
     }
     const claudeIdPromise = onEvent<ClaudeIdPayload>("session:claude_id", (data) => {
-      if (data.sessionId !== sessionId) return;
-      useSessionStore.getState().setClaudeSessionId(data.claudeSessionId);
+      const store = useSessionStore.getState();
+      const floorId = store.getFloorBySessionId(data.sessionId);
+      if (!floorId) return;
+      store.setClaudeSessionIdOnFloor(floorId, data.claudeSessionId);
     });
 
     claudeIdPromise
       .then((unsub) => cleanups.push(unsub))
       .catch((error: unknown) => console.error("Failed to subscribe to session:claude_id:", error));
 
+    /* Listen for interactive mode transition (print process killed, PTY takes over) */
+    interface SessionInteractivePayload {
+      readonly sessionId: string;
+    }
+    const interactivePromise = onEvent<SessionInteractivePayload>("session:interactive", (data) => {
+      const store = useSessionStore.getState();
+      const floorId = store.getFloorBySessionId(data.sessionId);
+      if (!floorId) return;
+
+      const floor = store.floors[floorId];
+      if (!floor) return;
+
+      store.setInteractiveModeOnFloor(floorId, true);
+
+      const runtime = floor.session?.runtime ?? "claude-code";
+      store.addEventToFloor(floorId, {
+        id: `event-interactive-${Date.now()}`,
+        timestamp: Date.now(),
+        elfId: "system",
+        elfName: "System",
+        runtime,
+        type: "task_update",
+        payload: { message: "Switched to interactive terminal mode" },
+      });
+
+      /* Update lead elf status */
+      const leadElf = floor.elves[0];
+      if (leadElf) {
+        store.updateElfStatusOnFloor(floorId, leadElf.id, "working");
+      }
+    });
+
+    interactivePromise
+      .then((unsub) => cleanups.push(unsub))
+      .catch((error: unknown) => console.error("Failed to subscribe to session:interactive:", error));
+
     /* Listen for session completion (Claude process exited successfully) */
     const sessionCompletePromise = onEvent<SessionCompletedPayload>("session:completed", (data) => {
-      if (data.sessionId !== sessionId) return;
+      const store = useSessionStore.getState();
+      const floorId = store.getFloorBySessionId(data.sessionId);
+      if (!floorId) return;
+
+      const floor = store.floors[floorId];
+      if (!floor) return;
+
+      /* If in interactive mode, the print process was killed intentionally — ignore */
+      if (floor.isInteractiveMode) return;
 
       /* Transition all elves to "done" */
-      updateAllElfStatus("done");
+      store.updateAllElfStatusOnFloor(floorId, "done");
 
-      /* Add celebration event to the activity feed */
-      const leadElf = elvesRef.current[0];
+      /* Add celebration event */
+      const runtime = floor.session?.runtime ?? "claude-code";
+      const leadElf = floor.elves[0];
       const leadName = leadElf?.name ?? "The Elves";
 
-      addEvent({
+      store.addEventToFloor(floorId, {
         id: `event-complete-${Date.now()}`,
         timestamp: Date.now(),
         elfId: "system",
@@ -247,28 +287,52 @@ export function useSessionEvents(): void {
       /* Extract memories if auto-learn is enabled */
       const autoLearn = useSettingsStore.getState().autoLearn;
       if (autoLearn) {
-        extractSessionMemories(sessionId).catch((error: unknown) => {
+        extractSessionMemories(data.sessionId).catch((error: unknown) => {
           console.error("Failed to extract session memories:", error);
         });
       }
 
-      /* Mark session as completed and clear immediately — Shell captures summary before clear */
-      endSession("completed");
-      useSessionStore.getState().clearSession();
+      store.endSessionOnFloor(floorId, "completed");
     });
 
     sessionCompletePromise
       .then((unsub) => cleanups.push(unsub))
       .catch((error: unknown) => console.error("Failed to subscribe to session:completed:", error));
 
+    /* Listen for session continuation (follow-up message sent, new process spawned) */
+    interface SessionContinuedPayload {
+      readonly sessionId: string;
+    }
+    const sessionContinuedPromise = onEvent<SessionContinuedPayload>("session:continued", (data) => {
+      const store = useSessionStore.getState();
+      const floorId = store.getFloorBySessionId(data.sessionId);
+      if (!floorId) return;
+
+      store.reactivateSessionOnFloor(floorId);
+
+      const floor = store.floors[floorId];
+      const leadElf = floor?.elves[0];
+      if (leadElf) {
+        store.updateElfStatusOnFloor(floorId, leadElf.id, "working");
+      }
+    });
+
+    sessionContinuedPromise
+      .then((unsub) => cleanups.push(unsub))
+      .catch((error: unknown) => console.error("Failed to subscribe to session:continued:", error));
+
     /* Listen for session cancellation (user stopped the task) */
     const sessionCancelledPromise = onEvent<SessionCancelledPayload>("session:cancelled", (data) => {
-      if (data.sessionId !== sessionId) return;
-      updateAllElfStatus("done");
-      endSession("cancelled");
-      /* Clear session state after a brief delay so the user sees the cancellation */
+      const store = useSessionStore.getState();
+      const floorId = store.getFloorBySessionId(data.sessionId);
+      if (!floorId) return;
+
+      store.updateAllElfStatusOnFloor(floorId, "done");
+      store.endSessionOnFloor(floorId, "cancelled");
+
+      /* Clear floor session after a brief delay so the user sees the cancellation */
       setTimeout(() => {
-        useSessionStore.getState().clearSession();
+        useSessionStore.getState().clearFloorSession(floorId);
       }, 3000);
     });
 
@@ -277,7 +341,8 @@ export function useSessionEvents(): void {
       .catch((error: unknown) => console.error("Failed to subscribe to session:cancelled:", error));
 
     return () => {
+      mounted.current = false;
       cleanups.forEach((unsub) => unsub());
     };
-  }, [activeSession, addEvent, updateElfStatus, updateAllElfStatus, endSession]);
+  }, []);
 }

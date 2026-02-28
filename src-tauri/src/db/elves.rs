@@ -57,6 +57,7 @@ pub fn create_elf(
 /// Update an elf's status. Sets `finished_at` to the current UTC timestamp when
 /// the status transitions to a terminal state ("done" or "error").
 /// Returns true if a row was updated.
+#[allow(dead_code)]
 pub fn update_elf_status(
     conn: &Connection,
     id: &str,

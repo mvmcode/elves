@@ -2,6 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { useProjectStore } from "@/stores/project";
+import { useAppStore } from "@/stores/app";
+import { getRuntimeControlConfig } from "@/lib/runtime-controls";
 import { buildProjectContext } from "@/lib/tauri";
 import { Button } from "@/components/shared/Button";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -54,6 +56,10 @@ const DEFAULT_SECTIONS: readonly ContextSection[] = [
  */
 export function ContextEditor(): React.JSX.Element {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const defaultRuntime = useAppStore((s) => s.defaultRuntime);
+  const controlConfig = getRuntimeControlConfig(defaultRuntime);
+  const contextFileName = controlConfig.contextFileName ?? "CLAUDE.md";
+
   const [sections, setSections] = useState<readonly ContextSection[]>(DEFAULT_SECTIONS);
   const [autoContext, setAutoContext] = useState<string | null>(null);
   const [isLoadingContext, setIsLoadingContext] = useState(false);
@@ -121,9 +127,14 @@ export function ContextEditor(): React.JSX.Element {
     <div className="p-4" data-testid="context-editor">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-display text-2xl text-heading tracking-tight">
-          Context Editor
-        </h2>
+        <div>
+          <h2 className="font-display text-2xl text-heading tracking-tight">
+            Context Editor
+          </h2>
+          <p className="font-mono text-xs font-bold text-text-light/50" data-testid="context-file-label">
+            Editing {contextFileName}
+          </p>
+        </div>
         <Button
           variant="primary"
           className="text-xs"

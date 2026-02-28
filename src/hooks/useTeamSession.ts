@@ -1,4 +1,6 @@
-/* Team session lifecycle hook — orchestrates task analysis, plan preview, and team deployment. */
+/* Team session lifecycle hook — orchestrates task analysis, plan preview, and team deployment.
+ * Floor-aware: operates on the active floor. If the active floor has a running session,
+ * creates a new floor for the new task. */
 
 import { useCallback } from "react";
 import { useSessionStore } from "@/stores/session";
@@ -10,6 +12,7 @@ import {
   startTeamTask as invokeStartTeamTask,
   stopTask as invokeStopTask,
   stopTeamTask as invokeStopTeamTask,
+  continueTask as invokeContinueTask,
   buildProjectContext,
 } from "@/lib/tauri";
 import { generateElf, getStatusMessage } from "@/lib/elf-names";
@@ -19,10 +22,13 @@ import type { ClaudeSpawnOptions } from "@/types/claude";
 
 /**
  * Provides the task lifecycle for analysis and deployment:
- * 1. Analyze task → determine solo vs team
+ * 1. Analyze task -> determine solo vs team
  * 2. Show plan preview for team tasks (or auto-deploy for solo)
  * 3. Deploy agents with personality assignment
  * 4. Stop a running session
+ *
+ * All operations target the active floor. If the active floor already has a
+ * running session, a new floor is created automatically.
  *
  * Session completion (celebrations, memory extraction, sleep transitions) is
  * handled by `useSessionEvents` which listens for `session:completed` events.
@@ -30,8 +36,10 @@ import type { ClaudeSpawnOptions } from "@/types/claude";
 export function useTeamSession(): {
   analyzeAndDeploy: (task: string) => Promise<void>;
   deployWithPlan: (plan: TaskPlan) => Promise<void>;
+  continueSession: (message: string) => Promise<void>;
   stopSession: () => Promise<void>;
   isSessionActive: boolean;
+  isSessionCompleted: boolean;
   isPlanPreview: boolean;
 } {
   const activeSession = useSessionStore((s) => s.activeSession);
@@ -42,20 +50,35 @@ export function useTeamSession(): {
   const updateElfStatus = useSessionStore((s) => s.updateElfStatus);
   const showPlanPreview = useSessionStore((s) => s.showPlanPreview);
   const acceptPlan = useSessionStore((s) => s.acceptPlan);
+  const createFloor = useSessionStore((s) => s.createFloor);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const defaultRuntime = useAppStore((s) => s.defaultRuntime);
 
   /** Build ClaudeSpawnOptions from current app store selections. */
   const buildSpawnOptions = useCallback((): ClaudeSpawnOptions => {
-    const { selectedAgent, selectedModel, selectedPermissionMode, budgetCap } =
+    const { selectedAgent, selectedModel, selectedApprovalMode, budgetCap } =
       useAppStore.getState();
     return {
       agent: selectedAgent?.slug ?? undefined,
       model: selectedModel ?? selectedAgent?.model ?? undefined,
-      permissionMode: selectedPermissionMode ?? undefined,
+      permissionMode: selectedApprovalMode ?? undefined,
       maxBudgetUsd: budgetCap ?? undefined,
     };
   }, []);
+
+  /**
+   * Ensure the active floor is available for a new task.
+   * If it already has a running session, create a new floor first.
+   */
+  const ensureAvailableFloor = useCallback((): void => {
+    const state = useSessionStore.getState();
+    const floorId = state.activeFloorId;
+    if (!floorId) return;
+    const floor = state.floors[floorId];
+    if (floor?.session?.status === "active") {
+      createFloor();
+    }
+  }, [createFloor]);
 
   /**
    * Analyze the task and either auto-deploy (solo) or show plan preview (team).
@@ -68,6 +91,9 @@ export function useTeamSession(): {
       }
 
       try {
+        /* Ensure we have an available floor */
+        ensureAvailableFloor();
+
         /* Pre-task: build context from project memories (boosts relevance for used memories) */
         buildProjectContext(activeProjectId).catch((error: unknown) => {
           console.error("Failed to build project context:", error);
@@ -142,7 +168,7 @@ export function useTeamSession(): {
         console.error("Failed to analyze task:", error);
       }
     },
-    [activeProjectId, defaultRuntime, buildSpawnOptions, startSession, addElf, addEvent, updateElfStatus, showPlanPreview],
+    [activeProjectId, defaultRuntime, buildSpawnOptions, ensureAvailableFloor, startSession, addElf, addEvent, updateElfStatus, showPlanPreview],
   );
 
   /**
@@ -221,6 +247,41 @@ export function useTeamSession(): {
     [activeProjectId, defaultRuntime, buildSpawnOptions, acceptPlan, startSession, addElf, addEvent, updateElfStatus],
   );
 
+  /**
+   * Continue a completed session with a follow-up message.
+   * Spawns a new `--print --resume` process and reactivates the session.
+   */
+  const continueSession = useCallback(
+    async (message: string): Promise<void> => {
+      if (!activeSession || activeSession.status !== "completed") return;
+      if (!activeSession.claudeSessionId) {
+        console.error("Cannot continue — no Claude session ID");
+        return;
+      }
+
+      try {
+        const spawnOptions = buildSpawnOptions();
+
+        /* Add user message event to the activity feed */
+        addEvent({
+          id: `event-followup-${Date.now()}`,
+          timestamp: Date.now(),
+          elfId: "user",
+          elfName: "You",
+          runtime: activeSession.runtime,
+          type: "chat",
+          payload: { text: message },
+        });
+
+        await invokeContinueTask(activeSession.id, message, spawnOptions);
+        /* The session:continued event handler in useSessionEvents will reactivate the session */
+      } catch (error) {
+        console.error("Failed to continue session:", error);
+      }
+    },
+    [activeSession, buildSpawnOptions, addEvent],
+  );
+
   const stopSession = useCallback(async (): Promise<void> => {
     if (!activeSession) return;
 
@@ -240,8 +301,10 @@ export function useTeamSession(): {
   return {
     analyzeAndDeploy,
     deployWithPlan,
+    continueSession,
     stopSession,
     isSessionActive: activeSession !== null && activeSession.status === "active",
+    isSessionCompleted: activeSession !== null && activeSession.status === "completed",
     isPlanPreview,
   };
 }

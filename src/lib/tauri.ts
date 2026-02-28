@@ -95,6 +95,26 @@ export async function stopTeamTask(sessionId: string): Promise<boolean> {
   return invoke<boolean>("stop_team_task", { sessionId });
 }
 
+/** Continue a completed session with a follow-up message.
+ * Resumes the Claude session via `--print --resume` with the new message.
+ * The session transitions back to "active" and events stream into the same feed. */
+export async function continueTask(
+  sessionId: string,
+  message: string,
+  spawnOptions?: ClaudeSpawnOptions,
+): Promise<boolean> {
+  const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
+  return invoke<boolean>("continue_task", { sessionId, message, options });
+}
+
+/** Transition a session from non-interactive print mode to interactive terminal.
+ * Kills the --print process and marks the session so the backend suppresses
+ * the false session:completed event. The frontend then spawns a PTY terminal
+ * via `claude --resume` for direct user interaction. */
+export async function transitionToInteractive(sessionId: string): Promise<boolean> {
+  return invoke<boolean>("transition_to_interactive", { sessionId });
+}
+
 /* ── Memory commands ───────────────────────────────────────────── */
 
 /** List memories for a project with optional filtering. */

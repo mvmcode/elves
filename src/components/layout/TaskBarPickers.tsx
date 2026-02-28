@@ -1,14 +1,18 @@
-/* Task bar option pickers — agent, model, and permission mode dropdowns for Claude Code. */
+/* Task bar option pickers — agent, model, and approval mode dropdowns, driven by runtime config. */
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAppStore } from "@/stores/app";
-import type { ClaudeAgent, ClaudeModel, PermissionMode } from "@/types/claude";
+import { getRuntimeControlConfig } from "@/lib/runtime-controls";
+import type { ClaudeAgent } from "@/types/claude";
 
-/** Renders the four option pickers: Agent, Model, Mode, and Team toggle. */
+/** Renders the option pickers: Agent (when supported), Model, Mode, and Team toggle. */
 export function TaskBarPickers(): React.JSX.Element {
+  const defaultRuntime = useAppStore((s) => s.defaultRuntime);
+  const controlConfig = getRuntimeControlConfig(defaultRuntime);
+
   return (
     <div className="flex items-center gap-2">
-      <AgentPicker />
+      {controlConfig.supportsCustomAgents && <AgentPicker />}
       <ModelPicker />
       <ModePicker />
       <TeamToggle />
@@ -34,7 +38,7 @@ function AgentPicker(): React.JSX.Element {
       setSelectedAgent(agent);
       // When selecting an agent with a preferred model, auto-set the model
       if (agent?.model) {
-        setSelectedModel(agent.model as ClaudeModel);
+        setSelectedModel(agent.model);
       }
       setIsOpen(false);
     },
@@ -82,23 +86,22 @@ function AgentPicker(): React.JSX.Element {
   );
 }
 
-/** Compact neo-brutalist dropdown for selecting a Claude model. */
+/** Compact neo-brutalist dropdown for selecting a model — options driven by runtime config. */
 function ModelPicker(): React.JSX.Element {
   const selectedModel = useAppStore((s) => s.selectedModel);
   const setSelectedModel = useAppStore((s) => s.setSelectedModel);
+  const defaultRuntime = useAppStore((s) => s.defaultRuntime);
   const claudeDiscovery = useAppStore((s) => s.claudeDiscovery);
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(containerRef, () => setIsOpen(false));
 
-  const defaultModel = claudeDiscovery?.settings.defaultModel ?? "opus";
-
-  const models: Array<{ value: ClaudeModel; label: string; description: string }> = [
-    { value: "opus", label: "Opus", description: "Most capable, highest quality" },
-    { value: "sonnet", label: "Sonnet", description: "Fast and capable" },
-    { value: "haiku", label: "Haiku", description: "Fastest, most affordable" },
-  ];
+  const controlConfig = getRuntimeControlConfig(defaultRuntime);
+  const defaultModel =
+    defaultRuntime === "claude-code"
+      ? (claudeDiscovery?.settings.defaultModel ?? controlConfig.models[0]?.id ?? "opus")
+      : (controlConfig.models[0]?.id ?? "o4-mini");
 
   return (
     <div ref={containerRef} className="relative">
@@ -126,14 +129,14 @@ function ModelPicker(): React.JSX.Element {
               setIsOpen(false);
             }}
           />
-          {models.map((m) => (
+          {controlConfig.models.map((m) => (
             <DropdownItem
-              key={m.value}
+              key={m.id}
               label={m.label}
-              description={m.description}
-              isSelected={selectedModel === m.value}
+              description={m.id}
+              isSelected={selectedModel === m.id}
               onClick={() => {
-                setSelectedModel(m.value);
+                setSelectedModel(m.id);
                 setIsOpen(false);
               }}
             />
@@ -144,22 +147,17 @@ function ModelPicker(): React.JSX.Element {
   );
 }
 
-/** Compact neo-brutalist dropdown for selecting a permission mode. */
+/** Compact neo-brutalist dropdown for selecting an approval mode — options driven by runtime config. */
 function ModePicker(): React.JSX.Element {
-  const selectedMode = useAppStore((s) => s.selectedPermissionMode);
-  const setSelectedMode = useAppStore((s) => s.setSelectedPermissionMode);
+  const selectedMode = useAppStore((s) => s.selectedApprovalMode);
+  const setSelectedMode = useAppStore((s) => s.setSelectedApprovalMode);
+  const defaultRuntime = useAppStore((s) => s.defaultRuntime);
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(containerRef, () => setIsOpen(false));
 
-  const modes: Array<{ value: PermissionMode; label: string; description: string }> = [
-    { value: "default", label: "Default", description: "Ask before risky actions" },
-    { value: "acceptEdits", label: "Accept Edits", description: "Auto-approve file edits" },
-    { value: "plan", label: "Plan", description: "Must approve plan first" },
-    { value: "bypassPermissions", label: "YOLO", description: "Skip all permission checks" },
-    { value: "dontAsk", label: "Don't Ask", description: "Never prompt for approval" },
-  ];
+  const controlConfig = getRuntimeControlConfig(defaultRuntime);
 
   return (
     <div ref={containerRef} className="relative">
@@ -173,7 +171,7 @@ function ModePicker(): React.JSX.Element {
         ].join(" ")}
       >
         <span className="text-[10px] text-label text-text-light/50">Mode:</span>
-        <span>{modeDisplayName(selectedMode)}</span>
+        <span>{modeDisplayLabel(selectedMode, controlConfig.approvalModes)}</span>
         <span className="text-[8px]">{isOpen ? "\u25B2" : "\u25BC"}</span>
       </button>
       {isOpen && (
@@ -187,14 +185,14 @@ function ModePicker(): React.JSX.Element {
               setIsOpen(false);
             }}
           />
-          {modes.map((m) => (
+          {controlConfig.approvalModes.map((m) => (
             <DropdownItem
-              key={m.value}
+              key={m.id}
               label={m.label}
               description={m.description}
-              isSelected={selectedMode === m.value}
+              isSelected={selectedMode === m.id}
               onClick={() => {
-                setSelectedMode(m.value);
+                setSelectedMode(m.id);
                 setIsOpen(false);
               }}
             />
@@ -226,19 +224,15 @@ function TeamToggle(): React.JSX.Element {
   );
 }
 
-/** Short display name for a permission mode (or "Default" if null). */
-function modeDisplayName(mode: PermissionMode | null): string {
-  if (mode === null) return "Default";
-  switch (mode) {
-    case "bypassPermissions":
-      return "YOLO";
-    case "acceptEdits":
-      return "Accept Edits";
-    case "dontAsk":
-      return "Don't Ask";
-    default:
-      return mode.charAt(0).toUpperCase() + mode.slice(1);
-  }
+/** Display label for the selected approval mode. Looks up the label from config, falls back to capitalized id. */
+function modeDisplayLabel(
+  modeId: string | null,
+  approvalModes: readonly { id: string; label: string }[],
+): string {
+  if (modeId === null) return "Default";
+  const found = approvalModes.find((m) => m.id === modeId);
+  if (found) return found.label;
+  return modeId.charAt(0).toUpperCase() + modeId.slice(1);
 }
 
 /** Reusable dropdown menu item with label, description, and optional badge. */

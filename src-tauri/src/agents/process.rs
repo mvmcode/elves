@@ -3,7 +3,7 @@
 // Supports both single-agent sessions (one process per session) and team sessions
 // (multiple processes per session). The `teams` map handles multi-process tracking.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::process::Child;
 use std::sync::Mutex;
 
@@ -18,6 +18,10 @@ pub struct ProcessManager {
     processes: Mutex<HashMap<String, Child>>,
     /// Team sessions: multiple children per session.
     teams: Mutex<HashMap<String, Vec<Child>>>,
+    /// Sessions that transitioned to interactive terminal mode.
+    /// When a session is in this set, the stdout stream reader should NOT
+    /// emit `session:completed` on process exit — the PTY terminal takes over.
+    interactive: Mutex<HashSet<String>>,
 }
 
 impl ProcessManager {
@@ -26,22 +30,27 @@ impl ProcessManager {
         Self {
             processes: Mutex::new(HashMap::new()),
             teams: Mutex::new(HashMap::new()),
+            interactive: Mutex::new(HashSet::new()),
         }
     }
 
     /// Register a spawned child process for the given session (single-agent mode).
     ///
-    /// If a process already exists for this session, the old process is replaced
-    /// (but not killed — the caller should kill it first if needed).
+    /// If a process already exists for this session, the old process is killed
+    /// and reaped before inserting the new one to prevent zombie process leaks.
     pub fn register(&self, session_id: &str, child: Child) {
         let mut processes = self.processes.lock().expect("ProcessManager lock poisoned");
-        processes.insert(session_id.to_string(), child);
+        if let Some(mut old) = processes.insert(session_id.to_string(), child) {
+            let _ = old.kill();
+            let _ = old.wait();
+        }
     }
 
     /// Register a team of child processes for the given session.
     ///
     /// If processes already exist for this session, the old ones are replaced
     /// (but not killed — the caller should kill them first if needed).
+    #[allow(dead_code)]
     pub fn register_team(&self, session_id: &str, children: Vec<Child>) {
         let mut teams = self.teams.lock().expect("ProcessManager teams lock poisoned");
         teams.insert(session_id.to_string(), children);
@@ -84,6 +93,7 @@ impl ProcessManager {
     /// Kill all active processes (both single and team). Called on app shutdown.
     ///
     /// Returns the total number of processes that were killed.
+    #[allow(dead_code)]
     pub fn kill_all(&self) -> usize {
         let mut count = 0;
 
@@ -110,7 +120,30 @@ impl ProcessManager {
         count
     }
 
+    /// Mark a session as having transitioned to interactive terminal mode.
+    ///
+    /// The stdout stream reader checks this flag and suppresses the
+    /// `session:completed` event when the print process is killed for
+    /// an interactive transition (as opposed to a normal exit).
+    pub fn mark_interactive(&self, session_id: &str) {
+        let mut interactive = self.interactive.lock().expect("ProcessManager interactive lock poisoned");
+        interactive.insert(session_id.to_string());
+    }
+
+    /// Check if a session was transitioned to interactive mode.
+    pub fn is_interactive(&self, session_id: &str) -> bool {
+        let interactive = self.interactive.lock().expect("ProcessManager interactive lock poisoned");
+        interactive.contains(session_id)
+    }
+
+    /// Clear the interactive flag for a session (called on session cleanup).
+    pub fn clear_interactive(&self, session_id: &str) {
+        let mut interactive = self.interactive.lock().expect("ProcessManager interactive lock poisoned");
+        interactive.remove(session_id);
+    }
+
     /// Check if a session has an active (tracked) process (single or team).
+    #[allow(dead_code)]
     pub fn is_running(&self, session_id: &str) -> bool {
         let processes = self.processes.lock().expect("ProcessManager lock poisoned");
         if processes.contains_key(session_id) {
@@ -123,6 +156,7 @@ impl ProcessManager {
     }
 
     /// Get the total count of currently tracked active processes (single + team).
+    #[allow(dead_code)]
     pub fn active_count(&self) -> usize {
         let processes = self.processes.lock().expect("ProcessManager lock poisoned");
         let single_count = processes.len();

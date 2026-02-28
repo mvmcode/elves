@@ -1,9 +1,14 @@
-/* Tests for SessionHistory — verifies compact row rendering, expand/collapse, and resume button. */
+/* Tests for SessionHistory — verifies compact row rendering, expand/collapse, and Open as Floor. */
 
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SessionHistory } from "./SessionHistory";
 import type { Session } from "@/types/session";
+
+/* Mock the Tauri IPC layer so SessionEventViewer does not call the real invoke. */
+vi.mock("@/lib/tauri", () => ({
+  listSessionEvents: vi.fn().mockResolvedValue([]),
+}));
 
 /* Mock the hooks */
 const mockSessions: Session[] = [];
@@ -17,13 +22,21 @@ vi.mock("@/hooks/useSessionHistory", () => ({
   }),
 }));
 
-const mockSetTerminalSessionId = vi.fn();
+const mockSetActiveView = vi.fn();
 vi.mock("@/stores/ui", () => ({
   useUiStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
       highlightedSessionId: null,
       setHighlightedSessionId: vi.fn(),
-      setTerminalSessionId: mockSetTerminalSessionId,
+      setActiveView: mockSetActiveView,
+    }),
+}));
+
+const mockOpenHistoricalFloor = vi.fn();
+vi.mock("@/stores/session", () => ({
+  useSessionStore: (selector: (state: Record<string, unknown>) => unknown) =>
+    selector({
+      openHistoricalFloor: mockOpenHistoricalFloor,
     }),
 }));
 
@@ -50,7 +63,8 @@ describe("SessionHistory", () => {
   beforeEach(() => {
     mockSessions.length = 0;
     mockIsLoading = false;
-    mockSetTerminalSessionId.mockClear();
+    mockSetActiveView.mockClear();
+    mockOpenHistoricalFloor.mockClear();
   });
 
   it("shows empty state when no sessions exist", () => {
@@ -115,72 +129,99 @@ describe("SessionHistory", () => {
     expect(screen.queryByText("$0.00")).not.toBeInTheDocument();
   });
 
-  it("expands session detail on click", () => {
+  it("expands session detail on click", async () => {
     mockSessions.push(createTestSession());
     render(<SessionHistory />);
     expect(screen.queryByTestId("session-detail")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("session-card-header"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("session-card-header"));
+    });
     expect(screen.getByTestId("session-detail")).toBeInTheDocument();
   });
 
-  it("shows summary in expanded detail", () => {
+  it("shows summary in expanded detail", async () => {
     mockSessions.push(createTestSession());
     render(<SessionHistory />);
-    fireEvent.click(screen.getByTestId("session-card-header"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("session-card-header"));
+    });
     expect(screen.getByText("Successfully built the login page with OAuth integration.")).toBeInTheDocument();
   });
 
-  it("shows token and cost stats in expanded detail", () => {
+  it("shows token and cost stats in expanded detail", async () => {
     mockSessions.push(createTestSession({ tokensUsed: 15432, costEstimate: 0.0234 }));
     render(<SessionHistory />);
-    fireEvent.click(screen.getByTestId("session-card-header"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("session-card-header"));
+    });
     expect(screen.getByText("15,432")).toBeInTheDocument();
     expect(screen.getByText("$0.0234")).toBeInTheDocument();
   });
 
-  it("shows 'no summary' message when summary is null", () => {
+  it("shows 'no summary' message when summary is null", async () => {
     mockSessions.push(createTestSession({ summary: null }));
     render(<SessionHistory />);
-    fireEvent.click(screen.getByTestId("session-card-header"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("session-card-header"));
+    });
     expect(screen.getByText("No summary recorded for this session.")).toBeInTheDocument();
   });
 
-  it("shows Export Replay button in expanded detail", () => {
+  it("shows Export Replay button in expanded detail", async () => {
     mockSessions.push(createTestSession());
     render(<SessionHistory />);
-    fireEvent.click(screen.getByTestId("session-card-header"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("session-card-header"));
+    });
     expect(screen.getByText("Export Replay")).toBeInTheDocument();
   });
 
-  it("collapses on second click", () => {
+  it("collapses on second click", async () => {
     mockSessions.push(createTestSession());
     render(<SessionHistory />);
-    fireEvent.click(screen.getByTestId("session-card-header"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("session-card-header"));
+    });
     expect(screen.getByTestId("session-detail")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("session-card-header"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("session-card-header"));
+    });
     expect(screen.queryByTestId("session-detail")).not.toBeInTheDocument();
   });
 
-  it("shows resume button when session has claudeSessionId", () => {
-    mockSessions.push(createTestSession({ claudeSessionId: "claude-abc-123" }));
+  it("shows Open as Floor button in expanded detail", async () => {
+    mockSessions.push(createTestSession());
     render(<SessionHistory />);
-    fireEvent.click(screen.getByTestId("session-card-header"));
-    expect(screen.getByTestId("resume-button")).toBeInTheDocument();
-    expect(screen.getByText("Resume")).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("session-card-header"));
+    });
+    expect(screen.getByTestId("open-floor-button")).toBeInTheDocument();
+    expect(screen.getByText("Open as Floor")).toBeInTheDocument();
   });
 
-  it("does not show resume button when claudeSessionId is null", () => {
+  it("shows Open as Floor button regardless of claudeSessionId", async () => {
     mockSessions.push(createTestSession({ claudeSessionId: null }));
     render(<SessionHistory />);
-    fireEvent.click(screen.getByTestId("session-card-header"));
-    expect(screen.queryByTestId("resume-button")).not.toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("session-card-header"));
+    });
+    expect(screen.getByTestId("open-floor-button")).toBeInTheDocument();
   });
 
-  it("calls setTerminalSessionId when resume is clicked", () => {
-    mockSessions.push(createTestSession({ id: "session-42", claudeSessionId: "claude-abc-123" }));
+  it("calls openHistoricalFloor when Open as Floor is clicked", async () => {
+    mockSessions.push(createTestSession({ id: "session-42" }));
     render(<SessionHistory />);
-    fireEvent.click(screen.getByTestId("session-card-header"));
-    fireEvent.click(screen.getByTestId("resume-button"));
-    expect(mockSetTerminalSessionId).toHaveBeenCalledWith("session-42");
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("session-card-header"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("open-floor-button"));
+    });
+    /* Wait for async handleOpenAsFloor to resolve (listSessionEvents is mocked to return []) */
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(mockOpenHistoricalFloor).toHaveBeenCalled();
+    expect(mockSetActiveView).toHaveBeenCalledWith("session");
   });
 });

@@ -21,35 +21,48 @@ export function TaskBar(): React.JSX.Element {
   const isFocused = useUiStore((s) => s.isTaskBarFocused);
   const setFocused = useUiStore((s) => s.setTaskBarFocused);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
-  const { analyzeAndDeploy, stopSession, isSessionActive, isPlanPreview } = useTeamSession();
+  const { analyzeAndDeploy, continueSession, stopSession, isSessionActive, isSessionCompleted, isPlanPreview } = useTeamSession();
   const claudeDiscovery = useAppStore((s) => s.claudeDiscovery);
   const isOptionsExpanded = useAppStore((s) => s.isOptionsExpanded);
   const setOptionsExpanded = useAppStore((s) => s.setOptionsExpanded);
   const selectedAgent = useAppStore((s) => s.selectedAgent);
   const selectedModel = useAppStore((s) => s.selectedModel);
-  const selectedPermissionMode = useAppStore((s) => s.selectedPermissionMode);
+  const selectedApprovalMode = useAppStore((s) => s.selectedApprovalMode);
   const forceTeamMode = useAppStore((s) => s.forceTeamMode);
   const appliedOptions = useSessionStore((s) => s.activeSession?.appliedOptions);
 
   const canDeploy = taskText.trim().length > 0 && activeProjectId !== null && !isSessionActive && !isPlanPreview;
-  const hasOptions = claudeDiscovery !== null && claudeDiscovery.claudeDirExists;
+  const canFollowUp = taskText.trim().length > 0 && isSessionCompleted;
+  const defaultRuntime = useAppStore((s) => s.defaultRuntime);
+  /* Show options row for Claude Code when discovery finds a .claude dir, or always for Codex (which has its own controls) */
+  const hasOptions = defaultRuntime === "codex" || (claudeDiscovery !== null && claudeDiscovery.claudeDirExists);
 
   /* During an active session, show the options that were applied at deploy time.
    * When idle, show the currently selected options for the next task. */
   const displayAgent = isSessionActive ? appliedOptions?.agent : selectedAgent?.slug;
   const displayModel = isSessionActive ? appliedOptions?.model : selectedModel;
-  const displayPermission = isSessionActive ? appliedOptions?.permissionMode : selectedPermissionMode;
+  const displayPermission = isSessionActive ? appliedOptions?.permissionMode : selectedApprovalMode;
   const displayTeamMode = !isSessionActive && forceTeamMode;
   const hasActiveSelections = displayAgent != null || displayModel != null || displayPermission != null || displayTeamMode;
 
   const handleDeploy = useCallback(async (): Promise<void> => {
+    /* Follow-up to a completed session */
+    if (canFollowUp) {
+      const message = taskText.trim();
+      setTaskText("");
+      inputRef.current?.blur();
+      setFocused(false);
+      await continueSession(message);
+      return;
+    }
+    /* New task deployment */
     if (!canDeploy) return;
     const task = taskText.trim();
     setTaskText("");
     inputRef.current?.blur();
     setFocused(false);
     await analyzeAndDeploy(task);
-  }, [canDeploy, taskText, setFocused, analyzeAndDeploy]);
+  }, [canDeploy, canFollowUp, taskText, setFocused, analyzeAndDeploy, continueSession]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -68,12 +81,12 @@ export function TaskBar(): React.JSX.Element {
 
   const handleInputKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === "Enter" && canDeploy) {
+      if (event.key === "Enter" && (canDeploy || canFollowUp)) {
         event.preventDefault();
         void handleDeploy();
       }
     },
-    [canDeploy, handleDeploy],
+    [canDeploy, canFollowUp, handleDeploy],
   );
 
   useEffect(() => {
@@ -102,7 +115,9 @@ export function TaskBar(): React.JSX.Element {
                 ? "Review the plan below... (Cmd+K)"
                 : isSessionActive
                   ? "Elves are working... (Cmd+K)"
-                  : "What do you want the elves to do? (Cmd+K)"
+                  : isSessionCompleted
+                    ? "Reply to continue the conversation... (Cmd+K)"
+                    : "What do you want the elves to do? (Cmd+K)"
           }
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
@@ -115,6 +130,28 @@ export function TaskBar(): React.JSX.Element {
           >
             Stop
           </button>
+        ) : isSessionCompleted ? (
+          <div className="flex shrink-0 gap-2">
+            <button
+              onClick={() => void handleDeploy()}
+              disabled={!canFollowUp}
+              className={[
+                "border-[3px] border-border px-4 py-2 font-display text-sm font-bold uppercase tracking-wider shadow-brutal-sm transition-all duration-100",
+                canFollowUp
+                  ? "cursor-pointer bg-info text-white hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                  : "cursor-not-allowed bg-gray-300 text-gray-500",
+              ].join(" ")}
+            >
+              SEND
+            </button>
+            <button
+              onClick={() => useSessionStore.getState().clearSession()}
+              className="cursor-pointer border-[3px] border-border bg-white px-3 py-2 font-display text-sm font-bold uppercase tracking-wider shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+              title="End conversation and start fresh"
+            >
+              NEW
+            </button>
+          </div>
         ) : (
           <DeployButton onClick={() => void handleDeploy()} disabled={!canDeploy} />
         )}
@@ -154,9 +191,9 @@ export function TaskBar(): React.JSX.Element {
                 )}
                 {!hasActiveSelections && (
                   <span className="text-xs text-text-light/50">
-                    {claudeDiscovery.hasAgents
+                    {claudeDiscovery?.hasAgents
                       ? `${claudeDiscovery.agents.length} agent${claudeDiscovery.agents.length !== 1 ? "s" : ""} available`
-                      : "Claude options"}
+                      : "Runtime options"}
                   </span>
                 )}
               </div>

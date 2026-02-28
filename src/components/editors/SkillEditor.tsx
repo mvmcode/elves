@@ -3,6 +3,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSkillStore } from "@/stores/skills";
 import { useSkillActions } from "@/hooks/useSkillActions";
+import { useAppStore } from "@/stores/app";
+import { getRuntimeControlConfig } from "@/lib/runtime-controls";
 import { Button } from "@/components/shared/Button";
 import { Badge } from "@/components/shared/Badge";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -32,6 +34,9 @@ Example usage here
  * shows the editor for the active skill with metadata fields and a textarea.
  */
 export function SkillEditor(): React.JSX.Element {
+  const defaultRuntime = useAppStore((s) => s.defaultRuntime);
+  const controlConfig = getRuntimeControlConfig(defaultRuntime);
+
   const skills = useSkillStore((s) => s.skills);
   const activeSkillId = useSkillStore((s) => s.activeSkillId);
   const setActiveSkillId = useSkillStore((s) => s.setActiveSkillId);
@@ -107,6 +112,17 @@ export function SkillEditor(): React.JSX.Element {
   /* Group skills: global first, then project-scoped */
   const globalSkills = skills.filter((s) => s.projectId === null);
   const projectSkills = skills.filter((s) => s.projectId !== null);
+
+  if (!controlConfig.supportsSkills) {
+    return (
+      <div className="flex h-full items-center justify-center" data-testid="skill-editor-unsupported">
+        <EmptyState
+          message="Skills are not available for Codex"
+          submessage="Skills are a Claude Code feature. Switch to Claude Code to manage custom skills."
+        />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

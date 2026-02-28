@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import type { RuntimeInfo } from "@/types/runtime";
 import type { Runtime } from "@/types/elf";
-import type { ClaudeDiscovery, ClaudeAgent, ClaudeModel, PermissionMode } from "@/types/claude";
+import type { ClaudeDiscovery, ClaudeAgent } from "@/types/claude";
 
 interface AppState {
   /** Detected runtimes on the system (null = not yet checked) */
@@ -17,10 +17,10 @@ interface AppState {
   readonly claudeDiscovery: ClaudeDiscovery | null;
   /** Currently selected custom agent for the next task (null = default) */
   readonly selectedAgent: ClaudeAgent | null;
-  /** Currently selected model override for the next task (null = use agent/settings default) */
-  readonly selectedModel: ClaudeModel | null;
-  /** Currently selected permission mode override (null = use default) */
-  readonly selectedPermissionMode: PermissionMode | null;
+  /** Currently selected model override for the next task (null = use agent/settings default). Runtime-generic string. */
+  readonly selectedModel: string | null;
+  /** Currently selected approval/permission mode override (null = use default). Runtime-generic string. */
+  readonly selectedApprovalMode: string | null;
   /** Per-session spending cap in USD (null = no cap) */
   readonly budgetCap: number | null;
   /** Whether to force team mode regardless of task analyzer classification */
@@ -39,9 +39,9 @@ interface AppState {
   /** Select a custom agent for the next task */
   setSelectedAgent: (agent: ClaudeAgent | null) => void;
   /** Select a model override for the next task */
-  setSelectedModel: (model: ClaudeModel | null) => void;
-  /** Select a permission mode override for the next task */
-  setSelectedPermissionMode: (mode: PermissionMode | null) => void;
+  setSelectedModel: (model: string | null) => void;
+  /** Select an approval/permission mode override for the next task */
+  setSelectedApprovalMode: (mode: string | null) => void;
   /** Set a per-session spending cap */
   setBudgetCap: (cap: number | null) => void;
   /** Toggle forced team mode for the next task */
@@ -59,14 +59,23 @@ export const useAppStore = create<AppState>((set) => ({
   claudeDiscovery: null,
   selectedAgent: null,
   selectedModel: null,
-  selectedPermissionMode: null,
+  selectedApprovalMode: null,
   budgetCap: null,
   forceTeamMode: false,
   isOptionsExpanded: false,
 
   setRuntimes: (runtimes: RuntimeInfo) => set({ runtimes }),
   setLoaded: () => set({ isLoading: false }),
-  setDefaultRuntime: (defaultRuntime: Runtime) => set({ defaultRuntime }),
+  setDefaultRuntime: (defaultRuntime: Runtime) =>
+    set({
+      defaultRuntime,
+      /* Clear stale selections when switching runtimes — model/mode IDs differ between runtimes */
+      selectedAgent: null,
+      selectedModel: null,
+      selectedApprovalMode: null,
+      budgetCap: null,
+      forceTeamMode: false,
+    }),
   setClaudeDiscovery: (claudeDiscovery: ClaudeDiscovery) =>
     set({
       claudeDiscovery,
@@ -74,9 +83,8 @@ export const useAppStore = create<AppState>((set) => ({
       isOptionsExpanded: claudeDiscovery.hasAgents,
     }),
   setSelectedAgent: (selectedAgent: ClaudeAgent | null) => set({ selectedAgent }),
-  setSelectedModel: (selectedModel: ClaudeModel | null) => set({ selectedModel }),
-  setSelectedPermissionMode: (selectedPermissionMode: PermissionMode | null) =>
-    set({ selectedPermissionMode }),
+  setSelectedModel: (selectedModel: string | null) => set({ selectedModel }),
+  setSelectedApprovalMode: (selectedApprovalMode: string | null) => set({ selectedApprovalMode }),
   setBudgetCap: (budgetCap: number | null) => set({ budgetCap }),
   setForceTeamMode: (forceTeamMode: boolean) => set({ forceTeamMode }),
   setOptionsExpanded: (isOptionsExpanded: boolean) => set({ isOptionsExpanded }),
@@ -84,7 +92,7 @@ export const useAppStore = create<AppState>((set) => ({
     set({
       selectedAgent: null,
       selectedModel: null,
-      selectedPermissionMode: null,
+      selectedApprovalMode: null,
       budgetCap: null,
       forceTeamMode: false,
     }),
