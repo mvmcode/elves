@@ -33,8 +33,10 @@ interface UiState {
   readonly isActivityFeedVisible: boolean;
   /** Session ID to auto-expand in SessionHistory after navigating from completion card. */
   readonly highlightedSessionId: string | null;
-  /** Session ID that currently has an embedded terminal open (null = no terminal). */
-  readonly terminalSessionId: string | null;
+  /** Whether the bottom terminal panel is open. */
+  readonly isTerminalPanelOpen: boolean;
+  /** Height of the bottom terminal panel in pixels. */
+  readonly terminalPanelHeight: number;
 
   setTaskBarFocused: (focused: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
@@ -44,7 +46,8 @@ interface UiState {
   setActivityFeedWidth: (width: number) => void;
   toggleActivityFeed: () => void;
   setHighlightedSessionId: (id: string | null) => void;
-  setTerminalSessionId: (id: string | null) => void;
+  toggleTerminalPanel: () => void;
+  setTerminalPanelHeight: (height: number) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -54,9 +57,10 @@ export const useUiStore = create<UiState>((set) => ({
   isNewProjectDialogOpen: false,
   sidebarWidth: 256,
   activityFeedWidth: 384,
-  isActivityFeedVisible: true,
+  isActivityFeedVisible: false,
   highlightedSessionId: null,
-  terminalSessionId: null,
+  isTerminalPanelOpen: false,
+  terminalPanelHeight: 300,
 
   setTaskBarFocused: (focused: boolean) => set({ isTaskBarFocused: focused }),
   setSettingsOpen: (open: boolean) => set({ isSettingsOpen: open }),
@@ -66,5 +70,6 @@ export const useUiStore = create<UiState>((set) => ({
   setActivityFeedWidth: (width: number) => set({ activityFeedWidth: clamp(width, ACTIVITY_FEED_MIN, ACTIVITY_FEED_MAX) }),
   toggleActivityFeed: () => set((state) => ({ isActivityFeedVisible: !state.isActivityFeedVisible })),
   setHighlightedSessionId: (id: string | null) => set({ highlightedSessionId: id }),
-  setTerminalSessionId: (id: string | null) => set({ terminalSessionId: id }),
+  toggleTerminalPanel: () => set((state) => ({ isTerminalPanelOpen: !state.isTerminalPanelOpen })),
+  setTerminalPanelHeight: (height: number) => set({ terminalPanelHeight: clamp(height, 150, 800) }),
 }));

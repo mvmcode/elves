@@ -29,6 +29,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(DbState(Mutex::new(conn)))
         .manage(ProcessManager::new())
@@ -48,6 +49,8 @@ pub fn run() {
             commands::tasks::analyze_task,
             commands::tasks::start_team_task,
             commands::tasks::stop_team_task,
+            commands::tasks::transition_to_interactive,
+            commands::tasks::continue_task,
             commands::memory::list_memories,
             commands::memory::create_memory,
             commands::memory::update_memory,

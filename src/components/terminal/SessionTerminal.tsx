@@ -17,6 +17,8 @@ interface SessionTerminalProps {
   readonly taskLabel: string;
   /** Called when the user closes the terminal panel. */
   readonly onClose: () => void;
+  /** Called when the PTY process exits — allows the parent to update session state. */
+  readonly onPtyExit?: () => void;
 }
 
 /** Tauri IPC: spawn a new PTY process. Returns a unique pty_id. */
@@ -55,6 +57,7 @@ export function SessionTerminal({
   projectPath,
   taskLabel,
   onClose,
+  onPtyExit,
 }: SessionTerminalProps): React.JSX.Element {
   const terminalRef = useRef<XTerminalHandle>(null);
   const ptyIdRef = useRef<string | null>(null);
@@ -101,13 +104,14 @@ export function SessionTerminal({
           terminalRef.current?.write(event.payload);
         });
 
-        /* Listen for PTY process exit → show message */
+        /* Listen for PTY process exit → show message and notify parent */
         unlistenExit = await listen<number>(`pty:exit:${ptyId}`, (event) => {
           terminalRef.current?.writeln("");
           terminalRef.current?.writeln(
             `\x1b[33m--- Session ended (exit code: ${event.payload}) ---\x1b[0m`,
           );
           setHasExited(true);
+          onPtyExit?.();
         });
       } catch (error) {
         console.error("Failed to spawn PTY:", error);
@@ -139,8 +143,11 @@ export function SessionTerminal({
       {/* Header bar */}
       <div className="flex items-center justify-between border-b-token-normal border-border bg-surface-elevated px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 border-token-thin border-border bg-info/20 px-1.5 py-0.5 font-mono text-[10px] text-label">
-            Resume
+          <span className={[
+            "shrink-0 border-token-thin border-border px-1.5 py-0.5 font-mono text-[10px] text-label",
+            hasExited ? "bg-gray-300" : "bg-success/20",
+          ].join(" ")}>
+            {hasExited ? "ENDED" : "LIVE"}
           </span>
           <span className="min-w-0 truncate font-body text-xs font-bold" title={taskLabel}>
             {taskLabel}

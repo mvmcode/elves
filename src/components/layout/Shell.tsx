@@ -7,6 +7,7 @@ import { TopBar } from "./TopBar";
 import { TaskBar } from "./TaskBar";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ElfTheater } from "@/components/theater/ElfTheater";
+import { SessionControlCard } from "@/components/session/SessionControlCard";
 import { ActivityFeed } from "@/components/feed/ActivityFeed";
 import { PlanPreview } from "@/components/theater/PlanPreview";
 import { TaskGraph } from "@/components/theater/TaskGraph";
@@ -17,13 +18,13 @@ import ThemePicker from "@/components/settings/ThemePicker";
 import { SkillEditor } from "@/components/editors/SkillEditor";
 import { McpManager } from "@/components/editors/McpManager";
 import { SessionHistory } from "@/components/project/SessionHistory";
-import { SessionTerminal } from "@/components/terminal/SessionTerminal";
+import { BottomTerminalPanel } from "@/components/terminal/BottomTerminalPanel";
 import { ShortcutOverlay } from "@/components/shared/ShortcutOverlay";
 import { NewProjectDialog } from "@/components/project/NewProjectDialog";
+import { FloorBar } from "@/components/layout/FloorBar";
 import { ResizeHandle } from "@/components/shared/ResizeHandle";
 import { useSessionStore } from "@/stores/session";
 import { useUiStore } from "@/stores/ui";
-import { useProjectStore } from "@/stores/project";
 import { useTeamSession } from "@/hooks/useTeamSession";
 import { useMemoryActions } from "@/hooks/useMemoryActions";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -54,10 +55,10 @@ export function Shell(): React.JSX.Element {
   const thinkingStream = useSessionStore((state) => state.thinkingStream);
   const isPlanPreview = useSessionStore((state) => state.isPlanPreview);
   const pendingPlan = useSessionStore((state) => state.pendingPlan);
-  const terminalSessionId = useUiStore((state) => state.terminalSessionId);
-  const setTerminalSessionId = useUiStore((state) => state.setTerminalSessionId);
-  const projects = useProjectStore((state) => state.projects);
-  const activeProjectId = useProjectStore((state) => state.activeProjectId);
+  const isHistoricalFloor = useSessionStore(
+    (state) => (state.activeFloorId ? state.floors[state.activeFloorId]?.isHistorical : false) ?? false,
+  );
+  const isTerminalPanelOpen = useUiStore((state) => state.isTerminalPanelOpen);
   const { deployWithPlan, stopSession } = useTeamSession();
   const {
     handleCreateMemory,
@@ -66,6 +67,8 @@ export function Shell(): React.JSX.Element {
     handleDeleteMemory,
     handleSearch,
     handleClearAll,
+    handleExportMemories,
+    handleImportMemories,
   } = useMemoryActions();
   const { play } = useSounds();
   const { shortcutOverlayOpen, toggleOverlay } = useKeyboardShortcuts({
@@ -74,45 +77,6 @@ export function Shell(): React.JSX.Element {
 
   /* Subscribe to Tauri backend events (elf:event, session:completed) */
   useSessionEvents();
-
-  /** Resolved session info for the embedded terminal (looked up when terminalSessionId changes). */
-  interface TerminalTarget {
-    readonly sessionId: string;
-    readonly claudeSessionId: string;
-    readonly projectPath: string;
-    readonly taskLabel: string;
-  }
-  const [terminalTarget, setTerminalTarget] = useState<TerminalTarget | null>(null);
-
-  /** Look up session details when terminalSessionId changes. */
-  useEffect(() => {
-    if (!terminalSessionId) {
-      setTerminalTarget(null);
-      return;
-    }
-    /* Look up session from Tauri backend */
-    import("@/lib/tauri").then(({ listSessions }) => {
-      if (!activeProjectId) return;
-      listSessions(activeProjectId).then((sessions) => {
-        const session = sessions.find((s) => s.id === terminalSessionId);
-        if (!session?.claudeSessionId) {
-          setTerminalTarget(null);
-          return;
-        }
-        const project = projects.find((p) => p.id === session.projectId);
-        setTerminalTarget({
-          sessionId: session.id,
-          claudeSessionId: session.claudeSessionId,
-          projectPath: project?.path ?? "",
-          taskLabel: session.task,
-        });
-      }).catch(() => setTerminalTarget(null));
-    }).catch(() => setTerminalTarget(null));
-  }, [terminalSessionId, activeProjectId, projects]);
-
-  const handleCloseTerminal = useCallback((): void => {
-    setTerminalSessionId(null);
-  }, [setTerminalSessionId]);
 
   const sidebarResize = useResizable({
     initialWidth: sidebarWidth,
@@ -239,32 +203,18 @@ export function Shell(): React.JSX.Element {
             <McpManager />
           </div>
         ) : activeView === "history" ? (
-          terminalTarget ? (
-            /* Split layout: session list (30%) + terminal (70%) */
-            <div className="flex flex-1 overflow-hidden">
-              <div className="flex w-[30%] min-w-[240px] shrink-0 flex-col overflow-y-auto border-r-token-normal border-border">
-                <SessionHistory />
-              </div>
-              <div className="flex flex-1 flex-col overflow-hidden">
-                <SessionTerminal
-                  sessionId={terminalTarget.sessionId}
-                  claudeSessionId={terminalTarget.claudeSessionId}
-                  projectPath={terminalTarget.projectPath}
-                  taskLabel={terminalTarget.taskLabel}
-                  onClose={handleCloseTerminal}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-1 flex-col overflow-y-auto">
-              <SessionHistory />
-            </div>
-          )
+          <div className="flex flex-1 flex-col overflow-y-auto">
+            <SessionHistory />
+          </div>
         ) : activeView === "settings" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <ThemePicker />
             <div className="border-t-token-normal border-border" />
-            <MemorySettings onClearAll={handleClearAll} />
+            <MemorySettings
+              onClearAll={handleClearAll}
+              onExport={handleExportMemories}
+              onImport={handleImportMemories}
+            />
           </div>
         ) : (
           <>
@@ -275,9 +225,9 @@ export function Shell(): React.JSX.Element {
               </div>
             )}
 
-            {/* Active session — show ElfTheater, TaskGraph, ThinkingPanel, ActivityFeed */}
+            {/* Active session — show ElfTheater, TaskGraph, ThinkingPanel, SessionControlCard */}
             {!isPlanPreview && activeSession ? (
-              <div className="flex flex-1 overflow-hidden">
+              <div className="relative flex flex-1 overflow-hidden">
                 {/* Center — elf workshop + task graph + thinking panel */}
                 <div className="flex flex-1 flex-col overflow-y-auto">
                   {/* Celebration banner on completion */}
@@ -304,6 +254,7 @@ export function Shell(): React.JSX.Element {
                     leadElfId={leadElfId}
                     startedAt={activeSession.startedAt}
                     sessionStatus={activeSession.status}
+                    isHistorical={isHistoricalFloor}
                   />
 
                   {/* Task Graph — shown for team sessions */}
@@ -328,10 +279,10 @@ export function Shell(): React.JSX.Element {
                   )}
                 </div>
 
-                {/* Right panel — activity feed (resizable + collapsible) */}
-                {isActivityFeedVisible ? (
+                {/* Activity feed overlay (Cmd+B) — absolute positioned, does not push layout */}
+                {isActivityFeedVisible && (
                   <div
-                    className="relative shrink-0 border-l-token-normal border-border"
+                    className="absolute right-0 top-0 z-20 h-full border-l-token-normal border-border bg-surface-elevated shadow-brutal-lg"
                     style={{ width: activityFeedWidth }}
                   >
                     <ResizeHandle
@@ -340,29 +291,25 @@ export function Shell(): React.JSX.Element {
                       isDragging={feedResize.isDragging}
                     />
                     <div className="flex h-full flex-col">
-                      <div className="flex items-center justify-end border-b-token-normal border-border px-3 py-1">
+                      <div className="flex items-center justify-between border-b-token-normal border-border px-3 py-2">
+                        <h3 className="font-display text-xs text-label">Activity</h3>
                         <button
                           onClick={toggleActivityFeed}
                           className="cursor-pointer border-none bg-transparent p-1 font-mono text-xs font-bold text-text-light/40 hover:text-text-light"
-                          title="Collapse activity feed (Cmd+B)"
+                          title="Close activity feed (Cmd+B)"
                         >
                           {"\u00BB"}
                         </button>
                       </div>
-                      <ActivityFeed events={events} maxHeight="100%" />
+                      <div className="flex-1 overflow-y-auto">
+                        <ActivityFeed events={events} maxHeight="100%" />
+                      </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="flex w-6 shrink-0 flex-col items-center border-l-token-normal border-border bg-surface-elevated pt-2">
-                    <button
-                      onClick={toggleActivityFeed}
-                      className="cursor-pointer border-none bg-transparent p-1 font-mono text-xs font-bold text-text-light/40 hover:text-text-light"
-                      title="Expand activity feed (Cmd+B)"
-                    >
-                      {"\u00AB"}
-                    </button>
-                  </div>
                 )}
+
+                {/* Floating session control card */}
+                <SessionControlCard />
               </div>
             ) : (
               /* Empty state — no session and not in plan preview */
@@ -431,8 +378,14 @@ export function Shell(): React.JSX.Element {
           </>
         )}
 
+        {/* Bottom terminal panel — slides up when toggled from SessionControlCard */}
+        {isTerminalPanelOpen && <BottomTerminalPanel />}
+
         {/* Shortcut overlay — toggled via Cmd+/ */}
         <ShortcutOverlay isOpen={shortcutOverlayOpen} onClose={toggleOverlay} />
+
+        {/* Floor bar — tab bar at bottom of main content */}
+        <FloorBar />
       </main>
 
       {/* New project creation dialog */}

@@ -1,8 +1,9 @@
-/* Keyboard shortcuts hook — global key bindings for app navigation and actions. */
+/* Keyboard shortcuts hook — global key bindings for app navigation, floor management, and actions. */
 
 import { useEffect, useCallback } from "react";
 import { useUiStore } from "@/stores/ui";
 import { useProjectStore } from "@/stores/project";
+import { useSessionStore } from "@/stores/session";
 
 /** Definition of a keyboard shortcut for display in the help overlay. */
 export interface ShortcutDef {
@@ -14,8 +15,13 @@ export interface ShortcutDef {
 export const SHORTCUT_DEFINITIONS: readonly ShortcutDef[] = [
   { keys: "⌘ K", description: "Focus task bar" },
   { keys: "⌘ N", description: "New project" },
+  { keys: "⌘ T", description: "New floor" },
+  { keys: "⌘ W", description: "Close active floor" },
+  { keys: "⌘ ⇧ ]", description: "Next floor" },
+  { keys: "⌘ ⇧ [", description: "Previous floor" },
   { keys: "⌘ 1-9", description: "Switch project by index" },
   { keys: "⌘ .", description: "Cancel current task" },
+  { keys: "⌘ `", description: "Toggle terminal panel" },
   { keys: "⌘ M", description: "Toggle memory view" },
   { keys: "⌘ ,", description: "Toggle settings view" },
   { keys: "⌘ /", description: "Toggle shortcut help" },
@@ -43,6 +49,7 @@ export function useKeyboardShortcuts(
   const setActiveView = useUiStore((s) => s.setActiveView);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const toggleActivityFeed = useUiStore((s) => s.toggleActivityFeed);
+  const toggleTerminalPanel = useUiStore((s) => s.toggleTerminalPanel);
   const activeView = useUiStore((s) => s.activeView);
   const isTaskBarFocused = useUiStore((s) => s.isTaskBarFocused);
   const projects = useProjectStore((s) => s.projects);
@@ -72,6 +79,36 @@ export function useKeyboardShortcuts(
 
       if (!isMeta) return;
 
+      /* Cmd+Shift shortcuts — floor navigation */
+      if (event.shiftKey) {
+        switch (event.key) {
+          case "]": {
+            event.preventDefault();
+            const store = useSessionStore.getState();
+            const floors = store.getOrderedFloors();
+            const currentIdx = floors.findIndex((f) => f.id === store.activeFloorId);
+            const nextFloor = floors[currentIdx + 1];
+            if (currentIdx < floors.length - 1 && nextFloor) {
+              store.switchFloor(nextFloor.id);
+            }
+            return;
+          }
+          case "[": {
+            event.preventDefault();
+            const store = useSessionStore.getState();
+            const floors = store.getOrderedFloors();
+            const currentIdx = floors.findIndex((f) => f.id === store.activeFloorId);
+            const prevFloor = floors[currentIdx - 1];
+            if (currentIdx > 0 && prevFloor) {
+              store.switchFloor(prevFloor.id);
+            }
+            return;
+          }
+          default:
+            break;
+        }
+      }
+
       switch (event.key.toLowerCase()) {
         case "k":
           event.preventDefault();
@@ -83,9 +120,34 @@ export function useKeyboardShortcuts(
           options.onNewProject?.();
           break;
 
+        case "t":
+          event.preventDefault();
+          useSessionStore.getState().createFloor();
+          break;
+
+        case "w": {
+          event.preventDefault();
+          const store = useSessionStore.getState();
+          const activeFloorId = store.activeFloorId;
+          if (activeFloorId) {
+            const floor = store.floors[activeFloorId];
+            /* If the floor has an active session, do not close — user must stop it first */
+            if (floor?.session?.status === "active") {
+              break;
+            }
+            store.closeFloor(activeFloorId);
+          }
+          break;
+        }
+
         case ".":
           event.preventDefault();
           options.onCancelTask?.();
+          break;
+
+        case "`":
+          event.preventDefault();
+          toggleTerminalPanel();
           break;
 
         case "b":
@@ -144,6 +206,7 @@ export function useKeyboardShortcuts(
     setSettingsOpen,
     toggleOverlay,
     toggleActivityFeed,
+    toggleTerminalPanel,
   ]);
 
   return { shortcutOverlayOpen, toggleOverlay };

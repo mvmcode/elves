@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSessionHistory } from "@/hooks/useSessionHistory";
 import { useUiStore } from "@/stores/ui";
+import { useSessionStore } from "@/stores/session";
+import type { ActiveSession } from "@/stores/session";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ShareButton } from "@/components/project/ShareButton";
 import { getEmptyState } from "@/lib/funny-copy";
 import { listSessionEvents } from "@/lib/tauri";
 import type { SessionEvent } from "@/lib/tauri";
+import type { ElfEvent } from "@/types/elf";
 import type { Session, SessionStatus } from "@/types/session";
 
 /** Status dot color — 8px circle color-coded by session status. */
@@ -164,7 +167,8 @@ export function SessionHistory(): React.JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const highlightedSessionId = useUiStore((state) => state.highlightedSessionId);
   const setHighlightedSessionId = useUiStore((state) => state.setHighlightedSessionId);
-  const setTerminalSessionId = useUiStore((state) => state.setTerminalSessionId);
+  const setActiveView = useUiStore((state) => state.setActiveView);
+  const openHistoricalFloor = useSessionStore((state) => state.openHistoricalFloor);
   const highlightRef = useRef<HTMLDivElement>(null);
 
   /** Auto-expand and scroll to the highlighted session (navigated from completion card). */
@@ -180,12 +184,41 @@ export function SessionHistory(): React.JSX.Element {
     }
   }, [highlightedSessionId, isLoading, sessions, setHighlightedSessionId]);
 
-  /** Open the embedded terminal for a session with a Claude session ID. */
-  const handleResume = useCallback(
-    (sessionId: string): void => {
-      setTerminalSessionId(sessionId);
+  /** Open a historical session as a new floor tab. */
+  const handleOpenAsFloor = useCallback(
+    async (session: Session): Promise<void> => {
+      try {
+        const dbEvents = await listSessionEvents(session.id);
+        /* Convert DB events to ElfEvent format for the floor */
+        const elfEvents: ElfEvent[] = dbEvents.map((event: SessionEvent) => ({
+          id: `hist-event-${event.id}`,
+          timestamp: event.timestamp,
+          elfId: event.elfId ?? "system",
+          elfName: event.elfId ?? "System",
+          runtime: session.runtime,
+          type: event.eventType as ElfEvent["type"],
+          payload: (() => { try { return JSON.parse(event.payload) as Record<string, unknown>; } catch { return {}; } })(),
+          funnyStatus: event.funnyStatus ?? undefined,
+        }));
+
+        const activeSession: ActiveSession = {
+          id: session.id,
+          projectId: session.projectId,
+          task: session.task,
+          runtime: session.runtime,
+          status: session.status,
+          startedAt: session.startedAt,
+          plan: session.plan,
+          claudeSessionId: session.claudeSessionId ?? undefined,
+        };
+
+        openHistoricalFloor(activeSession, elfEvents);
+        setActiveView("session");
+      } catch (error) {
+        console.error("Failed to open session as floor:", error);
+      }
     },
-    [setTerminalSessionId],
+    [openHistoricalFloor, setActiveView],
   );
 
   if (isLoading) {
@@ -216,7 +249,6 @@ export function SessionHistory(): React.JSX.Element {
       <div className="border-token-normal border-border bg-surface-elevated rounded-token-md shadow-brutal-lg">
         {sessions.map((session: Session) => {
           const isExpanded = expandedId === session.id;
-          const hasClaudeSession = session.claudeSessionId != null;
           return (
             <div
               key={session.id}
@@ -307,18 +339,16 @@ export function SessionHistory(): React.JSX.Element {
                   {/* Action buttons row */}
                   <div className="flex items-center gap-2">
                     <ShareButton sessionId={session.id} sessionTask={session.task} />
-                    {hasClaudeSession && (
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleResume(session.id);
-                        }}
-                        className="cursor-pointer border-token-normal border-border bg-info/20 rounded-token-sm px-3 py-1 font-display text-xs text-label shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
-                        data-testid="resume-button"
-                      >
-                        Resume
-                      </button>
-                    )}
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleOpenAsFloor(session);
+                      }}
+                      className="cursor-pointer border-token-normal border-border bg-info/20 rounded-token-sm px-3 py-1 font-display text-xs text-label shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                      data-testid="open-floor-button"
+                    >
+                      Open as Floor
+                    </button>
                   </div>
                 </div>
               )}

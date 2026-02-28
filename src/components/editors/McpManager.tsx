@@ -3,6 +3,8 @@
 import { useState, useCallback } from "react";
 import { useMcpStore } from "@/stores/mcp";
 import { useMcpActions } from "@/hooks/useMcpActions";
+import { useAppStore } from "@/stores/app";
+import { getRuntimeControlConfig } from "@/lib/runtime-controls";
 import { Button } from "@/components/shared/Button";
 import { Badge } from "@/components/shared/Badge";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -14,6 +16,9 @@ import type { McpServer } from "@/types/mcp";
  * Each card shows server name, command, status indicator, toggle switch, and actions.
  */
 export function McpManager(): React.JSX.Element {
+  const defaultRuntime = useAppStore((s) => s.defaultRuntime);
+  const controlConfig = getRuntimeControlConfig(defaultRuntime);
+
   const servers = useMcpStore((s) => s.servers);
   const isLoading = useMcpStore((s) => s.isLoading);
   const {
@@ -60,6 +65,17 @@ export function McpManager(): React.JSX.Element {
   const handleImport = useCallback((): void => {
     void handleImportFromClaude();
   }, [handleImportFromClaude]);
+
+  if (!controlConfig.supportsMcp) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8" data-testid="mcp-manager-unsupported">
+        <EmptyState
+          message="MCP servers are not available for Codex"
+          submessage="MCP is a Claude Code feature. Switch to Claude Code to manage MCP server connections."
+        />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
