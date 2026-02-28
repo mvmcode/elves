@@ -9,7 +9,7 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const variantStyles: Record<BadgeVariant, string> = {
-  default: "bg-elf-gold text-text-light",
+  default: "bg-accent text-accent-contrast",
   success: "bg-success text-white",
   error: "bg-error text-white",
   warning: "bg-warning text-white",
@@ -29,8 +29,8 @@ export function Badge({
   return (
     <span
       className={[
-        "inline-block border-[2px] border-border px-2 py-0.5",
-        "font-body text-xs font-bold uppercase tracking-wider",
+        "inline-block border-token-thin border-border rounded-token-sm px-2 py-0.5",
+        "font-body text-xs text-label",
         variantStyles[variant],
         className,
       ].join(" ")}

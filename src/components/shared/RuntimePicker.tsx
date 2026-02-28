@@ -52,7 +52,7 @@ export function RuntimePicker({
     return (
       <button
         onClick={toggleRuntime}
-        className="flex h-8 w-8 cursor-pointer items-center justify-center border-[2px] border-border font-mono text-xs font-black shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+        className="flex h-8 w-8 cursor-pointer items-center justify-center border-token-thin border-border font-mono text-xs font-black shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
         style={{ backgroundColor: currentMeta.color }}
         title={`Runtime: ${currentMeta.label} (⌘R to switch)`}
         data-testid="runtime-picker-compact"
@@ -66,7 +66,7 @@ export function RuntimePicker({
     <div className="relative" data-testid="runtime-picker">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex cursor-pointer items-center gap-2 border-[3px] border-border px-3 py-2 font-body text-sm font-bold shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+        className="flex cursor-pointer items-center gap-2 border-token-normal border-border px-3 py-2 font-body text-sm font-bold shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
         style={{ backgroundColor: currentMeta.color }}
         data-testid="runtime-picker-button"
       >
@@ -77,7 +77,7 @@ export function RuntimePicker({
 
       {isOpen && (
         <div
-          className="absolute left-0 top-full z-10 mt-1 w-full border-[3px] border-border bg-white shadow-brutal"
+          className="absolute left-0 top-full z-10 mt-1 w-full border-token-normal border-border bg-surface-elevated rounded-token-md shadow-brutal"
           data-testid="runtime-picker-dropdown"
         >
           {(["claude-code", "codex"] as const).map((runtime) => {
@@ -91,13 +91,13 @@ export function RuntimePicker({
                   setIsOpen(false);
                 }}
                 className={[
-                  "flex w-full cursor-pointer items-center gap-2 border-b-[2px] border-border/20 px-3 py-2 text-left font-body text-sm font-bold last:border-b-0",
-                  isSelected ? "bg-elf-gold-light" : "hover:bg-elf-gold-light/50",
+                  "flex w-full cursor-pointer items-center gap-2 border-b-token-thin border-border/20 px-3 py-2 text-left font-body text-sm font-bold last:border-b-0",
+                  isSelected ? "bg-accent-light" : "hover:bg-accent-light/50",
                 ].join(" ")}
                 data-testid={`runtime-option-${runtime}`}
               >
                 <span
-                  className="flex h-6 w-6 items-center justify-center border-[2px] border-border font-mono text-[10px] font-black"
+                  className="flex h-6 w-6 items-center justify-center border-token-thin border-border font-mono text-[10px] font-black"
                   style={{ backgroundColor: meta.color }}
                 >
                   {meta.icon}

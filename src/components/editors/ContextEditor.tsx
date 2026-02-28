@@ -121,7 +121,7 @@ export function ContextEditor(): React.JSX.Element {
     <div className="p-4" data-testid="context-editor">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-display text-2xl font-black uppercase tracking-tight">
+        <h2 className="font-display text-2xl text-heading tracking-tight">
           Context Editor
         </h2>
         <Button
@@ -136,10 +136,10 @@ export function ContextEditor(): React.JSX.Element {
       {/* Full context preview */}
       {showPreview && (
         <div
-          className="mb-4 border-[3px] border-border bg-gray-900 p-4 shadow-brutal"
+          className="mb-4 border-token-normal border-border bg-surface-inset rounded-token-md p-4 shadow-brutal"
           data-testid="context-preview"
         >
-          <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-300">
+          <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-text-inset">
             {buildFullPreview()}
           </pre>
         </div>
@@ -151,19 +151,19 @@ export function ContextEditor(): React.JSX.Element {
           <div
             key={section.id}
             className={[
-              "border-[3px] border-border bg-white p-4 shadow-brutal-lg transition-opacity duration-100",
+              "border-token-normal border-border bg-surface-elevated rounded-token-md p-4 shadow-brutal-lg transition-opacity duration-100",
               section.enabled ? "" : "opacity-50",
             ].join(" ")}
             data-testid="context-section"
           >
             {/* Section header with toggle */}
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-display text-lg font-bold uppercase">{section.title}</h3>
+              <h3 className="font-display text-lg text-heading">{section.title}</h3>
               <button
                 onClick={() => handleToggleSection(section.id)}
                 className={[
-                  "relative h-6 w-11 cursor-pointer border-[2px] border-border transition-colors duration-100",
-                  section.enabled ? "bg-success" : "bg-gray-300",
+                  "relative h-6 w-11 cursor-pointer border-token-thin border-border transition-colors duration-100",
+                  section.enabled ? "bg-success" : "bg-surface-muted",
                 ].join(" ")}
                 data-testid="context-section-toggle"
                 role="switch"
@@ -183,7 +183,7 @@ export function ContextEditor(): React.JSX.Element {
                 onChange={(event) => handleContentChange(section.id, event.target.value)}
                 placeholder={section.placeholder}
                 rows={4}
-                className="w-full resize-y border-[2px] border-border/40 bg-white p-3 font-body text-sm outline-none focus:border-border focus:shadow-[3px_3px_0px_0px_#FFD93D]"
+                className="w-full resize-y border-token-thin border-border/40 bg-surface-elevated rounded-token-md p-3 font-body text-sm outline-none focus:border-border focus:focus-ring"
                 data-testid="context-section-editor"
               />
             )}
@@ -192,11 +192,11 @@ export function ContextEditor(): React.JSX.Element {
 
         {/* Auto-context section (read-only) */}
         <div
-          className="border-[3px] border-border bg-elf-gold-light p-4 shadow-brutal-lg"
+          className="border-token-normal border-border bg-accent-light rounded-token-md p-4 shadow-brutal-lg"
           data-testid="auto-context-section"
         >
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-display text-lg font-bold uppercase">
+            <h3 className="font-display text-lg text-heading">
               Auto-Context (Memory)
             </h3>
             <Button
@@ -210,7 +210,7 @@ export function ContextEditor(): React.JSX.Element {
           </div>
           {autoContext ? (
             <pre
-              className="whitespace-pre-wrap border-[2px] border-border/40 bg-white p-3 font-mono text-xs leading-relaxed text-text-light/70"
+              className="whitespace-pre-wrap border-token-thin border-border/40 bg-surface-elevated rounded-token-sm p-3 font-mono text-xs leading-relaxed text-text-light/70"
               data-testid="auto-context-content"
             >
               {autoContext}

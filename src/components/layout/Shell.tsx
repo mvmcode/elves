@@ -13,6 +13,7 @@ import { TaskGraph } from "@/components/theater/TaskGraph";
 import { ThinkingPanel } from "@/components/theater/ThinkingPanel";
 import { MemoryExplorer } from "@/components/memory/MemoryExplorer";
 import { MemorySettings } from "@/components/settings/MemorySettings";
+import ThemePicker from "@/components/settings/ThemePicker";
 import { SkillEditor } from "@/components/editors/SkillEditor";
 import { McpManager } from "@/components/editors/McpManager";
 import { SessionHistory } from "@/components/project/SessionHistory";
@@ -241,7 +242,7 @@ export function Shell(): React.JSX.Element {
           terminalTarget ? (
             /* Split layout: session list (30%) + terminal (70%) */
             <div className="flex flex-1 overflow-hidden">
-              <div className="flex w-[30%] min-w-[240px] shrink-0 flex-col overflow-y-auto border-r-[3px] border-border">
+              <div className="flex w-[30%] min-w-[240px] shrink-0 flex-col overflow-y-auto border-r-token-normal border-border">
                 <SessionHistory />
               </div>
               <div className="flex flex-1 flex-col overflow-hidden">
@@ -261,6 +262,8 @@ export function Shell(): React.JSX.Element {
           )
         ) : activeView === "settings" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
+            <ThemePicker />
+            <div className="border-t-token-normal border-border" />
             <MemorySettings onClearAll={handleClearAll} />
           </div>
         ) : (
@@ -285,11 +288,11 @@ export function Shell(): React.JSX.Element {
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.2, ease: "easeOut" }}
-                        className="border-b-[3px] border-border bg-success px-6 py-3 text-center"
+                        className="border-b-token-normal border-border bg-success px-6 py-3 text-center"
                         data-testid="celebration-banner"
                       >
-                        <p className="font-display text-xl font-bold uppercase tracking-wide text-white">
-                          ALL DONE!
+                        <p className="font-display text-xl text-heading tracking-wide text-white">
+                          All Done!
                         </p>
                       </motion.div>
                     )}
@@ -305,8 +308,8 @@ export function Shell(): React.JSX.Element {
 
                   {/* Task Graph — shown for team sessions */}
                   {hasTaskGraph && activeSession.plan && (
-                    <div className="border-t-[3px] border-border px-4 py-4">
-                      <h3 className="mb-2 font-display text-sm font-bold uppercase tracking-wider text-gray-500">
+                    <div className="border-t-token-normal border-border px-4 py-4">
+                      <h3 className="mb-2 font-display text-sm text-label text-text-muted-light">
                         Task Graph
                       </h3>
                       <TaskGraph nodes={activeSession.plan.taskGraph} />
@@ -315,7 +318,7 @@ export function Shell(): React.JSX.Element {
 
                   {/* Thinking Panel — shown for team sessions */}
                   {hasTaskGraph && (
-                    <div className="border-t-[3px] border-border px-4 py-3">
+                    <div className="border-t-token-normal border-border px-4 py-3">
                       <ThinkingPanel
                         thoughts={thinkingStream}
                         isVisible={isThinkingVisible}
@@ -328,7 +331,7 @@ export function Shell(): React.JSX.Element {
                 {/* Right panel — activity feed (resizable + collapsible) */}
                 {isActivityFeedVisible ? (
                   <div
-                    className="relative shrink-0 border-l-[3px] border-border"
+                    className="relative shrink-0 border-l-token-normal border-border"
                     style={{ width: activityFeedWidth }}
                   >
                     <ResizeHandle
@@ -337,7 +340,7 @@ export function Shell(): React.JSX.Element {
                       isDragging={feedResize.isDragging}
                     />
                     <div className="flex h-full flex-col">
-                      <div className="flex items-center justify-end border-b-[3px] border-border px-3 py-1">
+                      <div className="flex items-center justify-end border-b-token-normal border-border px-3 py-1">
                         <button
                           onClick={toggleActivityFeed}
                           className="cursor-pointer border-none bg-transparent p-1 font-mono text-xs font-bold text-text-light/40 hover:text-text-light"
@@ -350,7 +353,7 @@ export function Shell(): React.JSX.Element {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex w-6 shrink-0 flex-col items-center border-l-[3px] border-border bg-white pt-2">
+                  <div className="flex w-6 shrink-0 flex-col items-center border-l-token-normal border-border bg-surface-elevated pt-2">
                     <button
                       onClick={toggleActivityFeed}
                       className="cursor-pointer border-none bg-transparent p-1 font-mono text-xs font-bold text-text-light/40 hover:text-text-light"
@@ -373,14 +376,14 @@ export function Shell(): React.JSX.Element {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
                         transition={{ duration: 0.2, ease: "easeOut" }}
-                        className="mx-auto mt-8 w-full max-w-md border-[3px] border-border bg-white p-6 shadow-brutal-lg"
+                        className="mx-auto mt-8 w-full max-w-md border-token-normal border-border bg-surface-elevated p-6 shadow-brutal-lg rounded-token-md"
                         data-testid="completion-summary"
                       >
-                        <div className="mb-4 border-b-[3px] border-border pb-3 text-center">
-                          <p className="font-display text-3xl font-black uppercase tracking-tight text-success">
-                            ALL DONE!
+                        <div className="mb-4 border-b-token-normal border-border pb-3 text-center">
+                          <p className="font-display text-3xl text-heading tracking-tight text-success">
+                            All Done!
                           </p>
-                          <p className="mt-1 font-body text-sm text-gray-600">
+                          <p className="mt-1 font-body text-sm text-text-muted">
                             The elves have spoken. Task completed successfully.
                           </p>
                         </div>
@@ -388,8 +391,8 @@ export function Shell(): React.JSX.Element {
                           {completedSummary.task}
                         </p>
                         <div className="mb-4 flex gap-4">
-                          <div className="border-[2px] border-border/30 px-3 py-1">
-                            <p className="font-mono text-xs text-gray-500">Elapsed</p>
+                          <div className="border-token-thin border-border/30 px-3 py-1">
+                            <p className="font-mono text-xs text-text-muted-light">Elapsed</p>
                             <p className="font-mono text-sm font-bold">
                               {completedSummary.elapsed < 60
                                 ? `${completedSummary.elapsed}s`
@@ -400,14 +403,14 @@ export function Shell(): React.JSX.Element {
                         <div className="flex gap-3">
                           <button
                             onClick={handleViewInHistory}
-                            className="flex-1 cursor-pointer border-[3px] border-border bg-elf-gold px-4 py-2 font-display text-xs font-bold uppercase tracking-wider shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                            className="flex-1 cursor-pointer border-token-normal border-border bg-accent text-accent-contrast px-4 py-2 font-display text-xs text-label shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none rounded-token-md"
                             data-testid="view-in-history-btn"
                           >
                             View in History
                           </button>
                           <button
                             onClick={handleNewTask}
-                            className="flex-1 cursor-pointer border-[3px] border-border bg-white px-4 py-2 font-display text-xs font-bold uppercase tracking-wider shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                            className="flex-1 cursor-pointer border-token-normal border-border bg-surface-elevated px-4 py-2 font-display text-xs text-label shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none rounded-token-md"
                             data-testid="new-task-btn"
                           >
                             New Task

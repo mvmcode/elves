@@ -104,7 +104,7 @@ export function MemoryExplorer({
   return (
     <div className="flex flex-col gap-6 p-6" data-testid="memory-explorer">
       {/* Header */}
-      <h1 className="font-display text-4xl font-bold uppercase tracking-wide">
+      <h1 className="font-display text-4xl text-heading">
         Memory Explorer
       </h1>
 
@@ -114,7 +114,7 @@ export function MemoryExplorer({
         value={searchQuery}
         onChange={(event) => handleSearchChange(event.target.value)}
         placeholder="Search memories..."
-        className="w-full border-[3px] border-border bg-white px-4 py-3 font-body text-base text-text-light outline-none placeholder:text-text-light/40 focus:shadow-[4px_4px_0px_0px_#FFD93D]"
+        className="w-full border-token-normal border-border bg-surface-elevated rounded-token-md px-4 py-3 font-body text-base text-text-light outline-none placeholder:text-text-light/40 focus:focus-ring"
         data-testid="memory-search"
       />
 
@@ -127,10 +127,10 @@ export function MemoryExplorer({
               key={filter.label}
               onClick={() => setActiveCategory(filter.value)}
               className={[
-                "cursor-pointer border-[3px] border-border px-4 py-2 font-body text-sm font-bold uppercase tracking-wider transition-all duration-100",
+                "cursor-pointer border-token-normal border-border px-4 py-2 font-body text-sm text-label transition-all duration-100",
                 isActive
-                  ? "bg-elf-gold text-text-light shadow-brutal-sm"
-                  : "bg-white text-text-light hover:bg-elf-gold-light",
+                  ? "bg-accent text-accent-contrast shadow-brutal-sm rounded-token-md"
+                  : "bg-surface-elevated text-text-light hover:bg-accent-light rounded-token-md",
               ].join(" ")}
               data-testid={`filter-${filter.label.toLowerCase()}`}
             >
@@ -146,7 +146,7 @@ export function MemoryExplorer({
           {Array.from({ length: 3 }, (_, index) => (
             <div
               key={index}
-              className="h-40 animate-pulse border-[3px] border-border bg-gray-100"
+              className="h-40 animate-pulse border-token-normal border-border bg-surface-muted rounded-token-md"
             />
           ))}
         </div>
@@ -156,10 +156,10 @@ export function MemoryExplorer({
           data-testid="memory-empty"
         >
           <span className="text-6xl">🧠</span>
-          <p className="font-display text-xl font-bold uppercase tracking-wide text-gray-400">
+          <p className="font-display text-xl text-heading text-text-muted-light">
             Your elves have amnesia.
           </p>
-          <p className="font-body text-sm text-gray-400">
+          <p className="font-body text-sm text-text-muted-light">
             Start a task to build memories.
           </p>
         </div>
@@ -180,17 +180,17 @@ export function MemoryExplorer({
       {/* Add memory section */}
       {isAddFormOpen ? (
         <div
-          className="border-[3px] border-border bg-surface-light p-5 shadow-brutal"
+          className="border-token-normal border-border bg-surface-light p-5 shadow-brutal"
           data-testid="add-memory-form"
         >
-          <h3 className="mb-3 font-display text-lg font-bold uppercase tracking-wide">
+          <h3 className="mb-3 font-display text-lg text-heading">
             Add Memory
           </h3>
           <div className="flex flex-col gap-3">
             <select
               value={addCategory}
               onChange={(event) => setAddCategory(event.target.value as MemoryCategory)}
-              className="border-[3px] border-border bg-white px-4 py-2 font-body text-sm font-bold uppercase tracking-wider outline-none"
+              className="border-token-normal border-border bg-surface-elevated rounded-token-md px-4 py-2 font-body text-sm text-label outline-none"
               data-testid="add-memory-category"
             >
               {ADD_CATEGORIES.map((cat) => (
@@ -204,7 +204,7 @@ export function MemoryExplorer({
               onChange={(event) => setAddContent(event.target.value)}
               placeholder="Enter memory content..."
               rows={3}
-              className="border-[3px] border-border bg-white px-4 py-3 font-body text-sm text-text-light outline-none placeholder:text-text-light/40 focus:shadow-[4px_4px_0px_0px_#FFD93D]"
+              className="border-token-normal border-border bg-surface-elevated rounded-token-md px-4 py-3 font-body text-sm text-text-light outline-none placeholder:text-text-light/40 focus:focus-ring"
               data-testid="add-memory-content"
             />
             <div className="flex gap-2">

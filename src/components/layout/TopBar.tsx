@@ -38,8 +38,8 @@ export function TopBar(): React.JSX.Element {
   }, [activeProject, claudeSessionId]);
 
   return (
-    <header className="no-select flex h-14 items-center justify-between border-b-[3px] border-border px-6">
-      <span className="font-body text-sm font-bold uppercase tracking-widest text-text-light/60">
+    <header className="no-select flex h-14 items-center justify-between border-b-token-normal border-border px-6">
+      <span className="font-body text-sm text-label text-text-light/60">
         Deploy Your AI Army
       </span>
 

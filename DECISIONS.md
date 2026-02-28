@@ -290,6 +290,22 @@
 **Decision:** Extracted to `useSessionEvents` hook mounted by Shell.tsx
 **Rationale:** useTeamSession was becoming a god-hook handling both deployment logic and event reception. Extracting event handling into its own hook follows the single-responsibility principle. The hook subscribes to four Tauri events (`elf:event`, `session:claude_id`, `session:completed`, `session:cancelled`) and contains the `parseClaudePayload` function that decomposes Claude's `stream-json` format. Shell mounts it unconditionally.
 
+## 2026-02-27 — Multi-Theme Architecture via CSS Custom Properties + Tailwind v4 @theme
+**Context:** ELVES had a single neo-brutalist visual identity. Users and contributors requested an alternative clean/modern theme (Notion/Linear-inspired). Need an extensible architecture that supports multiple themes without duplicating components.
+**Options:** (A) CSS Modules with per-theme stylesheets, (B) Tailwind v4 @theme tokens + [data-theme] CSS variable overrides, (C) Component-level theme props, (D) Separate theme packages
+**Decision:** Tailwind v4 @theme for semantic tokens + @layer base with [data-theme] attribute selectors for per-theme overrides. Neo-brutalist is the default (values in @theme). Modern is opt-in via `data-theme="modern"` on `<html>`.
+**Rationale:** Option B gives zero-JS theme switching (pure CSS variable cascade), instant visual updates without page reload, and full Tailwind utility class generation for all tokens. The @theme block defines semantic names (--color-surface, --shadow-md, --radius-lg) alongside legacy aliases (--color-surface-light, --shadow-brutal-sm) for backward compatibility during migration. New themes only need a single CSS block — no TypeScript changes except registering the theme name. The architecture supports future themes (dark mode, high-contrast) by adding more [data-theme] blocks. Trade-off: token values are duplicated between @theme defaults and @layer base overrides, but this makes each theme's complete token set visible in one place.
+
+**Key design decisions within the theme system:**
+- Semantic + legacy dual naming: New code uses `--color-surface`, old code continues using `--color-surface-light` — both resolve correctly per theme. Legacy aliases will be removed after full migration.
+- `--transition-speed` is set in @layer base (:root), not @theme, because it's not a Tailwind utility — just a CSS variable consumed via `var()`.
+- Modern accent color is muted indigo (#5B5BD6, Linear-inspired) rather than the neo-brutalist elf-gold (#FFD93D). The `--color-elf-gold` alias overrides to the modern accent automatically.
+- Border widths (`--border-brutal: 3px` → `1px` in modern) are CSS custom properties, not Tailwind namespaced tokens, because components use explicit pixel values (`border-[3px]`) rather than utility classes.
+- Border radius uses the `--radius-*` Tailwind namespace, generating `rounded-sm/md/lg/xl` utilities. Neo-brutalist: 0px (sharp corners). Modern: 6/8/12/16px. Only `rounded-full` was used in existing code (unaffected).
+- ThemePicker component lives in settings view with visual preview cards showing each theme's aesthetic before selecting.
+- Theme persists across sessions via Zustand persist middleware in the settings store (localStorage key: `elves-settings`).
+- useInitialize applies the persisted theme to `document.documentElement` on startup, preventing a flash of the wrong theme.
+
 ## 2026-02-27 — stderr Drain Thread to Prevent Pipe Deadlock
 **Context:** Claude CLI writes warnings and logs to stderr; if the pipe buffer fills (~64KB on macOS), the process deadlocks
 **Options:** Redirect stderr to /dev/null, drain in same thread as stdout, drain in separate thread

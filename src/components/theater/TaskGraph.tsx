@@ -164,7 +164,7 @@ export function TaskGraph({
 
   if (nodes.length === 0) {
     return (
-      <div className="py-4 text-center font-body text-sm text-gray-400" data-testid="task-graph-empty">
+      <div className="py-4 text-center font-body text-sm text-text-muted-light" data-testid="task-graph-empty">
         No tasks in graph
       </div>
     );

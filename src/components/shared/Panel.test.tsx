@@ -12,7 +12,7 @@ describe("Panel", () => {
 
   it("has border by default", () => {
     render(<Panel data-testid="panel">Test</Panel>);
-    expect(screen.getByTestId("panel").className).toContain("border-[3px]");
+    expect(screen.getByTestId("panel").className).toContain("border-token-normal");
   });
 
   it("removes border when bordered=false", () => {
@@ -21,7 +21,7 @@ describe("Panel", () => {
         Test
       </Panel>,
     );
-    expect(screen.getByTestId("panel").className).not.toContain("border-[3px]");
+    expect(screen.getByTestId("panel").className).not.toContain("border-token-normal");
   });
 
   it("merges custom className", () => {

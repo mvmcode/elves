@@ -84,8 +84,8 @@ export function TaskBar(): React.JSX.Element {
   return (
     <div
       className={[
-        "border-b-[3px] border-border transition-colors duration-100",
-        isFocused ? "bg-elf-gold-light" : "bg-white",
+        "border-b-token-normal border-border transition-colors duration-100",
+        isFocused ? "bg-accent-light" : "bg-surface-elevated",
       ].join(" ")}
     >
       {/* Main input row */}
@@ -111,9 +111,9 @@ export function TaskBar(): React.JSX.Element {
         {isSessionActive ? (
           <button
             onClick={() => void stopSession()}
-            className="shrink-0 cursor-pointer border-[3px] border-border bg-error px-4 py-2 font-display text-sm font-bold uppercase tracking-wider text-white shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+            className="shrink-0 cursor-pointer border-token-normal border-border bg-error px-4 py-2 font-display text-sm text-label text-white shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none rounded-token-md"
           >
-            STOP
+            Stop
           </button>
         ) : (
           <DeployButton onClick={() => void handleDeploy()} disabled={!canDeploy} />
@@ -131,22 +131,22 @@ export function TaskBar(): React.JSX.Element {
                 {hasActiveSelections && (
                   <>
                     {displayAgent != null && (
-                      <span className="border-[2px] border-border bg-info/20 px-2 py-0.5 font-mono text-xs font-bold">
+                      <span className="border-token-thin border-border bg-info/20 px-2 py-0.5 font-mono text-xs font-bold rounded-token-sm">
                         {displayAgent}
                       </span>
                     )}
                     {displayModel != null && (
-                      <span className="border-[2px] border-border bg-elf-gold/30 px-2 py-0.5 font-mono text-xs font-bold">
+                      <span className="border-token-thin border-border bg-accent/30 px-2 py-0.5 font-mono text-xs font-bold rounded-token-sm">
                         {displayModel}
                       </span>
                     )}
                     {displayPermission != null && (
-                      <span className="border-[2px] border-border bg-success/20 px-2 py-0.5 font-mono text-xs font-bold">
+                      <span className="border-token-thin border-border bg-success/20 px-2 py-0.5 font-mono text-xs font-bold rounded-token-sm">
                         {displayPermission}
                       </span>
                     )}
                     {displayTeamMode && (
-                      <span className="border-[2px] border-border bg-[#E0C3FC]/30 px-2 py-0.5 font-mono text-xs font-bold">
+                      <span className="border-token-thin border-border bg-[#E0C3FC]/30 px-2 py-0.5 font-mono text-xs font-bold rounded-token-sm">
                         Team: ON
                       </span>
                     )}
@@ -163,9 +163,9 @@ export function TaskBar(): React.JSX.Element {
             )}
             <button
               onClick={() => setOptionsExpanded(!isOptionsExpanded)}
-              className="ml-2 shrink-0 cursor-pointer border-[2px] border-border bg-white px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-widest transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:bg-surface-light"
+              className="ml-2 shrink-0 cursor-pointer border-token-thin border-border bg-surface-elevated px-2 py-0.5 font-display text-[10px] text-label transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:bg-surface-light rounded-token-sm"
             >
-              {isOptionsExpanded ? "LESS" : "MORE"}
+              {isOptionsExpanded ? "Less" : "More"}
             </button>
           </div>
         </div>
