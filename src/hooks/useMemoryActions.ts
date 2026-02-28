@@ -1,6 +1,9 @@
-/* Memory actions hook — connects MemoryExplorer and MemorySettings callbacks to Tauri IPC. */
+/* Memory actions hook — connects MemoryExplorer and MemorySettings callbacks to Tauri IPC.
+ * Includes export (save JSON) and import (load JSON) via Tauri dialog plugin. */
 
 import { useCallback, useEffect } from "react";
+import { save, open } from "@tauri-apps/plugin-dialog";
+import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { useProjectStore } from "@/stores/project";
 import { useMemoryStore } from "@/stores/memory";
 import {
@@ -27,6 +30,8 @@ export function useMemoryActions(): {
   handleDeleteMemory: (memory: MemoryEntry) => void;
   handleSearch: (query: string) => void;
   handleClearAll: () => void;
+  handleExportMemories: () => void;
+  handleImportMemories: () => void;
 } {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const setMemories = useMemoryStore((s) => s.setMemories);
@@ -171,6 +176,98 @@ export function useMemoryActions(): {
     })();
   }, [setMemories]);
 
+  /** Export all memories as a JSON file via save dialog. */
+  const handleExportMemories = useCallback((): void => {
+    if (!activeProjectId) return;
+    void (async () => {
+      try {
+        const memories = await listMemories(activeProjectId);
+        if (memories.length === 0) return;
+
+        const exportData = {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          projectId: activeProjectId,
+          memories: memories.map((m) => ({
+            category: m.category,
+            content: m.content,
+            source: m.source,
+            tags: m.tags,
+            relevanceScore: m.relevanceScore,
+          })),
+        };
+
+        const filePath = await save({
+          title: "Export Memories",
+          defaultPath: `elves-memories-${Date.now()}.json`,
+          filters: [{ name: "JSON", extensions: ["json"] }],
+        });
+
+        if (filePath) {
+          await writeTextFile(filePath, JSON.stringify(exportData, null, 2));
+        }
+      } catch (error) {
+        console.error("Failed to export memories:", error);
+      }
+    })();
+  }, [activeProjectId]);
+
+  /** Import memories from a JSON file via open dialog. */
+  const handleImportMemories = useCallback((): void => {
+    if (!activeProjectId) return;
+    void (async () => {
+      try {
+        const filePath = await open({
+          title: "Import Memories",
+          multiple: false,
+          filters: [{ name: "JSON", extensions: ["json"] }],
+        });
+
+        if (!filePath) return;
+
+        const raw = await readTextFile(filePath as string);
+        const data = JSON.parse(raw) as {
+          version?: number;
+          memories?: readonly {
+            category?: string;
+            content?: string;
+            source?: string | null;
+            tags?: string;
+          }[];
+        };
+
+        if (!data.memories || !Array.isArray(data.memories)) {
+          console.error("Invalid memory export file: missing memories array");
+          return;
+        }
+
+        let importedCount = 0;
+        for (const entry of data.memories) {
+          if (!entry.category || !entry.content) continue;
+          try {
+            const memory = await createMemory(
+              activeProjectId,
+              entry.category,
+              entry.content,
+              entry.source ?? "imported",
+              entry.tags,
+            );
+            addMemory(memory);
+            importedCount++;
+          } catch (error) {
+            console.error("Failed to import memory entry:", error);
+          }
+        }
+
+        if (importedCount > 0) {
+          await loadMemories();
+        }
+      } catch (error) {
+        console.error("Failed to import memories:", error);
+      }
+    })();
+  }, [activeProjectId, addMemory, loadMemories]);
+
   return {
     loadMemories,
     handleCreateMemory,
@@ -179,5 +276,7 @@ export function useMemoryActions(): {
     handleDeleteMemory,
     handleSearch,
     handleClearAll,
+    handleExportMemories,
+    handleImportMemories,
   };
 }

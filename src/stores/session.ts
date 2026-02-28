@@ -193,6 +193,60 @@ function createInitialState(): {
   };
 }
 
+/**
+ * Extract elf instances from spawn-type events in a historical event stream.
+ * Each unique elfId with a spawn event becomes a sleeping elf.
+ * If no spawn events exist (older sessions), creates a single placeholder elf.
+ */
+function extractElvesFromEvents(events: readonly ElfEvent[], session: ActiveSession): readonly Elf[] {
+  const spawnEvents = events.filter((event) => event.type === "spawn");
+  const seen = new Set<string>();
+  const elves: Elf[] = [];
+
+  for (const event of spawnEvents) {
+    if (seen.has(event.elfId)) continue;
+    seen.add(event.elfId);
+
+    const payload = event.payload as Record<string, unknown>;
+    elves.push({
+      id: event.elfId,
+      sessionId: session.id,
+      name: event.elfName,
+      role: typeof payload.role === "string" ? payload.role : null,
+      avatar: typeof payload.avatar === "string" ? payload.avatar : "🧝",
+      color: typeof payload.color === "string" ? payload.color : "#FFD93D",
+      quirk: typeof payload.quirk === "string" ? payload.quirk : null,
+      runtime: event.runtime,
+      status: "sleeping",
+      spawnedAt: event.timestamp,
+      finishedAt: Date.now(),
+      parentElfId: typeof payload.parentElfId === "string" ? payload.parentElfId : null,
+      toolsUsed: [],
+    });
+  }
+
+  /* Fallback: create a placeholder elf for sessions without spawn events */
+  if (elves.length === 0) {
+    elves.push({
+      id: `placeholder-${session.id}`,
+      sessionId: session.id,
+      name: "Elf",
+      role: null,
+      avatar: "🧝",
+      color: "#FFD93D",
+      quirk: null,
+      runtime: session.runtime,
+      status: "sleeping",
+      spawnedAt: session.startedAt,
+      finishedAt: Date.now(),
+      parentElfId: null,
+      toolsUsed: [],
+    });
+  }
+
+  return elves;
+}
+
 export const useSessionStore = create<SessionState>((set, get) => ({
   ...createInitialState(),
 
@@ -342,12 +396,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const { nextOrder } = get();
     const label = session.task.slice(0, 20) || "History";
 
+    /* Extract elves from spawn events so historical floors show sleeping elves */
+    const extractedElves = extractElvesFromEvents(events, session);
+
     const floor: FloorSession = {
       id: floorId,
       label,
       session,
       events,
-      elves: [],
+      elves: extractedElves,
       thinkingStream: [],
       isPlanPreview: false,
       pendingPlan: null,

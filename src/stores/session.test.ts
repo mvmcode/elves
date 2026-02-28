@@ -263,6 +263,88 @@ describe("useSessionStore", () => {
       expect(floor.events).toHaveLength(1);
       expect(useSessionStore.getState().activeFloorId).toBe(floorId);
     });
+
+    it("openHistoricalFloor extracts sleeping elves from spawn events", () => {
+      const session: ActiveSession = {
+        id: "hist-2",
+        projectId: "p1",
+        task: "Task with elves",
+        runtime: "claude-code",
+        status: "completed",
+        startedAt: Date.now() - 60000,
+        plan: null,
+      };
+      const events = [
+        createTestEvent({
+          id: "spawn-1",
+          type: "spawn",
+          elfId: "elf-a",
+          elfName: "Spark",
+          payload: { role: "engineer", avatar: "⚡", color: "#FF6B6B", quirk: "Leaves glitter" },
+        }),
+        createTestEvent({
+          id: "spawn-2",
+          type: "spawn",
+          elfId: "elf-b",
+          elfName: "Tinker",
+          payload: { role: "researcher", avatar: "🔧", color: "#4D96FF" },
+        }),
+        createTestEvent({ id: "output-1", type: "output", elfId: "elf-a" }),
+      ];
+      const floorId = useSessionStore.getState().openHistoricalFloor(session, events);
+
+      const floor = useSessionStore.getState().floors[floorId]!;
+      expect(floor.elves).toHaveLength(2);
+      expect(floor.elves[0]!.id).toBe("elf-a");
+      expect(floor.elves[0]!.name).toBe("Spark");
+      expect(floor.elves[0]!.status).toBe("sleeping");
+      expect(floor.elves[0]!.role).toBe("engineer");
+      expect(floor.elves[1]!.id).toBe("elf-b");
+      expect(floor.elves[1]!.name).toBe("Tinker");
+      expect(floor.elves[1]!.status).toBe("sleeping");
+    });
+
+    it("openHistoricalFloor deduplicates elves by elfId", () => {
+      const session: ActiveSession = {
+        id: "hist-3",
+        projectId: "p1",
+        task: "Dedup test",
+        runtime: "claude-code",
+        status: "completed",
+        startedAt: Date.now() - 60000,
+        plan: null,
+      };
+      const events = [
+        createTestEvent({ id: "spawn-1", type: "spawn", elfId: "elf-a", elfName: "Spark", payload: {} }),
+        createTestEvent({ id: "spawn-2", type: "spawn", elfId: "elf-a", elfName: "Spark", payload: {} }),
+      ];
+      const floorId = useSessionStore.getState().openHistoricalFloor(session, events);
+
+      const floor = useSessionStore.getState().floors[floorId]!;
+      expect(floor.elves).toHaveLength(1);
+    });
+
+    it("openHistoricalFloor creates placeholder elf when no spawn events exist", () => {
+      const session: ActiveSession = {
+        id: "hist-4",
+        projectId: "p1",
+        task: "No spawns",
+        runtime: "claude-code",
+        status: "completed",
+        startedAt: Date.now() - 60000,
+        plan: null,
+      };
+      const events = [
+        createTestEvent({ id: "output-1", type: "output" }),
+      ];
+      const floorId = useSessionStore.getState().openHistoricalFloor(session, events);
+
+      const floor = useSessionStore.getState().floors[floorId]!;
+      expect(floor.elves).toHaveLength(1);
+      expect(floor.elves[0]!.id).toContain("placeholder");
+      expect(floor.elves[0]!.status).toBe("sleeping");
+      expect(floor.elves[0]!.name).toBe("Elf");
+    });
   });
 
   /* ── clearFloorSession ────────────────────────────────────── */

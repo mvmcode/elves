@@ -14,6 +14,8 @@ interface ElfTheaterProps {
   readonly startedAt?: number;
   /** Session status — timer freezes when not "active". */
   readonly sessionStatus?: string;
+  /** Whether this is a historical/read-only floor. Shows static resting message. */
+  readonly isHistorical?: boolean;
 }
 
 /** A chat bubble message extracted from chat-type events. */
@@ -73,6 +75,7 @@ export function ElfTheater({
   costEstimate = 0,
   startedAt,
   sessionStatus,
+  isHistorical = false,
 }: ElfTheaterProps): React.JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -105,14 +108,19 @@ export function ElfTheater({
     return () => clearInterval(interval);
   }, [startedAt, sessionStatus]);
 
-  /** Rotate global status message every 8 seconds. */
+  /** Rotate global status message every 8 seconds — skip for historical floors. */
   useEffect(() => {
-    if (elves.length === 0) return;
+    if (elves.length === 0 || isHistorical) return;
     const interval = setInterval(() => {
       setGlobalStatusIndex((prev) => (prev + 1) % GLOBAL_STATUS_MESSAGES.length);
     }, 8000);
     return () => clearInterval(interval);
-  }, [elves.length]);
+  }, [elves.length, isHistorical]);
+
+  /** The status message to display — static for historical, rotating for active. */
+  const globalStatusMessage = isHistorical
+    ? "Session complete — elves are resting"
+    : GLOBAL_STATUS_MESSAGES[globalStatusIndex];
 
   /** Extract chat bubbles from events — filter for chat-type events. */
   useEffect(() => {
@@ -185,7 +193,7 @@ export function ElfTheater({
             className="ml-auto font-body text-xs italic text-text-muted-light"
             data-testid="global-status"
           >
-            {GLOBAL_STATUS_MESSAGES[globalStatusIndex]}
+            {globalStatusMessage}
           </span>
         </div>
 
@@ -230,7 +238,7 @@ export function ElfTheater({
           className="font-body text-xs italic text-text-muted-light"
           data-testid="global-status"
         >
-          {GLOBAL_STATUS_MESSAGES[globalStatusIndex]}
+          {globalStatusMessage}
         </span>
       </div>
 

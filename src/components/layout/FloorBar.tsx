@@ -97,7 +97,7 @@ export function FloorBar(): React.JSX.Element {
             {/* Close button */}
             <span
               onClick={(event) => handleCloseFloor(event, floor.id)}
-              className="ml-0.5 hidden h-4 w-4 items-center justify-center text-[10px] opacity-60 transition-opacity hover:opacity-100 group-hover:flex"
+              className="ml-0.5 flex h-4 w-4 items-center justify-center text-[10px] opacity-40 transition-opacity hover:opacity-100"
               data-testid="floor-close-btn"
             >
               ×

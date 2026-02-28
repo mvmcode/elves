@@ -1,4 +1,5 @@
-/* Task bar — Cmd+K focused input with Claude Code options row for agent, model, and mode selection. */
+/* Task bar — Cmd+K focused input with Claude Code options row for agent, model, and mode selection.
+ * Shows contextual suggestion chips when viewing historical/completed floors. */
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/shared/Input";
@@ -9,6 +10,13 @@ import { useAppStore } from "@/stores/app";
 import { useSessionStore } from "@/stores/session";
 import { useTeamSession } from "@/hooks/useTeamSession";
 import { TaskBarPickers } from "@/components/layout/TaskBarPickers";
+
+/** Suggestion chips shown when viewing a historical floor. */
+const HISTORICAL_SUGGESTIONS: readonly string[] = [
+  "Continue this task",
+  "Explain the approach",
+  "What changed?",
+];
 
 /**
  * Command-K style task input bar with collapsible options row.
@@ -30,6 +38,9 @@ export function TaskBar(): React.JSX.Element {
   const selectedApprovalMode = useAppStore((s) => s.selectedApprovalMode);
   const forceTeamMode = useAppStore((s) => s.forceTeamMode);
   const appliedOptions = useSessionStore((s) => s.activeSession?.appliedOptions);
+  const isHistoricalFloor = useSessionStore(
+    (s) => (s.activeFloorId ? s.floors[s.activeFloorId]?.isHistorical : false) ?? false,
+  );
 
   const canDeploy = taskText.trim().length > 0 && activeProjectId !== null && !isSessionActive && !isPlanPreview;
   const canFollowUp = taskText.trim().length > 0 && isSessionCompleted;
@@ -113,11 +124,13 @@ export function TaskBar(): React.JSX.Element {
               ? "Select a project first..."
               : isPlanPreview
                 ? "Review the plan below... (Cmd+K)"
-                : isSessionActive
-                  ? "Elves are working... (Cmd+K)"
-                  : isSessionCompleted
-                    ? "Reply to continue the conversation... (Cmd+K)"
-                    : "What do you want the elves to do? (Cmd+K)"
+                : isHistoricalFloor
+                  ? "Ask a follow-up or continue this session... (Cmd+K)"
+                  : isSessionActive
+                    ? "Elves are working... (Cmd+K)"
+                    : isSessionCompleted
+                      ? "Reply to continue the conversation... (Cmd+K)"
+                      : "What do you want the elves to do? (Cmd+K)"
           }
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
@@ -156,6 +169,22 @@ export function TaskBar(): React.JSX.Element {
           <DeployButton onClick={() => void handleDeploy()} disabled={!canDeploy} />
         )}
       </div>
+
+      {/* Suggestion chips — shown for historical floors */}
+      {isHistoricalFloor && (
+        <div className="flex gap-2 px-3 pb-2" data-testid="historical-suggestions">
+          {HISTORICAL_SUGGESTIONS.map((suggestion) => (
+            <button
+              key={suggestion}
+              onClick={() => setTaskText(suggestion)}
+              className="cursor-pointer border-[2px] border-border bg-surface-elevated px-3 py-1 font-display text-[11px] font-bold uppercase tracking-wider shadow-brutal-xs transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none rounded-token-sm"
+              data-testid="suggestion-chip"
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Options row — agent, model, mode pickers */}
       {hasOptions && (

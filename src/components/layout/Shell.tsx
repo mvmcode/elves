@@ -55,6 +55,9 @@ export function Shell(): React.JSX.Element {
   const thinkingStream = useSessionStore((state) => state.thinkingStream);
   const isPlanPreview = useSessionStore((state) => state.isPlanPreview);
   const pendingPlan = useSessionStore((state) => state.pendingPlan);
+  const isHistoricalFloor = useSessionStore(
+    (state) => (state.activeFloorId ? state.floors[state.activeFloorId]?.isHistorical : false) ?? false,
+  );
   const isTerminalPanelOpen = useUiStore((state) => state.isTerminalPanelOpen);
   const { deployWithPlan, stopSession } = useTeamSession();
   const {
@@ -64,6 +67,8 @@ export function Shell(): React.JSX.Element {
     handleDeleteMemory,
     handleSearch,
     handleClearAll,
+    handleExportMemories,
+    handleImportMemories,
   } = useMemoryActions();
   const { play } = useSounds();
   const { shortcutOverlayOpen, toggleOverlay } = useKeyboardShortcuts({
@@ -205,7 +210,11 @@ export function Shell(): React.JSX.Element {
           <div className="flex flex-1 flex-col overflow-y-auto">
             <ThemePicker />
             <div className="border-t-token-normal border-border" />
-            <MemorySettings onClearAll={handleClearAll} />
+            <MemorySettings
+              onClearAll={handleClearAll}
+              onExport={handleExportMemories}
+              onImport={handleImportMemories}
+            />
           </div>
         ) : (
           <>
@@ -245,6 +254,7 @@ export function Shell(): React.JSX.Element {
                     leadElfId={leadElfId}
                     startedAt={activeSession.startedAt}
                     sessionStatus={activeSession.status}
+                    isHistorical={isHistoricalFloor}
                   />
 
                   {/* Task Graph — shown for team sessions */}

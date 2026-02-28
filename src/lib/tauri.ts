@@ -197,7 +197,7 @@ export async function listSkills(projectId?: string): Promise<Skill[]> {
   return invoke<Skill[]>("list_skills", { projectId });
 }
 
-/** Create a new skill. */
+/** Create a new skill. Generates a UUID for the skill ID. */
 export async function createSkill(
   name: string,
   content: string,
@@ -205,7 +205,8 @@ export async function createSkill(
   description?: string,
   triggerPattern?: string,
 ): Promise<Skill> {
-  return invoke<Skill>("create_skill", { name, content, projectId, description, triggerPattern });
+  const id = `skill-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return invoke<Skill>("create_skill", { id, name, content, projectId, description, triggerPattern });
 }
 
 /** Update an existing skill. */
