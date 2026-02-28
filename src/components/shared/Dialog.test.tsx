@@ -64,7 +64,7 @@ describe("Dialog", () => {
       </Dialog>,
     );
     const content = screen.getByTestId("dialog-content");
-    expect(content.className).toContain("border-[3px]");
+    expect(content.className).toContain("border-token-normal");
     expect(content.className).toContain("shadow-brutal-lg");
   });
 });

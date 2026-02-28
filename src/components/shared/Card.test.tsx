@@ -13,23 +13,23 @@ describe("Card", () => {
   it("has neo-brutalist border and shadow", () => {
     render(<Card data-testid="card">Test</Card>);
     const card = screen.getByTestId("card");
-    expect(card.className).toContain("border-[3px]");
+    expect(card.className).toContain("border-token-normal");
     expect(card.className).toContain("shadow-brutal-lg");
   });
 
-  it("applies white background by default", () => {
+  it("applies elevated surface background by default", () => {
     render(<Card data-testid="card">Test</Card>);
-    expect(screen.getByTestId("card").className).toContain("bg-white");
+    expect(screen.getByTestId("card").className).toContain("bg-surface-elevated");
   });
 
-  it("applies yellow highlight background when highlighted", () => {
+  it("applies accent-light highlight background when highlighted", () => {
     render(
       <Card highlight data-testid="card">
         Highlighted
       </Card>,
     );
     expect(screen.getByTestId("card").className).toContain(
-      "bg-elf-gold-light",
+      "bg-accent-light",
     );
   });
 

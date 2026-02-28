@@ -7,7 +7,7 @@ import { DeployButton } from "./DeployButton";
 describe("DeployButton", () => {
   it("renders the summon text", () => {
     render(<DeployButton />);
-    expect(screen.getByRole("button")).toHaveTextContent("SUMMON THE ELVES");
+    expect(screen.getByRole("button")).toHaveTextContent("Summon the Elves");
   });
 
   it("calls onClick when clicked", () => {
@@ -20,7 +20,7 @@ describe("DeployButton", () => {
   it("has neo-brutalist styling", () => {
     render(<DeployButton />);
     const button = screen.getByRole("button");
-    expect(button.className).toContain("border-[3px]");
+    expect(button.className).toContain("border-token-normal");
     expect(button.className).toContain("shadow-brutal");
   });
 });

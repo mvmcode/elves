@@ -12,7 +12,7 @@ describe("Input", () => {
 
   it("has neo-brutalist 3px border", () => {
     render(<Input data-testid="input" />);
-    expect(screen.getByTestId("input").className).toContain("border-[3px]");
+    expect(screen.getByTestId("input").className).toContain("border-token-normal");
   });
 
   it("calls onChange handler", () => {

@@ -30,7 +30,7 @@ export function ResizeHandle({
         "flex items-center justify-center",
         "transition-colors duration-100",
         positionClass,
-        isDragging ? "bg-elf-gold" : "hover:bg-elf-gold/40",
+        isDragging ? "bg-accent" : "hover:bg-accent/40",
       ].join(" ")}
       data-testid="resize-handle"
     >

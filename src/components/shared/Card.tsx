@@ -19,8 +19,8 @@ export function Card({
   return (
     <div
       className={[
-        "border-[3px] border-border p-5 shadow-brutal-lg",
-        highlight ? "bg-elf-gold-light" : "bg-white",
+        "border-token-normal border-border p-5 shadow-brutal-lg rounded-token-md",
+        highlight ? "bg-accent-light" : "bg-surface-elevated",
         className,
       ].join(" ")}
       {...props}

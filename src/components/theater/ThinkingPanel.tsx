@@ -75,12 +75,12 @@ export function ThinkingPanel({
       {/* Toggle button */}
       <button
         onClick={onToggle}
-        className="flex cursor-pointer items-center gap-2 border-[2px] border-border bg-surface-dark px-4 py-2 font-body text-sm font-bold text-text-dark shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+        className="flex cursor-pointer items-center gap-2 border-token-thin border-border bg-surface-dark px-4 py-2 font-body text-sm font-bold text-text-dark shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none rounded-token-sm"
         data-testid="thinking-toggle"
       >
         <span>{isVisible ? "Hide Thinking" : "Show Thinking"}</span>
         {isStreaming && (
-          <span className="inline-block h-2 w-2 animate-pulse bg-elf-gold" data-testid="streaming-indicator" />
+          <span className="inline-block h-2 w-2 animate-pulse bg-accent" data-testid="streaming-indicator" />
         )}
       </button>
 
@@ -96,12 +96,12 @@ export function ThinkingPanel({
           >
             <div
               ref={scrollRef}
-              className="mt-2 max-h-64 overflow-y-auto border-[2px] border-dashed border-border bg-surface-dark p-4"
+              className="mt-2 max-h-64 overflow-y-auto border-token-thin border-dashed border-border bg-surface-dark p-4"
               style={{ boxShadow: "-4px -4px 0px 0px rgba(0,0,0,0.15)" }}
               data-testid="thinking-content"
             >
               {displayedText.length === 0 ? (
-                <p className="font-mono text-sm text-gray-500" data-testid="thinking-empty">
+                <p className="font-mono text-sm text-text-muted-light" data-testid="thinking-empty">
                   Waiting for thinking events...
                 </p>
               ) : (
@@ -111,7 +111,7 @@ export function ThinkingPanel({
                 >
                   {displayedText}
                   {isStreaming && (
-                    <span className="inline-block animate-pulse text-elf-gold" data-testid="cursor">
+                    <span className="inline-block animate-pulse text-accent" data-testid="cursor">
                       |
                     </span>
                   )}

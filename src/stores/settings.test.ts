@@ -10,9 +10,11 @@ function resetStore(): void {
     decayRate: "normal",
     maxMemoriesPerProject: 500,
     maxContextInjection: 20,
+    theme: "neo-brutalist",
     soundEnabled: true,
     soundVolume: 0.5,
   });
+  document.documentElement.removeAttribute("data-theme");
 }
 
 describe("useSettingsStore", () => {
@@ -90,6 +92,31 @@ describe("useSettingsStore", () => {
     it("accepts small values", () => {
       useSettingsStore.getState().setMaxContextInjection(1);
       expect(useSettingsStore.getState().maxContextInjection).toBe(1);
+    });
+  });
+
+  describe("theme settings", () => {
+    it("has neo-brutalist as the default theme", () => {
+      expect(useSettingsStore.getState().theme).toBe("neo-brutalist");
+    });
+
+    it("sets theme to modern", () => {
+      useSettingsStore.getState().setTheme("modern");
+      expect(useSettingsStore.getState().theme).toBe("modern");
+    });
+
+    it("sets theme back to neo-brutalist", () => {
+      useSettingsStore.getState().setTheme("modern");
+      useSettingsStore.getState().setTheme("neo-brutalist");
+      expect(useSettingsStore.getState().theme).toBe("neo-brutalist");
+    });
+
+    it("sets data-theme attribute on document.documentElement", () => {
+      useSettingsStore.getState().setTheme("modern");
+      expect(document.documentElement.getAttribute("data-theme")).toBe("modern");
+
+      useSettingsStore.getState().setTheme("neo-brutalist");
+      expect(document.documentElement.getAttribute("data-theme")).toBe("neo-brutalist");
     });
   });
 

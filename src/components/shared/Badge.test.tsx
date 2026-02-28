@@ -10,9 +10,9 @@ describe("Badge", () => {
     expect(screen.getByText("Active")).toBeInTheDocument();
   });
 
-  it("applies default variant (yellow) styles", () => {
+  it("applies default variant (accent) styles", () => {
     render(<Badge data-testid="badge">Status</Badge>);
-    expect(screen.getByTestId("badge").className).toContain("bg-elf-gold");
+    expect(screen.getByTestId("badge").className).toContain("bg-accent");
   });
 
   it("applies success variant styles", () => {
@@ -35,7 +35,7 @@ describe("Badge", () => {
 
   it("has neo-brutalist 2px border", () => {
     render(<Badge data-testid="badge">Test</Badge>);
-    expect(screen.getByTestId("badge").className).toContain("border-[2px]");
+    expect(screen.getByTestId("badge").className).toContain("border-token-thin");
   });
 
   it("merges custom className", () => {

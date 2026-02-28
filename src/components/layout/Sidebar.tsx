@@ -30,10 +30,10 @@ export function Sidebar(): React.JSX.Element {
   const setNewProjectDialogOpen = useUiStore((s) => s.setNewProjectDialogOpen);
 
   return (
-    <aside className="no-select flex h-full shrink-0 flex-col border-r-[3px] border-border bg-white">
+    <aside className="no-select flex h-full shrink-0 flex-col border-r-token-normal border-border bg-surface-elevated">
       {/* Logo / Branding */}
-      <div className="flex items-center gap-2 border-b-[3px] border-border p-4">
-        <span className="font-display text-2xl font-black uppercase tracking-tight">
+      <div className="flex items-center gap-2 border-b-token-normal border-border p-4">
+        <span className="font-display text-2xl text-heading tracking-tight">
           ELVES
         </span>
         <Badge variant="info">v0.1</Badge>
@@ -60,11 +60,11 @@ export function Sidebar(): React.JSX.Element {
                 <button
                   onClick={() => setActiveProject(project.id)}
                   className={[
-                    "w-full border-[2px] p-3 text-left transition-all duration-100",
+                    "w-full border-token-thin p-3 text-left transition-all duration-100",
                     "font-body text-sm font-bold",
                     activeProjectId === project.id
-                      ? "border-border bg-elf-gold shadow-brutal-sm"
-                      : "border-transparent hover:border-border hover:bg-elf-gold-light",
+                      ? "border-border bg-accent text-accent-contrast shadow-brutal-sm rounded-token-sm"
+                      : "border-transparent hover:border-border hover:bg-accent-light rounded-token-sm",
                   ].join(" ")}
                 >
                   {project.name}
@@ -76,17 +76,17 @@ export function Sidebar(): React.JSX.Element {
       </div>
 
       {/* Navigation */}
-      <div className="border-t-[3px] border-border p-2">
+      <div className="border-t-token-normal border-border p-2">
         {NAV_ITEMS.map((item, index) => (
           <button
             key={item.view}
             onClick={() => setActiveView(item.view)}
             className={[
-              "w-full border-[2px] p-2 text-left font-body text-sm font-bold transition-all duration-100",
+              "w-full border-token-thin p-2 text-left font-body text-sm font-bold transition-all duration-100",
               index < NAV_ITEMS.length - 1 ? "mb-1" : "",
               activeView === item.view
-                ? "border-border bg-elf-gold shadow-brutal-sm"
-                : "border-transparent hover:border-border hover:bg-elf-gold-light",
+                ? "border-border bg-accent text-accent-contrast shadow-brutal-sm rounded-token-sm"
+                : "border-transparent hover:border-border hover:bg-accent-light rounded-token-sm",
             ].join(" ")}
           >
             {item.label}
@@ -95,7 +95,7 @@ export function Sidebar(): React.JSX.Element {
       </div>
 
       {/* Bottom section */}
-      <div className="border-t-[3px] border-border p-3">
+      <div className="border-t-token-normal border-border p-3">
         <p className="font-mono text-xs text-text-light/40">
           Built with cookies
         </p>

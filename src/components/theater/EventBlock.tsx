@@ -74,8 +74,8 @@ export function EventBlock({
   if (isMinorType(event.type)) {
     const description = describeMinorEvent(event);
     return (
-      <div className={`flex items-center gap-2 ${paddingClass} font-mono text-xs text-gray-300`} data-testid="event-block">
-        <span className="shrink-0 text-gray-500">[{formatTime(event.timestamp)}]</span>
+      <div className={`flex items-center gap-2 ${paddingClass} font-mono text-xs text-text-inset`} data-testid="event-block">
+        <span className="shrink-0 text-text-muted-light">[{formatTime(event.timestamp)}]</span>
         <span className="shrink-0">{eventEmoji(event.type)}</span>
         <span className="truncate">{description}</span>
       </div>
@@ -90,7 +90,7 @@ export function EventBlock({
 
     return (
       <div
-        className={`border-l-[3px] border-dashed ${borderColor("thinking")} ${paddingClass}`}
+        className={`border-l-token-normal border-dashed ${borderColor("thinking")} ${paddingClass}`}
         data-testid="event-block"
         data-event-type="thinking"
       >
@@ -120,20 +120,20 @@ export function EventBlock({
 
     return (
       <div
-        className={`border-l-[3px] ${borderColor("tool_call")} ${paddingClass}`}
+        className={`border-l-token-normal ${borderColor("tool_call")} ${paddingClass}`}
         data-testid="event-block"
         data-event-type="tool_call"
       >
         <div className="flex items-center gap-2">
-          <span className="shrink-0 text-gray-500 font-mono text-xs">[{formatTime(event.timestamp)}]</span>
+          <span className="shrink-0 text-text-muted-light font-mono text-xs">[{formatTime(event.timestamp)}]</span>
           <span
-            className="inline-block border-[2px] border-blue-500/50 bg-blue-500/20 px-2 py-0.5 font-mono text-xs font-bold text-blue-300"
+            className="inline-block border-token-thin border-blue-500/50 bg-blue-500/20 px-2 py-0.5 font-mono text-xs font-bold text-blue-300"
             data-testid="tool-pill"
           >
             {toolName}
           </span>
           {detail && (
-            <span className="truncate font-mono text-xs text-gray-400">{detail}</span>
+            <span className="truncate font-mono text-xs text-text-muted-light">{detail}</span>
           )}
         </div>
       </div>
@@ -150,7 +150,7 @@ export function EventBlock({
 
     return (
       <div
-        className={`border-l-[3px] ${borderColor("tool_result")} ${paddingClass}`}
+        className={`border-l-token-normal ${borderColor("tool_result")} ${paddingClass}`}
         data-testid="event-block"
         data-event-type="tool_result"
       >
@@ -186,7 +186,7 @@ export function EventBlock({
 
     return (
       <div
-        className={`border-l-[3px] ${borderColor("output")} ${paddingClass}`}
+        className={`border-l-token-normal ${borderColor("output")} ${paddingClass}`}
         data-testid="event-block"
         data-event-type="output"
       >
@@ -207,7 +207,7 @@ export function EventBlock({
     const message = String(payload.message ?? "error occurred");
     return (
       <div
-        className={`border-l-[3px] ${borderColor("error")} ${paddingClass}`}
+        className={`border-l-token-normal ${borderColor("error")} ${paddingClass}`}
         data-testid="event-block"
         data-event-type="error"
       >
@@ -219,7 +219,7 @@ export function EventBlock({
   /* Fallback: generic event display */
   return (
     <div className={`${paddingClass} font-mono text-xs`} data-testid="event-block" data-event-type={event.type}>
-      <span className="text-gray-500">[{formatTime(event.timestamp)}]</span>{" "}
+      <span className="text-text-muted-light">[{formatTime(event.timestamp)}]</span>{" "}
       <span style={{ color: elfColor ?? "#FFD93D" }}>
         {event.type}: {JSON.stringify(payload).slice(0, textLimit)}
       </span>
