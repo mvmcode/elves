@@ -311,3 +311,27 @@
 **Options:** Redirect stderr to /dev/null, drain in same thread as stdout, drain in separate thread
 **Decision:** Spawn a dedicated `drain_stderr` background thread that reads stderr line-by-line and logs at warn level
 **Rationale:** Discarding stderr loses valuable diagnostic info. Draining in the same thread as stdout introduces ordering complexity. A separate thread is the simplest correct solution — it reads independently, never blocks stdout processing, and logs everything for debugging. The thread exits naturally when the process terminates and the pipe EOF is reached.
+
+## 2026-02-28 — Workshop Scene: Canvas 2D Architecture with Subsystem Decomposition
+**Context:** The workshop visualization needed camera controls, pathfinding integration, inter-elf delivery walks, ambient lighting effects, and additional scene elements (delivery chute, clock, cookie jar fill, door animation). The existing codebase had 10 files with a solid foundation but was missing ~30% of the design spec.
+**Options:** (1) Monolithic approach — add everything to WorkshopScene.ts and ElfSprite.ts. (2) Subsystem decomposition — create focused modules for camera, navigation, behaviors, ambient effects, and scene extras. (3) ECS (Entity Component System) — full architectural rewrite.
+**Decision:** Subsystem decomposition into 6 new files (Camera.ts, NavigationBridge.ts, TilemapExtras.ts, AmbientEffects.ts, BehaviorSequencer.ts, ElfDrawing.ts) with WorkshopScene.ts as the integration hub.
+**Rationale:** Monolithic would push WorkshopScene past 1000 lines and make parallel development impossible. ECS is overkill for a fixed-layout scene with <20 entities. The subsystem approach keeps each file focused (most under 300 lines), enables parallel agent development with zero file conflicts via an ownership matrix, and lets WorkshopScene remain the single orchestration point without becoming a god module. Camera, pathfinding, and behavior sequencing are naturally independent concerns that compose cleanly through the scene's update/render pipeline.
+
+## 2026-02-28 — Camera: Lerp-Based Smooth Tracking with Zoom-Toward-Cursor
+**Context:** The workshop canvas needed zoom and pan controls for users to inspect elf activity at different scales.
+**Options:** (1) CSS transform on the canvas element. (2) Canvas 2D transform with immediate snap. (3) Canvas 2D transform with lerp interpolation.
+**Decision:** Canvas 2D `ctx.translate/scale` with lerp interpolation toward target values each frame, plus zoom-toward-cursor that adjusts camera position so the world point under the cursor stays fixed.
+**Rationale:** CSS transforms break Canvas 2D hit detection (mouse coordinates no longer map to canvas pixels). Immediate snap feels jarring — lerp at 0.1 per frame gives a smooth, responsive feel. Zoom-toward-cursor is the standard map/editor UX and only requires adjusting camera offset proportionally to the zoom delta. The Camera class exposes `screenToWorld`/`worldToScreen` so InteractionHandler can do correct hit detection at any zoom level.
+
+## 2026-02-28 — Behavior Sequencer: Phase-Based State Machine for Multi-Step Choreography
+**Context:** Several elf behaviors require multi-step sequences: delivery walks (5 phases), session-complete ceremonies (4 phases), idle-to-sleep timers, and permission-granted celebrations.
+**Options:** (1) Inline state in ElfSprite. (2) Coroutine/generator-based sequences. (3) Phase-based state machine in a dedicated BehaviorSequencer.
+**Decision:** Dedicated BehaviorSequencer class with typed phase enums (DeliveryWalkPhase, CeremonyPhase) and per-sequence timer tracking.
+**Rationale:** Inlining in ElfSprite would balloon it further past 600 lines and mix movement concerns with choreography logic. Generators are elegant but harder to serialize/debug and don't compose well with the requestAnimationFrame loop. Phase-based state machines are explicit, debuggable (log current phase + timer), and map directly to the typed DeliveryWalkState/CeremonyState interfaces. Each phase transition is a simple switch case with clear timer thresholds.
+
+## 2026-02-28 — Elf Drawing: Extracted Pure Render Functions from ElfSprite
+**Context:** ElfSprite.ts was 618 lines — well above the 300-line guideline — with ~280 lines of pure stateless drawing code mixed into the state machine.
+**Options:** (1) Leave as-is. (2) Extract drawing into ElfDrawing.ts as pure functions. (3) Create an ElfRenderer class.
+**Decision:** Extract 12 pure functions into ElfDrawing.ts, each receiving position, colors, and state as parameters.
+**Rationale:** Pure functions are the simplest extraction — no class instantiation, no shared state, trivially testable. The ElfVisuals interface provides a clean contract between the state machine (ElfSprite) and the renderer (ElfDrawing). ElfSprite still handles state transitions and animation timing; ElfDrawing only knows how to draw pixels. This brought ElfSprite to 628 lines (still over 300 but the remaining code is the irreducible state machine complexity) and ElfDrawing to 297 lines.

@@ -7,6 +7,8 @@ import { TopBar } from "./TopBar";
 import { TaskBar } from "./TaskBar";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ElfTheater } from "@/components/theater/ElfTheater";
+import { WorkshopCanvas } from "@/components/workshop/WorkshopCanvas";
+import { WorkshopOverlay } from "@/components/workshop/WorkshopOverlay";
 import { SessionControlCard } from "@/components/session/SessionControlCard";
 import { ActivityFeed } from "@/components/feed/ActivityFeed";
 import { PlanPreview } from "@/components/theater/PlanPreview";
@@ -59,6 +61,7 @@ export function Shell(): React.JSX.Element {
     (state) => (state.activeFloorId ? state.floors[state.activeFloorId]?.isHistorical : false) ?? false,
   );
   const isTerminalPanelOpen = useUiStore((state) => state.isTerminalPanelOpen);
+  const workshopViewMode = useUiStore((state) => state.workshopViewMode);
   const { deployWithPlan, stopSession } = useTeamSession();
   const {
     handleCreateMemory,
@@ -248,14 +251,28 @@ export function Shell(): React.JSX.Element {
                     )}
                   </AnimatePresence>
 
-                  <ElfTheater
-                    elves={elves}
-                    events={events}
-                    leadElfId={leadElfId}
-                    startedAt={activeSession.startedAt}
-                    sessionStatus={activeSession.status}
-                    isHistorical={isHistoricalFloor}
-                  />
+                  {/* Workshop view (pixel art) or Card view — toggled via Space */}
+                  {workshopViewMode === "workshop" && !isHistoricalFloor ? (
+                    <div className="relative flex flex-1 overflow-hidden">
+                      <WorkshopCanvas elves={elves} events={events} />
+                      <WorkshopOverlay
+                        elves={elves}
+                        events={events}
+                        startedAt={activeSession.startedAt}
+                        tasksDone={0}
+                        tasksTotal={0}
+                      />
+                    </div>
+                  ) : (
+                    <ElfTheater
+                      elves={elves}
+                      events={events}
+                      leadElfId={leadElfId}
+                      startedAt={activeSession.startedAt}
+                      sessionStatus={activeSession.status}
+                      isHistorical={isHistoricalFloor}
+                    />
+                  )}
 
                   {/* Task Graph — shown for team sessions */}
                   {hasTaskGraph && activeSession.plan && (

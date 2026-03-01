@@ -1,6 +1,7 @@
 /* UI state — tracks panel visibility, modals, and transient UI concerns. */
 
 import { create } from "zustand";
+import type { WorkshopViewMode } from "@/types/workshop";
 
 /** Top-level views the shell can render in the main content area. */
 export type AppView = "session" | "memory" | "skills" | "mcp" | "history" | "settings";
@@ -37,6 +38,10 @@ interface UiState {
   readonly isTerminalPanelOpen: boolean;
   /** Height of the bottom terminal panel in pixels. */
   readonly terminalPanelHeight: number;
+  /** Workshop view mode — toggle between pixel art workshop and card grid. */
+  readonly workshopViewMode: WorkshopViewMode;
+  /** ID of the elf currently selected in the workshop scene. */
+  readonly selectedWorkshopElfId: string | null;
 
   setTaskBarFocused: (focused: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
@@ -48,6 +53,9 @@ interface UiState {
   setHighlightedSessionId: (id: string | null) => void;
   toggleTerminalPanel: () => void;
   setTerminalPanelHeight: (height: number) => void;
+  setWorkshopViewMode: (mode: WorkshopViewMode) => void;
+  toggleWorkshopViewMode: () => void;
+  setSelectedWorkshopElfId: (id: string | null) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -61,6 +69,8 @@ export const useUiStore = create<UiState>((set) => ({
   highlightedSessionId: null,
   isTerminalPanelOpen: false,
   terminalPanelHeight: 300,
+  workshopViewMode: "workshop" as WorkshopViewMode,
+  selectedWorkshopElfId: null,
 
   setTaskBarFocused: (focused: boolean) => set({ isTaskBarFocused: focused }),
   setSettingsOpen: (open: boolean) => set({ isSettingsOpen: open }),
@@ -72,4 +82,9 @@ export const useUiStore = create<UiState>((set) => ({
   setHighlightedSessionId: (id: string | null) => set({ highlightedSessionId: id }),
   toggleTerminalPanel: () => set((state) => ({ isTerminalPanelOpen: !state.isTerminalPanelOpen })),
   setTerminalPanelHeight: (height: number) => set({ terminalPanelHeight: clamp(height, 150, 800) }),
+  setWorkshopViewMode: (mode: WorkshopViewMode) => set({ workshopViewMode: mode }),
+  toggleWorkshopViewMode: () => set((state) => ({
+    workshopViewMode: state.workshopViewMode === "workshop" ? "cards" : "workshop",
+  })),
+  setSelectedWorkshopElfId: (id: string | null) => set({ selectedWorkshopElfId: id }),
 }));
