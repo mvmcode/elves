@@ -77,19 +77,23 @@ export function SessionControlCard(): React.JSX.Element | null {
     }
   }, [activeFloorId, clearFloorSession]);
 
-  /* Only show when there's a session (active or completed) */
-  if (!activeSession || (activeSession.status !== "active" && activeSession.status !== "completed")) {
+  const isCancelled = activeSession?.status === "cancelled";
+
+  /* Only show when there's a session (active, completed, or cancelled) */
+  if (!activeSession || (activeSession.status !== "active" && activeSession.status !== "completed" && activeSession.status !== "cancelled")) {
     return null;
   }
 
   const leadElf = elves[0];
   const statusText = isCompleted
     ? "Done!"
-    : isInteractiveMode
-      ? "Interactive mode"
-      : leadElf?.status === "thinking"
-        ? "Thinking..."
-        : "Working...";
+    : isCancelled
+      ? "Cancelled"
+      : isInteractiveMode
+        ? "Interactive mode"
+        : leadElf?.status === "thinking"
+          ? "Thinking..."
+          : "Working...";
 
   return (
     <div
@@ -102,7 +106,7 @@ export function SessionControlCard(): React.JSX.Element | null {
         <span
           className={[
             "h-2.5 w-2.5 shrink-0 rounded-full",
-            isActive ? "animate-pulse bg-info" : "bg-success",
+            isActive ? "animate-pulse bg-info" : isCancelled ? "bg-warning" : "bg-success",
           ].join(" ")}
           data-testid="control-status-dot"
         />

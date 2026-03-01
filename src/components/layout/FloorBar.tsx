@@ -1,4 +1,4 @@
-/* FloorBar — tab bar at the bottom of main content, like Google Sheets sheet tabs.
+/* FloorBar — tab bar at the top of main content, styled like editor/browser tabs.
  * Each tab represents a floor (workspace) with its own session lifecycle. */
 
 import { useCallback, useMemo } from "react";
@@ -26,9 +26,9 @@ function truncateLabel(label: string, maxLen: number): string {
 }
 
 /**
- * Horizontal tab bar rendered at the bottom of the main content area.
+ * Horizontal tab bar rendered at the top of the main content area (below TaskBar).
  * Displays one tab per floor with status indicator, label, and close button.
- * "+" button creates a new floor. Active tab is highlighted with elf-gold.
+ * "+" button creates a new floor. Active tab highlighted with bottom accent.
  */
 export function FloorBar(): React.JSX.Element {
   const floorsMap = useSessionStore((s) => s.floors);
@@ -55,7 +55,7 @@ export function FloorBar(): React.JSX.Element {
 
   return (
     <div
-      className="flex h-10 shrink-0 items-center gap-0 overflow-x-auto border-t-[3px] border-border bg-white"
+      className="flex h-9 shrink-0 items-end gap-0 overflow-x-auto border-b-[2px] border-border bg-[#f5f3ee]"
       data-testid="floor-bar"
     >
       {floors.map((floor) => {
@@ -68,10 +68,10 @@ export function FloorBar(): React.JSX.Element {
             key={floor.id}
             onClick={() => switchFloor(floor.id)}
             className={[
-              "group flex h-full shrink-0 cursor-pointer items-center gap-1.5 border-r-[3px] border-border px-3 font-display text-xs font-bold uppercase tracking-wider transition-colors duration-75",
+              "group flex h-full shrink-0 cursor-pointer items-center gap-1.5 border-r-[1px] border-border/30 px-3 font-display text-[11px] font-bold tracking-wide transition-colors duration-75",
               isActive
-                ? "bg-elf-gold text-text-light"
-                : "bg-white text-text-light/60 hover:bg-surface-light hover:text-text-light",
+                ? "border-b-[2px] border-b-elf-gold bg-white text-text-light"
+                : "bg-transparent text-text-light/50 hover:bg-white/60 hover:text-text-light",
             ].join(" ")}
             data-testid="floor-tab"
             data-floor-id={floor.id}
@@ -81,7 +81,7 @@ export function FloorBar(): React.JSX.Element {
             {statusColor && (
               <span
                 className={[
-                  "h-2 w-2 shrink-0 rounded-full",
+                  "h-1.5 w-1.5 shrink-0 rounded-full",
                   isRunning ? "animate-pulse" : "",
                 ].join(" ")}
                 style={{ backgroundColor: statusColor }}
@@ -97,7 +97,7 @@ export function FloorBar(): React.JSX.Element {
             {/* Close button */}
             <span
               onClick={(event) => handleCloseFloor(event, floor.id)}
-              className="ml-0.5 flex h-4 w-4 items-center justify-center text-[10px] opacity-40 transition-opacity hover:opacity-100"
+              className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-sm text-[10px] opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-border/20"
               data-testid="floor-close-btn"
             >
               ×
@@ -109,7 +109,7 @@ export function FloorBar(): React.JSX.Element {
       {/* Add floor button */}
       <button
         onClick={handleCreateFloor}
-        className="flex h-full shrink-0 cursor-pointer items-center px-3 border-none bg-transparent font-display text-sm font-bold text-text-light/40 transition-colors duration-75 hover:bg-surface-light hover:text-text-light"
+        className="flex h-full shrink-0 cursor-pointer items-center px-3 border-none bg-transparent font-display text-sm font-bold text-text-light/30 transition-colors duration-75 hover:text-text-light/60"
         data-testid="floor-add-btn"
         title="New floor (Cmd+T)"
       >

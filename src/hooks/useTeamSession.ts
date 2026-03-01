@@ -282,8 +282,20 @@ export function useTeamSession(): {
     [activeSession, buildSpawnOptions, addEvent],
   );
 
+  const updateAllElfStatusOnFloor = useSessionStore((s) => s.updateAllElfStatusOnFloor);
+  const endSessionOnFloor = useSessionStore((s) => s.endSessionOnFloor);
+
   const stopSession = useCallback(async (): Promise<void> => {
     if (!activeSession) return;
+
+    // Optimistic UI update — respond instantly while the backend catches up.
+    // endSessionOnFloor and updateAllElfStatusOnFloor are idempotent, so the
+    // session:cancelled event handler re-applying them is a harmless no-op.
+    const floorId = useSessionStore.getState().activeFloorId;
+    if (floorId) {
+      updateAllElfStatusOnFloor(floorId, "done");
+      endSessionOnFloor(floorId, "cancelled");
+    }
 
     try {
       const isTeam = activeSession.plan?.complexity === "team";
@@ -292,11 +304,10 @@ export function useTeamSession(): {
       } else {
         await invokeStopTask(activeSession.id);
       }
-      /* Cancellation events are handled by useSessionEvents via session:cancelled listener */
     } catch (error) {
       console.error("Failed to stop task:", error);
     }
-  }, [activeSession]);
+  }, [activeSession, updateAllElfStatusOnFloor, endSessionOnFloor]);
 
   return {
     analyzeAndDeploy,

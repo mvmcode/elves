@@ -42,6 +42,8 @@ interface UiState {
   readonly workshopViewMode: WorkshopViewMode;
   /** ID of the elf currently selected in the workshop scene. */
   readonly selectedWorkshopElfId: string | null;
+  /** Whether the sidebar is collapsed to icon-only mode. */
+  readonly isSidebarCollapsed: boolean;
 
   setTaskBarFocused: (focused: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
@@ -56,6 +58,7 @@ interface UiState {
   setWorkshopViewMode: (mode: WorkshopViewMode) => void;
   toggleWorkshopViewMode: () => void;
   setSelectedWorkshopElfId: (id: string | null) => void;
+  toggleSidebarCollapsed: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -71,6 +74,7 @@ export const useUiStore = create<UiState>((set) => ({
   terminalPanelHeight: 300,
   workshopViewMode: "workshop" as WorkshopViewMode,
   selectedWorkshopElfId: null,
+  isSidebarCollapsed: false,
 
   setTaskBarFocused: (focused: boolean) => set({ isTaskBarFocused: focused }),
   setSettingsOpen: (open: boolean) => set({ isSettingsOpen: open }),
@@ -87,4 +91,5 @@ export const useUiStore = create<UiState>((set) => ({
     workshopViewMode: state.workshopViewMode === "workshop" ? "cards" : "workshop",
   })),
   setSelectedWorkshopElfId: (id: string | null) => set({ selectedWorkshopElfId: id }),
+  toggleSidebarCollapsed: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
 }));

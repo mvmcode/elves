@@ -27,6 +27,7 @@ export const SHORTCUT_DEFINITIONS: readonly ShortcutDef[] = [
   { keys: "⌘ /", description: "Toggle shortcut help" },
   { keys: "⌘ B", description: "Toggle activity feed" },
   { keys: "⌘ R", description: "Toggle runtime" },
+  { keys: "Space", description: "Toggle workshop / card view" },
   { keys: "Escape", description: "Close panel / unfocus" },
 ] as const;
 

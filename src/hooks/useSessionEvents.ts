@@ -329,11 +329,6 @@ export function useSessionEvents(): void {
 
       store.updateAllElfStatusOnFloor(floorId, "done");
       store.endSessionOnFloor(floorId, "cancelled");
-
-      /* Clear floor session after a brief delay so the user sees the cancellation */
-      setTimeout(() => {
-        useSessionStore.getState().clearFloorSession(floorId);
-      }, 3000);
     });
 
     sessionCancelledPromise

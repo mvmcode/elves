@@ -12,11 +12,13 @@
   "app": {
     "windows": [
       {
-        "title": "ELVES — Summon Your AI Army",
+        "title": "ELVES",
         "width": 1280,
         "height": 800,
         "minWidth": 900,
-        "minHeight": 600
+        "minHeight": 600,
+        "maximizable": true,
+        "maximized": true
       }
     ],
     "security": {
