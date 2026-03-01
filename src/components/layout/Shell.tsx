@@ -1,10 +1,12 @@
-/* App shell — top-level layout composing sidebar, top bar, task bar, and content area. */
+/* App shell — IDE-like layout with icon sidebar, command palette, top tabs, and status bar.
+ * Inspired by Cursor/VS Code: narrow icon bar left, tabs + palette + content center, status bottom. */
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sidebar } from "./Sidebar";
-import { TopBar } from "./TopBar";
 import { TaskBar } from "./TaskBar";
+import { FloorBar } from "./FloorBar";
+import { StatusBar } from "./StatusBar";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ElfTheater } from "@/components/theater/ElfTheater";
 import { WorkshopCanvas } from "@/components/workshop/WorkshopCanvas";
@@ -23,7 +25,6 @@ import { SessionHistory } from "@/components/project/SessionHistory";
 import { BottomTerminalPanel } from "@/components/terminal/BottomTerminalPanel";
 import { ShortcutOverlay } from "@/components/shared/ShortcutOverlay";
 import { NewProjectDialog } from "@/components/project/NewProjectDialog";
-import { FloorBar } from "@/components/layout/FloorBar";
 import { ResizeHandle } from "@/components/shared/ResizeHandle";
 import { useSessionStore } from "@/stores/session";
 import { useUiStore } from "@/stores/ui";
@@ -33,20 +34,26 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useSessionEvents } from "@/hooks/useSessionEvents";
 import { useSounds } from "@/hooks/useSounds";
 import { useResizable } from "@/hooks/useResizable";
+import { onEvent } from "@/lib/tauri";
 
 /**
- * Root layout shell matching the UI design from product plan Section 7.1.
- * Left sidebar + main area (top bar, task bar, center content, activity feed).
- * Routes between session workshop, memory, skills, MCP, history, and settings views.
- * Shows PlanPreview during plan phase, ElfTheater + TaskGraph + ThinkingPanel during
- * active sessions, celebration banner on completion, or empty state when idle.
+ * Root layout shell — IDE-like structure:
+ * ┌────┬──────────────────────────────────┐
+ * │Icon│  TaskBar (command palette)        │
+ * │Bar │──────────────────────────────────│
+ * │    │  FloorBar (tabs)                 │
+ * │ ⚒  │──────────────────────────────────│
+ * │ 🧠 │  Main Content Area               │
+ * │ ⚡ │   (Workshop/Theater/Memory/etc)   │
+ * │ 🔌 │                  ActivityFeed    │
+ * │ 📜 │──────────────────────────────────│
+ * │ ⚙  │  StatusBar (bottom)              │
+ * └────┴──────────────────────────────────┘
  */
 export function Shell(): React.JSX.Element {
   const activeView = useUiStore((state) => state.activeView);
   const isNewProjectDialogOpen = useUiStore((state) => state.isNewProjectDialogOpen);
   const setNewProjectDialogOpen = useUiStore((state) => state.setNewProjectDialogOpen);
-  const sidebarWidth = useUiStore((state) => state.sidebarWidth);
-  const setSidebarWidth = useUiStore((state) => state.setSidebarWidth);
   const activityFeedWidth = useUiStore((state) => state.activityFeedWidth);
   const setActivityFeedWidth = useUiStore((state) => state.setActivityFeedWidth);
   const isActivityFeedVisible = useUiStore((state) => state.isActivityFeedVisible);
@@ -81,13 +88,53 @@ export function Shell(): React.JSX.Element {
   /* Subscribe to Tauri backend events (elf:event, session:completed) */
   useSessionEvents();
 
-  const sidebarResize = useResizable({
-    initialWidth: sidebarWidth,
-    onWidthChange: setSidebarWidth,
-    minWidth: 200,
-    maxWidth: 400,
-    side: "right",
-  });
+  /* Global Space key listener for toggling workshop/card view.
+   * Lives here (not in WorkshopCanvas) so it works from both views. */
+  useEffect(() => {
+    function handleSpaceToggle(event: KeyboardEvent): void {
+      if (event.code !== "Space") return;
+      const target = event.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+      if (activeView !== "session" || !activeSession) return;
+      if (isPlanPreview) return;
+      event.preventDefault();
+      useUiStore.getState().toggleWorkshopViewMode();
+    }
+    window.addEventListener("keydown", handleSpaceToggle);
+    return () => window.removeEventListener("keydown", handleSpaceToggle);
+  }, [activeView, activeSession, isPlanPreview]);
+
+  /* Listen for native menu events from Tauri backend */
+  useEffect(() => {
+    const cleanups: Array<() => void> = [];
+
+    const menuEvents: Record<string, () => void> = {
+      "menu:new_floor": () => useSessionStore.getState().createFloor(),
+      "menu:close_floor": () => {
+        const store = useSessionStore.getState();
+        const floorId = store.activeFloorId;
+        if (floorId && store.floors[floorId]?.session?.status !== "active") {
+          store.closeFloor(floorId);
+        }
+      },
+      "menu:toggle_workshop": () => useUiStore.getState().toggleWorkshopViewMode(),
+      "menu:toggle_activity": () => useUiStore.getState().toggleActivityFeed(),
+      "menu:toggle_terminal": () => useUiStore.getState().toggleTerminalPanel(),
+      "menu:toggle_settings": () => {
+        const store = useUiStore.getState();
+        store.setActiveView(store.activeView === "settings" ? "session" : "settings");
+      },
+      "menu:keyboard_shortcuts": () => toggleOverlay(),
+    };
+
+    for (const [eventName, handler] of Object.entries(menuEvents)) {
+      onEvent(eventName, handler)
+        .then((unsub) => cleanups.push(unsub))
+        .catch((error: unknown) => console.error(`Failed to subscribe to ${eventName}:`, error));
+    }
+
+    return () => cleanups.forEach((unsub) => unsub());
+  }, [toggleOverlay]);
 
   const feedResize = useResizable({
     initialWidth: activityFeedWidth,
@@ -173,18 +220,16 @@ export function Shell(): React.JSX.Element {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-surface-light">
-      <div className="relative shrink-0" style={{ width: sidebarWidth }}>
-        <Sidebar />
-        <ResizeHandle
-          side="right"
-          onMouseDown={sidebarResize.handleProps.onMouseDown}
-          isDragging={sidebarResize.isDragging}
-        />
-      </div>
+      {/* Icon sidebar — narrow left strip */}
+      <Sidebar />
 
+      {/* Main area */}
       <main className="flex flex-1 flex-col overflow-hidden">
-        <TopBar />
+        {/* Command palette / TaskBar */}
         <TaskBar />
+
+        {/* Floor tabs — at top, like editor tabs */}
+        <FloorBar />
 
         {/* View routing — session workshop, memory, skills, MCP, history, settings */}
         {activeView === "memory" ? (
@@ -299,7 +344,7 @@ export function Shell(): React.JSX.Element {
                 {/* Activity feed overlay (Cmd+B) — absolute positioned, does not push layout */}
                 {isActivityFeedVisible && (
                   <div
-                    className="absolute right-0 top-0 z-20 h-full border-l-token-normal border-border bg-surface-elevated shadow-brutal-lg"
+                    className="absolute right-0 top-0 z-20 h-full border-l-[2px] border-border bg-surface-elevated shadow-brutal-lg"
                     style={{ width: activityFeedWidth }}
                   >
                     <ResizeHandle
@@ -308,7 +353,7 @@ export function Shell(): React.JSX.Element {
                       isDragging={feedResize.isDragging}
                     />
                     <div className="flex h-full flex-col">
-                      <div className="flex items-center justify-between border-b-token-normal border-border px-3 py-2">
+                      <div className="flex items-center justify-between border-b-[2px] border-border px-3 py-2">
                         <h3 className="font-display text-xs text-label">Activity</h3>
                         <button
                           onClick={toggleActivityFeed}
@@ -401,8 +446,8 @@ export function Shell(): React.JSX.Element {
         {/* Shortcut overlay — toggled via Cmd+/ */}
         <ShortcutOverlay isOpen={shortcutOverlayOpen} onClose={toggleOverlay} />
 
-        {/* Floor bar — tab bar at bottom of main content */}
-        <FloorBar />
+        {/* Status bar — always visible at bottom */}
+        <StatusBar />
       </main>
 
       {/* New project creation dialog */}

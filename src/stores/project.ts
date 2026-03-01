@@ -15,6 +15,8 @@ interface ProjectState {
   setActiveProject: (id: string | null) => void;
   /** Add a newly created project to the list and select it */
   addProject: (project: Project) => void;
+  /** Remove a project by ID. Switches to the next project or clears selection. */
+  removeProject: (id: string) => void;
 }
 
 export const useProjectStore = create<ProjectState>((set) => ({
@@ -28,4 +30,13 @@ export const useProjectStore = create<ProjectState>((set) => ({
       projects: [project, ...state.projects],
       activeProjectId: project.id,
     })),
+  removeProject: (id: string) =>
+    set((state) => {
+      const remaining = state.projects.filter((p) => p.id !== id);
+      const needsSwitch = state.activeProjectId === id;
+      return {
+        projects: remaining,
+        activeProjectId: needsSwitch ? (remaining[0]?.id ?? null) : state.activeProjectId,
+      };
+    }),
 }));

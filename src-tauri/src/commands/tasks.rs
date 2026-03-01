@@ -162,27 +162,38 @@ pub async fn stop_task(
     let killed = process_mgr.kill(&session_id);
     let is_interactive = process_mgr.is_interactive(&session_id);
 
-    // Process killed OR session is in interactive mode (PTY owns the process,
-    // so ProcessManager won't find it — but we still need to cancel the session).
     if killed || is_interactive {
         process_mgr.clear_interactive(&session_id);
-
-        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
-        db::sessions::update_session_status(
-            &conn,
-            &session_id,
-            "cancelled",
-            Some("Task stopped by user"),
-        )
-        .map_err(|e| format!("Database error: {e}"))?;
-
-        let _ = app.emit(
-            "session:cancelled",
-            serde_json::json!({
-                "sessionId": &session_id,
-            }),
-        );
     }
+
+    // Always update DB and emit event so the frontend syncs — even if the process
+    // already exited (crash, race condition). Skip DB write only if already terminal.
+    {
+        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+        let already_terminal = db::sessions::get_session(&conn, &session_id)
+            .ok()
+            .flatten()
+            .map(|s| matches!(s.status.as_str(), "completed" | "cancelled" | "error"))
+            .unwrap_or(false);
+
+        if !already_terminal {
+            db::sessions::update_session_status(
+                &conn,
+                &session_id,
+                "cancelled",
+                Some("Task stopped by user"),
+            )
+            .map_err(|e| format!("Database error: {e}"))?;
+        }
+    }
+
+    // Always emit so the frontend transitions out of "active" state
+    let _ = app.emit(
+        "session:cancelled",
+        serde_json::json!({
+            "sessionId": &session_id,
+        }),
+    );
 
     Ok(killed || is_interactive)
 }
@@ -383,29 +394,42 @@ pub async fn stop_team_task(
     let single_killed = process_mgr.kill(&session_id);
     let team_killed = process_mgr.kill_team(&session_id);
     let is_interactive = process_mgr.is_interactive(&session_id);
-    let should_cancel = single_killed || team_killed > 0 || is_interactive;
+    let any_killed = single_killed || team_killed > 0 || is_interactive;
 
-    if should_cancel {
+    if any_killed {
         process_mgr.clear_interactive(&session_id);
-
-        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
-        db::sessions::update_session_status(
-            &conn,
-            &session_id,
-            "cancelled",
-            Some("Team task stopped by user"),
-        )
-        .map_err(|e| format!("Database error: {e}"))?;
-
-        let _ = app.emit(
-            "session:cancelled",
-            serde_json::json!({
-                "sessionId": &session_id,
-            }),
-        );
     }
 
-    Ok(should_cancel)
+    // Always update DB and emit event so the frontend syncs — even if all processes
+    // already exited. Skip DB write only if session is already in a terminal state.
+    {
+        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+        let already_terminal = db::sessions::get_session(&conn, &session_id)
+            .ok()
+            .flatten()
+            .map(|s| matches!(s.status.as_str(), "completed" | "cancelled" | "error"))
+            .unwrap_or(false);
+
+        if !already_terminal {
+            db::sessions::update_session_status(
+                &conn,
+                &session_id,
+                "cancelled",
+                Some("Team task stopped by user"),
+            )
+            .map_err(|e| format!("Database error: {e}"))?;
+        }
+    }
+
+    // Always emit so the frontend transitions out of "active" state
+    let _ = app.emit(
+        "session:cancelled",
+        serde_json::json!({
+            "sessionId": &session_id,
+        }),
+    );
+
+    Ok(any_killed)
 }
 
 /// Continue a completed session with a follow-up message.

@@ -88,7 +88,7 @@ export function ElfCard({
   if (isTerminal) {
     return (
       <div
-        className="flex h-full flex-col border-token-normal border-border bg-surface-elevated shadow-brutal-lg rounded-token-md"
+        className={`flex flex-col border-token-normal border-border bg-surface-elevated shadow-brutal-lg rounded-token-md${isOutputCollapsed ? "" : " h-full"}`}
         style={{ borderLeftWidth: "4px", borderLeftColor: elf.color }}
         data-testid="elf-card"
       >

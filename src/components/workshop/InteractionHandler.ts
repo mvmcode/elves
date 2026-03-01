@@ -202,19 +202,15 @@ export class InteractionHandler {
 
   /**
    * Handle keyboard shortcuts for workshop interaction.
-   * - Space: toggle between workshop and card view
    * - 1-6: reserved for bench focus
    * - F: fit all elves in viewport
    * - R: reset camera to default
    * - Escape: deselect current target, release camera follow
+   *
+   * Note: Space toggle is handled globally in Shell.tsx so it works in both views.
    */
   handleKeyDown(event: KeyboardEvent, scene: WorkshopScene): void {
     switch (event.code) {
-      case 'Space':
-        event.preventDefault();
-        this.callbacks.onViewToggle();
-        break;
-
       case 'Digit1':
       case 'Digit2':
       case 'Digit3':

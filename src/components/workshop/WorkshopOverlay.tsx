@@ -1,6 +1,6 @@
 /* WorkshopOverlay — React overlay rendered on top of the workshop canvas. Provides tooltip, elf detail panel, progress indicator, and view toggle hint. */
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUiStore } from "@/stores/ui";
 import type { Elf, ElfEvent } from "@/types/elf";
@@ -55,6 +55,13 @@ export function WorkshopOverlay({
   const dismissDetailPanel = useCallback(() => {
     setSelectedElfId(null);
   }, [setSelectedElfId]);
+
+  // Auto-dismiss the speech bubble after 6 seconds
+  useEffect(() => {
+    if (!selectedElfId) return;
+    const timer = setTimeout(() => setSelectedElfId(null), 6000);
+    return () => clearTimeout(timer);
+  }, [selectedElfId, setSelectedElfId]);
 
   /** Count tools used by selected elf from events. */
   const toolsUsedCount = useMemo(() => {
@@ -147,104 +154,100 @@ export function WorkshopOverlay({
         </div>
       </div>
 
-      {/* Elf detail panel — slide out from right on elf click */}
+      {/* Elf speech bubble toast — pops up from bottom-center on elf click */}
       <AnimatePresence>
         {selectedElf && (
           <motion.div
-            initial={{ x: 320, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 320, opacity: 0 }}
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute right-0 top-0 z-20 flex h-full w-80 flex-col border-l-[3px] border-black bg-[#1A1A2E]"
+            className="absolute bottom-14 left-1/2 z-20 w-80 -translate-x-1/2 border-[3px] border-black bg-[#1A1A2E] shadow-[4px_4px_0_0_#000]"
             data-testid="workshop-detail-panel"
           >
-            {/* Header */}
-            <div className="flex items-center justify-between border-b-[3px] border-black px-4 py-3">
-              <div>
+            {/* Speech bubble pointer */}
+            <div
+              className="absolute -top-2 left-1/2 h-0 w-0 -translate-x-1/2"
+              style={{
+                borderLeft: "8px solid transparent",
+                borderRight: "8px solid transparent",
+                borderBottom: "8px solid #000",
+              }}
+            />
+            <div
+              className="absolute -top-[5px] left-1/2 h-0 w-0 -translate-x-1/2"
+              style={{
+                borderLeft: "6px solid transparent",
+                borderRight: "6px solid transparent",
+                borderBottom: "6px solid #1A1A2E",
+              }}
+            />
+
+            {/* Header — name, status, dismiss */}
+            <div className="flex items-center justify-between border-b-[2px] border-black/30 px-3 py-2">
+              <div className="flex items-center gap-2">
                 <h3 className="font-display text-sm font-bold tracking-wide text-[#FFD93D]">
                   {selectedElf.name}
                 </h3>
-                <p className="font-mono text-[10px] text-[#FFFDF7] opacity-60">
-                  {selectedElf.role ?? "Worker"} · {selectedElf.runtime}
-                </p>
+                <div className="flex items-center gap-1">
+                  <div className={`h-2 w-2 rounded-full ${statusDotColor(selectedElf)}`} />
+                  <span className="font-mono text-[10px] font-bold text-[#FFFDF7]">
+                    {elfStatusLabel(selectedElf)}
+                  </span>
+                </div>
               </div>
               <button
                 onClick={dismissDetailPanel}
-                className="cursor-pointer border-[2px] border-[#FFD93D] bg-transparent px-2 py-0.5 font-mono text-xs font-bold text-[#FFD93D] transition-all duration-100 hover:bg-[#FFD93D] hover:text-black"
+                className="cursor-pointer border-[2px] border-[#FFD93D] bg-transparent px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#FFD93D] transition-all duration-100 hover:bg-[#FFD93D] hover:text-black"
               >
                 X
               </button>
             </div>
 
-            {/* Status */}
-            <div className="border-b-[2px] border-black/30 px-4 py-3">
-              <div className="flex items-center gap-2">
-                <div className={`h-2.5 w-2.5 rounded-full ${statusDotColor(selectedElf)}`} />
-                <span className="font-mono text-xs font-bold text-[#FFFDF7]">
-                  {elfStatusLabel(selectedElf)}
-                </span>
+            {/* Quick stats row */}
+            <div className="flex gap-3 border-b-[2px] border-black/30 px-3 py-2">
+              <div className="flex items-center gap-1">
+                <span className="font-mono text-[8px] text-[#FFFDF7] opacity-50">Tools</span>
+                <span className="font-mono text-xs font-bold text-[#4D96FF]">{toolsUsedCount}</span>
               </div>
-              {startedAt && (
-                <p className="mt-1 font-mono text-[10px] text-[#FFFDF7] opacity-50">
-                  Uptime: {formatElapsed(Math.floor((Date.now() - selectedElf.spawnedAt) / 1000))}
+              <div className="flex items-center gap-1">
+                <span className="font-mono text-[8px] text-[#FFFDF7] opacity-50">Files</span>
+                <span className="font-mono text-xs font-bold text-[#6BCB77]">{filesChangedCount}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-mono text-[8px] text-[#FFFDF7] opacity-50">Msgs</span>
+                <span className="font-mono text-xs font-bold text-[#FFD93D]">{messagesSentCount}</span>
+              </div>
+            </div>
+
+            {/* Last event snippet */}
+            <div className="px-3 py-2">
+              {selectedElfEvents.length === 0 ? (
+                <p className="font-mono text-[10px] text-[#FFFDF7] opacity-30">
+                  No events yet...
                 </p>
+              ) : (
+                <div className="border-l-[2px] border-[#4D96FF]/30 pl-2">
+                  <span className="font-mono text-[8px] text-[#4D96FF]">
+                    {selectedElfEvents[selectedElfEvents.length - 1]!.type}
+                  </span>
+                  {selectedElfEvents[selectedElfEvents.length - 1]!.funnyStatus && (
+                    <p className="font-mono text-[10px] text-[#FFFDF7] opacity-70">
+                      {selectedElfEvents[selectedElfEvents.length - 1]!.funnyStatus}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 
-            {/* Stats */}
-            <div className="flex gap-3 border-b-[2px] border-black/30 px-4 py-3">
-              <div className="border-[2px] border-black/30 px-2 py-1">
-                <p className="font-mono text-[8px] text-[#FFFDF7] opacity-50">Tools</p>
-                <p className="font-mono text-sm font-bold text-[#4D96FF]">{toolsUsedCount}</p>
-              </div>
-              <div className="border-[2px] border-black/30 px-2 py-1">
-                <p className="font-mono text-[8px] text-[#FFFDF7] opacity-50">Files</p>
-                <p className="font-mono text-sm font-bold text-[#6BCB77]">{filesChangedCount}</p>
-              </div>
-              <div className="border-[2px] border-black/30 px-2 py-1">
-                <p className="font-mono text-[8px] text-[#FFFDF7] opacity-50">Messages</p>
-                <p className="font-mono text-sm font-bold text-[#FFD93D]">{messagesSentCount}</p>
-              </div>
-            </div>
-
-            {/* Recent output */}
-            <div className="flex flex-1 flex-col overflow-hidden px-4 py-3">
-              <h4 className="mb-2 font-mono text-[10px] font-bold tracking-wide text-[#FFFDF7] opacity-60">
-                RECENT OUTPUT
-              </h4>
-              <div className="flex-1 overflow-y-auto">
-                {selectedElfEvents.length === 0 ? (
-                  <p className="font-mono text-[10px] text-[#FFFDF7] opacity-30">
-                    No events yet...
-                  </p>
-                ) : (
-                  selectedElfEvents.map((event) => (
-                    <div
-                      key={event.id}
-                      className="mb-1 border-l-[2px] border-[#4D96FF]/30 pl-2"
-                    >
-                      <span className="font-mono text-[8px] text-[#4D96FF]">
-                        {event.type}
-                      </span>
-                      {event.funnyStatus && (
-                        <p className="font-mono text-[10px] text-[#FFFDF7] opacity-70">
-                          {event.funnyStatus}
-                        </p>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2 border-t-[2px] border-black/30 px-4 py-3">
+            {/* View Full Output button */}
+            <div className="border-t-[2px] border-black/30 px-3 py-2">
               <button
                 onClick={() => {
                   toggleViewMode();
                   dismissDetailPanel();
                 }}
-                className="flex-1 cursor-pointer border-[2px] border-black bg-[#4D96FF] px-3 py-1.5 font-mono text-[10px] font-bold text-white shadow-[3px_3px_0_0_#000] transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                className="w-full cursor-pointer border-[2px] border-black bg-[#4D96FF] px-3 py-1.5 font-mono text-[10px] font-bold text-white shadow-[3px_3px_0_0_#000] transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
               >
                 VIEW FULL OUTPUT
               </button>

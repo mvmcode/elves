@@ -8,6 +8,70 @@ use agents::process::ProcessManager;
 use commands::projects::DbState;
 use commands::pty::PtyManager;
 use std::sync::Mutex;
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::Emitter;
+
+/// Build the native macOS/desktop menu bar with File, Edit, View, and Help menus.
+/// Menu item clicks emit `menu:<id>` events to the frontend for dispatch.
+fn build_app_menu(app: &tauri::AppHandle) -> Result<Menu<tauri::Wry>, tauri::Error> {
+    // File menu
+    let new_floor = MenuItem::with_id(app, "new_floor", "New Floor", true, Some("CmdOrCtrl+T"))?;
+    let close_floor =
+        MenuItem::with_id(app, "close_floor", "Close Floor", true, Some("CmdOrCtrl+W"))?;
+    let quit = PredefinedMenuItem::quit(app, Some("Quit ELVES"))?;
+    let file_menu = Submenu::with_items(
+        app,
+        "File",
+        true,
+        &[&new_floor, &close_floor, &PredefinedMenuItem::separator(app)?, &quit],
+    )?;
+
+    // Edit menu — standard items required for text input to work with native menus
+    let edit_menu = Submenu::with_items(
+        app,
+        "Edit",
+        true,
+        &[
+            &PredefinedMenuItem::undo(app, None)?,
+            &PredefinedMenuItem::redo(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::cut(app, None)?,
+            &PredefinedMenuItem::copy(app, None)?,
+            &PredefinedMenuItem::paste(app, None)?,
+            &PredefinedMenuItem::select_all(app, None)?,
+        ],
+    )?;
+
+    // View menu
+    let toggle_workshop =
+        MenuItem::with_id(app, "toggle_workshop", "Toggle Workshop/Cards", true, None::<&str>)?;
+    let toggle_activity =
+        MenuItem::with_id(app, "toggle_activity", "Toggle Activity Feed", true, Some("CmdOrCtrl+B"))?;
+    let toggle_terminal =
+        MenuItem::with_id(app, "toggle_terminal", "Toggle Terminal", true, Some("CmdOrCtrl+`"))?;
+    let toggle_settings =
+        MenuItem::with_id(app, "toggle_settings", "Settings", true, Some("CmdOrCtrl+,"))?;
+    let view_menu = Submenu::with_items(
+        app,
+        "View",
+        true,
+        &[
+            &toggle_workshop,
+            &toggle_activity,
+            &toggle_terminal,
+            &PredefinedMenuItem::separator(app)?,
+            &toggle_settings,
+        ],
+    )?;
+
+    // Help menu
+    let shortcuts =
+        MenuItem::with_id(app, "keyboard_shortcuts", "Keyboard Shortcuts", true, Some("CmdOrCtrl+/"))?;
+    let about = MenuItem::with_id(app, "about_elves", "About ELVES", true, None::<&str>)?;
+    let help_menu = Submenu::with_items(app, "Help", true, &[&shortcuts, &about])?;
+
+    Menu::with_items(app, &[&file_menu, &edit_menu, &view_menu, &help_menu])
+}
 
 /// Bootstrap the Tauri application with all plugins, state, and command handlers.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -34,6 +98,22 @@ pub fn run() {
         .manage(DbState(Mutex::new(conn)))
         .manage(ProcessManager::new())
         .manage(PtyManager::new())
+        .setup(|app| {
+            let menu = build_app_menu(app.handle())?;
+            app.set_menu(menu)?;
+            Ok(())
+        })
+        .on_menu_event(|app, event| {
+            let id = event.id().0.as_str();
+            // Emit custom menu events to the frontend for those that aren't handled natively
+            match id {
+                "new_floor" | "close_floor" | "toggle_workshop" | "toggle_activity"
+                | "toggle_terminal" | "toggle_settings" | "keyboard_shortcuts" | "about_elves" => {
+                    let _ = app.emit(&format!("menu:{id}"), ());
+                }
+                _ => {}
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::agents::detect_runtimes,
             commands::agents::discover_claude,
