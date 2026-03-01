@@ -25,6 +25,8 @@ export type ElfEventType =
   | "task_update"
   | "error"
   | "permission_request"
+  | "permission_granted"
+  | "session_complete"
   | "file_change";
 
 /** A single event from the unified agent protocol stream */
