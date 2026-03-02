@@ -104,11 +104,20 @@ jobs:
       - name: Verify formula update
         run: cat packaging/homebrew/elves.rb
 
-      - name: Commit and push updated formula
+      - name: Create PR with updated formula
         run: |
+          BRANCH="chore/homebrew-${{ steps.version.outputs.VERSION }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
           git add packaging/homebrew/elves.rb
           git diff --cached --quiet && echo "No changes to commit" && exit 0
           git commit -m "chore(homebrew): update formula to ${{ env.RELEASE_TAG }}"
-          git push origin main
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "chore(homebrew): update formula to ${{ env.RELEASE_TAG }}" \
+            --body "Automated formula update from release workflow. Updates version and SHA256 for ${{ env.RELEASE_TAG }}." \
+            --base main \
+            --head "$BRANCH"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
