@@ -9,6 +9,9 @@ import { LiveEventTerminal } from "./LiveEventTerminal";
 import { useSessionStore } from "@/stores/session";
 import { useUiStore } from "@/stores/ui";
 import { useProjectStore } from "@/stores/project";
+import { generateElf, getStatusMessage } from "@/lib/elf-names";
+import { playSound } from "@/lib/sounds";
+import type { DetectedAgent } from "@/lib/pty-agent-detector";
 
 /** Minimum panel height in pixels. */
 const MIN_HEIGHT = 150;
@@ -53,6 +56,68 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
       useSessionStore.getState().endSession("completed");
     }
   }, [isInteractiveMode, isSessionCompleted]);
+
+  /* Track used elf names to avoid duplicates when creating elves from PTY agent detection */
+  const usedNamesRef = useRef<string[]>([]);
+
+  /* Create a new elf when an Agent tool call is detected in PTY output */
+  const handleAgentDetected = useCallback((agent: DetectedAgent): void => {
+    const store = useSessionStore.getState();
+    const floorId = store.activeFloorId;
+    if (!floorId || !sessionId) return;
+
+    const floor = store.floors[floorId];
+    if (!floor) return;
+
+    /* Collect already-used names from existing elves + previous detections */
+    const existingNames = floor.elves.map((elf) => elf.name);
+    usedNamesRef.current = [...new Set([...existingNames, ...usedNamesRef.current])];
+
+    const personality = generateElf(usedNamesRef.current);
+    usedNamesRef.current.push(personality.name);
+
+    const runtime = floor.session?.runtime ?? "claude-code";
+    const elfId = `elf-pty-${sessionId}-${agent.id}`;
+    const roleName = agent.role === "Agent" ? "Worker" : agent.role;
+
+    store.addElfToFloor(floorId, {
+      id: elfId,
+      sessionId,
+      name: personality.name,
+      role: roleName,
+      avatar: personality.avatar,
+      color: personality.color,
+      quirk: personality.quirk,
+      runtime,
+      status: "spawning",
+      spawnedAt: Date.now(),
+      finishedAt: null,
+      parentElfId: floor.elves[0]?.id ?? null,
+      toolsUsed: [],
+    });
+
+    store.addEventToFloor(floorId, {
+      id: `event-pty-spawn-${Date.now()}-${agent.id}`,
+      timestamp: Date.now(),
+      elfId,
+      elfName: personality.name,
+      runtime,
+      type: "spawn",
+      payload: { role: roleName, description: agent.description },
+      funnyStatus: getStatusMessage(personality.name, "spawning"),
+    });
+
+    playSound("spawn");
+
+    /* Transition to working after brief delay */
+    setTimeout(() => {
+      const currentStore = useSessionStore.getState();
+      const currentFloor = currentStore.floors[floorId];
+      if (currentFloor?.elves.some((e) => e.id === elfId)) {
+        currentStore.updateElfStatusOnFloor(floorId, elfId, "working");
+      }
+    }, 1500);
+  }, [sessionId]);
 
   /* Resize drag handlers */
   const handleDragStart = useCallback(
@@ -143,6 +208,7 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
             taskLabel={taskLabel}
             onClose={toggleTerminalPanel}
             onPtyExit={handlePtyExit}
+            onAgentDetected={handleAgentDetected}
           />
         ) : (
           <div className="flex h-full flex-col border-token-normal border-border bg-[#1A1A2E]">
