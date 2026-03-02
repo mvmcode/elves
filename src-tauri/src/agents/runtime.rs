@@ -1,7 +1,10 @@
 // Runtime detection — scans PATH for Claude Code and Codex CLI binaries.
+// macOS .app bundles get a minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin), so we
+// resolve the user's login shell PATH before searching for binaries.
 
 use serde::Serialize;
 use std::process::Command;
+use std::sync::Once;
 
 /// Version and path information for a detected runtime binary.
 #[derive(Debug, Clone, Serialize)]
@@ -16,6 +19,33 @@ pub struct RuntimeVersion {
 pub struct RuntimeInfo {
     pub claude_code: Option<RuntimeVersion>,
     pub codex: Option<RuntimeVersion>,
+}
+
+static FIX_PATH: Once = Once::new();
+
+/// Augment the process PATH with the user's login shell PATH.
+/// macOS .app bundles launched from Finder/Dock get a minimal PATH that doesn't
+/// include /opt/homebrew/bin, nvm paths, cargo bin, etc. This function runs the
+/// user's default shell to resolve their real PATH and sets it on the process.
+/// Called once before runtime detection.
+fn ensure_full_path() {
+    FIX_PATH.call_once(|| {
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+        if let Ok(output) = Command::new(&shell)
+            .args(["-l", "-c", "echo $PATH"])
+            .output()
+        {
+            if output.status.success() {
+                let shell_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !shell_path.is_empty() {
+                    // Merge: prepend shell PATH to existing PATH to cover all locations
+                    let current = std::env::var("PATH").unwrap_or_default();
+                    let merged = format!("{shell_path}:{current}");
+                    std::env::set_var("PATH", &merged);
+                }
+            }
+        }
+    });
 }
 
 /// Detect a runtime binary by name. Looks up the binary in PATH using `which`,
@@ -55,6 +85,7 @@ fn detect_binary(name: &str) -> Option<RuntimeVersion> {
 /// Scan the system for available AI runtimes (Claude Code CLI and Codex CLI).
 /// Returns detection results for each runtime, with None for binaries not found.
 pub fn detect_runtimes() -> RuntimeInfo {
+    ensure_full_path();
     RuntimeInfo {
         claude_code: detect_binary("claude"),
         codex: detect_binary("codex"),
