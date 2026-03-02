@@ -79,6 +79,13 @@ jobs:
           echo "DMG_NAME=$DMG_NAME" >> "$GITHUB_ENV"
           echo "Created $DMG_NAME"
 
+      - name: Upload DMG as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: ${{ env.DMG_NAME }}
+          retention-days: 1
+
       - name: Create draft GitHub Release
         run: |
           gh release create "$RELEASE_TAG" \
@@ -122,7 +129,15 @@ jobs:
         env:
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
 
-      - name: Download DMG from release
+      - name: Download DMG from workflow artifact
+        if: needs.build-macos.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-dmg
+          path: /tmp/dmg
+
+      - name: Download DMG from release (workflow_dispatch fallback)
+        if: needs.build-macos.result == 'skipped'
         run: gh release download "$RELEASE_TAG" --pattern "*.dmg" --dir /tmp/dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -144,20 +159,31 @@ jobs:
       - name: Verify formula update
         run: cat packaging/homebrew/elves.rb
 
-      - name: Create PR with updated formula
+      - name: Create or update PR with updated formula
         run: |
           BRANCH="chore/homebrew-${{ steps.version.outputs.VERSION }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Delete remote branch if it exists from a previous run
+          git push origin --delete "$BRANCH" 2>/dev/null || true
+
           git checkout -b "$BRANCH"
           git add packaging/homebrew/elves.rb
           git diff --cached --quiet && echo "No changes to commit" && exit 0
           git commit -m "chore(homebrew): update formula to ${{ env.RELEASE_TAG }}"
           git push origin "$BRANCH"
-          gh pr create \
-            --title "chore(homebrew): update formula to ${{ env.RELEASE_TAG }}" \
-            --body "Automated formula update from release workflow. Updates version and SHA256 for ${{ env.RELEASE_TAG }}." \
-            --base main \
-            --head "$BRANCH"
+
+          # Create PR, or update the existing one if it's still open
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR already exists — force-pushed updated branch."
+          else
+            gh pr create \
+              --title "chore(homebrew): update formula to ${{ env.RELEASE_TAG }}" \
+              --body "Automated formula update from release workflow. Updates version and SHA256 for ${{ env.RELEASE_TAG }}." \
+              --base main \
+              --head "$BRANCH"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
