@@ -22,6 +22,7 @@ import { EventProcessor } from './EventProcessor';
 import { InteractionHandler } from './InteractionHandler';
 import { computeElfPath, updateDynamicBlocks } from './NavigationBridge';
 import { WORKBENCHES, DOOR_POS, ST, WALKABLE_GRID } from './workshop-layout';
+import { pickDiversePalette } from './ElfPalette';
 
 /** Speed at which conveyor items travel across the belt in pixels per second */
 const CONVEYOR_SPEED = 24;
@@ -107,8 +108,16 @@ export class WorkshopScene {
     updateDynamicBlocks(this.pathfinder, this.getAllElves());
 
     /* Update elf sprites — animation frames, movement along paths, bubble timers */
+    const despawnedIds: string[] = [];
     for (const elf of this.elves.values()) {
       elf.update(dt, this.time);
+      /* Clean up elves that completed their despawn matrix effect */
+      if (elf.getState() === 'exiting' && elf.matrixEffect === null) {
+        despawnedIds.push(elf.getId());
+      }
+    }
+    for (const id of despawnedIds) {
+      this.elves.delete(id);
     }
 
     /* Update behavior sequences — deliveries, ceremonies, idle timers */
@@ -206,12 +215,12 @@ export class WorkshopScene {
 
   /**
    * Spawn a new elf sprite at the workshop door position.
-   * The elf starts in 'entering' state and should be directed to a workbench
-   * via the EventProcessor's spawn handler.
+   * Picks a diverse color palette automatically. Starts a matrix rain spawn
+   * effect that reveals the elf character.
    *
    * @param id - Unique identifier for this elf (matches ElfEvent.elfId)
    * @param name - Display name shown below the sprite
-   * @param hatColor - CSS color for the elf's pointed hat
+   * @param hatColor - CSS color override for the elf's pointed hat (used as fallback)
    * @param accessory - Accessory identifier for the elf's equipment
    */
   spawnElf(
@@ -221,6 +230,10 @@ export class WorkshopScene {
     accessory: string,
   ): void {
     if (this.elves.has(id)) return;
+
+    /* Pick a diverse palette based on what's already in use */
+    const usedIndices = Array.from(this.elves.values()).map((elf) => elf.paletteIndex);
+    const { index: paletteIndex } = pickDiversePalette(usedIndices);
 
     const doorPixel = this.pathfinder.tileToPixel(DOOR_POS);
     const config = {
@@ -241,14 +254,21 @@ export class WorkshopScene {
       hatColor,
       accessory,
       bodyColor: "#FFD93D",
+      paletteIndex,
+      isActive: true,
     };
     const elf = new ElfSprite(config);
+
+    /* Start matrix rain spawn effect */
+    elf.startMatrixSpawn();
+
     this.elves.set(id, elf);
   }
 
   /**
    * Remove an elf from the workshop scene.
-   * Frees the elf's assigned workbench before deletion.
+   * Starts a matrix despawn effect. The elf is deleted after the effect completes.
+   * Frees the elf's assigned workbench immediately so others can claim it.
    *
    * @param id - The elf's unique identifier
    */
@@ -256,7 +276,7 @@ export class WorkshopScene {
     const elf = this.elves.get(id);
     if (!elf) return;
 
-    /* Free the workbench this elf was assigned to */
+    /* Free the workbench this elf was assigned to (immediately so others can claim) */
     const benchId = elf.getWorkbenchId();
     if (benchId !== null) {
       const bench = WORKBENCHES.find((wb) => wb.id === benchId);
@@ -265,7 +285,14 @@ export class WorkshopScene {
       }
     }
 
-    this.elves.delete(id);
+    /* Start matrix despawn effect — elf will be deleted when effect completes */
+    if (elf.matrixEffect === null) {
+      elf.startMatrixDespawn();
+      /* Track for cleanup after effect completes — handled in update() */
+    } else {
+      /* If already in an effect, just delete immediately */
+      this.elves.delete(id);
+    }
   }
 
   /**

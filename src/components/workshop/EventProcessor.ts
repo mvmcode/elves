@@ -189,11 +189,13 @@ export class EventProcessor {
   /**
    * Thinking event: elf transitions to 'working' with 'read' animation
    * and shows a thought bubble with '...' or a preview of what they're thinking about.
+   * Marks elf as active and stops wandering.
    */
   private handleThinking = (event: ElfEvent, scene: WorkshopScene): void => {
     const elf = scene.getElf(event.elfId);
     if (!elf) return;
 
+    this.activateElf(elf, scene);
     elf.transitionTo('working', 'read');
     const preview = extractMessagePreview(event.payload);
     elf.showBubble(preview, 'thought', THOUGHT_BUBBLE_DURATION);
@@ -201,12 +203,13 @@ export class EventProcessor {
 
   /**
    * Tool call event: elf transitions to 'working' with animation based on tool name.
-   * Emits sparkle particles at the elf's position.
+   * Emits sparkle particles at the elf's position. Marks elf as active.
    */
   private handleToolCall = (event: ElfEvent, scene: WorkshopScene): void => {
     const elf = scene.getElf(event.elfId);
     if (!elf) return;
 
+    this.activateElf(elf, scene);
     const toolName = (event.payload['tool'] as string | undefined) ?? '';
     const animation = getToolAnimation(toolName);
     elf.transitionTo('working', animation);
@@ -343,16 +346,30 @@ export class EventProcessor {
 
   /**
    * Session complete: all elves celebrate with sparkle bursts.
-   * When BehaviorSequencer is wired, this will delegate to startCeremony().
+   * Deactivates all elves and starts wander behavior after celebration.
    */
   private handleSessionComplete = (_event: ElfEvent, scene: WorkshopScene): void => {
     const elves = scene.getAllElves();
     for (const elf of elves) {
+      elf.isActive = false;
       elf.transitionTo('celebrating');
       elf.showBubble('Done!', 'speech', 3.0);
       const pos = elf.getPosition();
       scene.emitSparkles(pos.x, pos.y, '#FFD93D', 15);
+
+      /* Start wander behavior after celebration finishes */
+      scene.getBehaviorSequencer().startWander(elf.getId());
     }
-    /* BehaviorSequencer.startCeremony() will handle the full sequence when wired */
   };
+
+  /**
+   * Mark an elf as active and stop its wander behavior.
+   * Called when the elf starts receiving work events.
+   */
+  private activateElf(elf: import('./ElfSprite').ElfSprite, scene: WorkshopScene): void {
+    if (!elf.isActive) {
+      elf.isActive = true;
+      scene.getBehaviorSequencer().stopWander(elf.getId(), scene);
+    }
+  }
 }

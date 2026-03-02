@@ -35,7 +35,8 @@ export type ElfSpriteState =
   | "error"
   | "permission"
   | "arguing"
-  | "exiting";
+  | "exiting"
+  | "wandering";
 
 /** Speech bubble variants displayed above elf heads */
 export type BubbleType = "thought" | "speech" | "alert";
@@ -75,6 +76,10 @@ export interface ElfSpriteConfig {
   readonly hatColor: string;
   readonly accessory: string;
   readonly bodyColor: string;
+  /** Palette index for color diversity (0-5). */
+  readonly paletteIndex: number;
+  /** Whether this elf is actively working (drives wander vs work behavior). */
+  isActive: boolean;
 }
 
 /** Workbench theme indices matching the design spec */
