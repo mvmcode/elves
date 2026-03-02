@@ -5,6 +5,8 @@ import { XTerminal } from "./XTerminal";
 import type { XTerminalHandle } from "./XTerminal";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { PtyAgentDetector } from "@/lib/pty-agent-detector";
+import type { DetectedAgent } from "@/lib/pty-agent-detector";
 
 interface SessionTerminalProps {
   /** ELVES session ID (used to look up the Claude session ID). */
@@ -19,6 +21,8 @@ interface SessionTerminalProps {
   readonly onClose: () => void;
   /** Called when the PTY process exits — allows the parent to update session state. */
   readonly onPtyExit?: () => void;
+  /** Called when Agent tool calls are detected in the PTY output stream. */
+  readonly onAgentDetected?: (agent: DetectedAgent) => void;
 }
 
 /** Tauri IPC: spawn a new PTY process. Returns a unique pty_id. */
@@ -58,9 +62,13 @@ export function SessionTerminal({
   taskLabel,
   onClose,
   onPtyExit,
+  onAgentDetected,
 }: SessionTerminalProps): React.JSX.Element {
   const terminalRef = useRef<XTerminalHandle>(null);
   const ptyIdRef = useRef<string | null>(null);
+  const detectorRef = useRef<PtyAgentDetector>(new PtyAgentDetector());
+  const onAgentDetectedRef = useRef(onAgentDetected);
+  onAgentDetectedRef.current = onAgentDetected;
   const [hasExited, setHasExited] = useState(false);
 
   /** Forward user keystrokes to PTY stdin. */
@@ -99,9 +107,15 @@ export function SessionTerminal({
         }
         ptyIdRef.current = ptyId;
 
-        /* Listen for PTY stdout data → write to xterm display */
+        /* Listen for PTY stdout data → write to xterm display + scan for agent spawns */
         unlistenData = await listen<string>(`pty:data:${ptyId}`, (event) => {
           terminalRef.current?.write(event.payload);
+
+          /* Feed PTY output through agent detector to find Agent tool calls */
+          const detected = detectorRef.current.feed(event.payload);
+          for (const agent of detected) {
+            onAgentDetectedRef.current?.(agent);
+          }
         });
 
         /* Listen for PTY process exit → show message and notify parent */

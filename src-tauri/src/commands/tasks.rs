@@ -620,6 +620,7 @@ fn stream_claude_output(
     let db_state = app.state::<DbState>();
     let reader = std::io::BufReader::new(stdout);
     let mut last_result_payload: Option<serde_json::Value> = None;
+    let mut last_assistant_text: Option<String> = None;
     let mut event_count: u32 = 0;
 
     for line in reader.lines() {
@@ -681,6 +682,25 @@ fn stream_claude_output(
                     // 3. Track the last result event for usage extraction
                     if event.event_type == "result" {
                         last_result_payload = Some(event.payload.clone());
+                    }
+
+                    // 4. Track the last assistant text for question detection fallback.
+                    // The result event may not always contain the text; the preceding
+                    // assistant event is a reliable source for the final message.
+                    if event.event_type == "assistant" {
+                        if let Some(message) = event.payload.get("message") {
+                            if let Some(content) = message.get("content").and_then(|c| c.as_array()) {
+                                for block in content {
+                                    if block.get("type").and_then(|t| t.as_str()) == Some("text") {
+                                        if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
+                                            if !text.trim().is_empty() {
+                                                last_assistant_text = Some(text.to_string());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -763,24 +783,26 @@ fn stream_claude_output(
         );
     }
 
-    // Detect if the result text contains a question that needs user input
-    let needs_input = last_result_payload.as_ref()
+    // Extract the final text — try the result event first, fall back to last assistant text.
+    // Claude's stream-json result event sometimes omits the text field, but the preceding
+    // assistant event always contains the actual message content.
+    let extracted_text: Option<String> = last_result_payload.as_ref()
         .and_then(|r| {
             r.get("result").and_then(|v| v.as_str())
                 .or_else(|| r.get("text").and_then(|v| v.as_str()))
                 .or_else(|| r.get("content").and_then(|v| v.as_str()))
         })
+        .map(|s| s.to_string())
+        .or(last_assistant_text);
+
+    // Detect if the final text contains a question that needs user input
+    let needs_input = extracted_text.as_deref()
         .map(|text| detect_question_in_result(text))
         .unwrap_or(false);
 
-    let last_result_text = last_result_payload.as_ref()
-        .and_then(|r| {
-            r.get("result").and_then(|v| v.as_str())
-                .or_else(|| r.get("text").and_then(|v| v.as_str()))
-                .or_else(|| r.get("content").and_then(|v| v.as_str()))
-        })
+    let last_result_text = extracted_text
         .map(|text| {
-            if text.len() > 500 { format!("{}...", &text[..497]) } else { text.to_string() }
+            if text.len() > 500 { format!("{}...", &text[..497]) } else { text }
         });
 
     let _ = app.emit(

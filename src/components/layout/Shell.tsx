@@ -12,6 +12,8 @@ import { ElfTheater } from "@/components/theater/ElfTheater";
 import { WorkshopCanvas } from "@/components/workshop/WorkshopCanvas";
 import { WorkshopOverlay } from "@/components/workshop/WorkshopOverlay";
 import { SessionControlCard } from "@/components/session/SessionControlCard";
+import { AgentPromptPopup } from "@/components/session/AgentPromptPopup";
+import { classifyPromptType } from "@/lib/prompt-classifier";
 import { ActivityFeed } from "@/components/feed/ActivityFeed";
 import { PlanPreview } from "@/components/theater/PlanPreview";
 import { TaskGraph } from "@/components/theater/TaskGraph";
@@ -71,7 +73,12 @@ export function Shell(): React.JSX.Element {
   );
   const isTerminalPanelOpen = useUiStore((state) => state.isTerminalPanelOpen);
   const workshopViewMode = useUiStore((state) => state.workshopViewMode);
-  const { deployWithPlan, stopSession } = useTeamSession();
+  const needsInput = useSessionStore((state) => state.needsInput);
+  const lastResultText = useSessionStore((state) => state.lastResultText);
+  const activeFloorId = useSessionStore((state) => state.activeFloorId);
+  const setNeedsInputOnFloor = useSessionStore((state) => state.setNeedsInputOnFloor);
+  const toggleTerminalPanel = useUiStore((state) => state.toggleTerminalPanel);
+  const { deployWithPlan, stopSession, continueSession } = useTeamSession();
   const {
     handleCreateMemory,
     handleEditMemory,
@@ -86,6 +93,18 @@ export function Shell(): React.JSX.Element {
   const { shortcutOverlayOpen, toggleOverlay } = useKeyboardShortcuts({
     onCancelTask: () => void stopSession(),
   });
+
+  /* Prompt popup state and handlers */
+  const [isPromptSubmitting, setIsPromptSubmitting] = useState(false);
+
+  const handlePromptSubmit = useCallback((message: string): void => {
+    setIsPromptSubmitting(true);
+    void continueSession(message).finally(() => setIsPromptSubmitting(false));
+  }, [continueSession]);
+
+  const handlePromptDismiss = useCallback((): void => {
+    if (activeFloorId) setNeedsInputOnFloor(activeFloorId, false, null);
+  }, [activeFloorId, setNeedsInputOnFloor]);
 
   /* Subscribe to Tauri backend events (elf:event, session:completed) */
   useSessionEvents();
@@ -375,6 +394,21 @@ export function Shell(): React.JSX.Element {
                     </div>
                   </div>
                 )}
+
+                {/* Agent prompt popup — centered above StatusBar when Claude asks a question */}
+                <AnimatePresence>
+                  {needsInput && (
+                    <AgentPromptPopup
+                      questionText={lastResultText ?? "Claude is waiting for your input."}
+                      promptType={classifyPromptType(lastResultText ?? "")}
+                      leadElf={elves[0] ?? null}
+                      onSubmit={handlePromptSubmit}
+                      onDismiss={handlePromptDismiss}
+                      onOpenTerminal={toggleTerminalPanel}
+                      isSubmitting={isPromptSubmitting}
+                    />
+                  )}
+                </AnimatePresence>
 
                 {/* Floating session control card */}
                 <SessionControlCard />

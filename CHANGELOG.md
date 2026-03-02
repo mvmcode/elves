@@ -4,6 +4,29 @@ All notable changes to ELVES are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.0] - 2026-03-01 — Agent Prompt Popup & PTY Elf Pairing
+
+### Added
+- **Agent Prompt Popup** — centered popup replaces embedded `FollowUpCard` when Claude asks a follow-up question; classifies questions as yes/no or free-text and renders the appropriate UI
+- **Prompt classifier** — pure `classifyPromptType()` function detects yes/no patterns ("shall I", "should I", "proceed?") vs open-ended questions ("what", "which", "how")
+- **Quirky yes/no button pairs** — randomized labels like "Ship it! / Skip it!", "Make it so! / Hard pass!", "Let's gooo! / Not today!"
+- **"Go Super Mode" link** — opens the PTY terminal panel directly from the prompt popup
+- **PTY agent detector** — `PtyAgentDetector` class scans raw terminal output for Claude Code Agent tool invocations, strips ANSI escape codes, buffers across chunks
+- **Elf-agent pairing in interactive mode** — agents spawned in PTY/interactive terminal mode now create corresponding elves with personality, avatar, and spawn animation
+- **Elf-agent pairing in print mode** — `useSessionEvents` detects `Agent` tool calls in `--print` stream-json events and spawns elves for each sub-agent
+- **Elf leadership model** — first elf (elves[0]) is always the leader; spawned sub-agents set `parentElfId` pointing to the leader
+
+### Changed
+- `FollowUpCard` removed from `SessionControlCard` — follow-up prompts now handled by the global `AgentPromptPopup` mounted in `Shell`
+- `SessionTerminal` accepts `onAgentDetected` callback for PTY-based agent detection
+- `BottomTerminalPanel` creates elves via `handleAgentDetected` when agents are detected in PTY output
+
+### Tests
+- 17 unit tests for `prompt-classifier` (both types, multi-question, empty string, edge cases)
+- 19 component tests for `AgentPromptPopup` (both modes, submit/dismiss, elf display, keyboard shortcuts)
+- 28 unit tests for `pty-agent-detector` (ANSI stripping, all spawn patterns, cross-chunk buffering, role extraction, false positive avoidance)
+- Updated `SessionControlCard` tests to remove stale FollowUpCard assertions
+
 ## [0.8.0] - 2026-02-27 — Phase 8: Streaming, Terminal & Discovery
 
 ### Added
