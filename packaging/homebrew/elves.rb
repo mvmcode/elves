@@ -5,7 +5,7 @@ cask "elves" do
   version "0.9.0"
   sha256 "PLACEHOLDER_SHA256"
 
-  url "https://github.com/mvmcode/elves/releases/download/v#{version}/ELVES_v#{version}_aarch64.dmg"
+  url "https://github.com/mvmcode/elves/releases/download/v#{version}/ELVES_#{version}_aarch64.dmg"
   name "ELVES"
   desc "Summon your AI army — visual multi-agent orchestration for Claude Code and Codex"
   homepage "https://elves.dev"
@@ -13,6 +13,17 @@ cask "elves" do
   depends_on macos: ">= :ventura"
 
   app "ELVES.app"
+
+  caveats <<~EOS
+    ELVES is not notarized (open-source project). If macOS says it is
+    "damaged" or "can't be verified", run:
+
+      xattr -cr /Applications/ELVES.app
+
+    Or reinstall with:
+
+      brew reinstall --no-quarantine mvmcode/tap/elves
+  EOS
 
   zap trash: [
     "~/.elves",

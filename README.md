@@ -109,15 +109,22 @@ Every session records a full event log. Step through past sessions event-by-even
 
 ## Quick Start
 
-### Install via Homebrew
+### Install via Homebrew (recommended)
 
 ```bash
-brew install --cask elves
+brew install --no-quarantine --cask mvmcode/tap/elves
 ```
 
-### Or Download
+The `--no-quarantine` flag prevents macOS Gatekeeper from blocking the app (ELVES is not notarized — it's an open-source project without an Apple Developer account).
+
+### Or Download Directly
 
 Download the latest `.dmg` from [GitHub Releases](https://github.com/mvmcode/elves/releases).
+
+> **Gatekeeper note:** Since ELVES is not notarized, macOS may say the app is "damaged" or "can't be verified." To fix this, right-click `ELVES.app` → **Open** → click **Open** in the dialog. Or run:
+> ```bash
+> xattr -cr /Applications/ELVES.app
+> ```
 
 ---
 
@@ -140,7 +147,12 @@ On first launch, ELVES scans your PATH for `claude` and `codex` binaries and sho
 npm run tauri build
 ```
 
-This produces a signed `.dmg` in `src-tauri/target/release/bundle/`.
+This produces a `.app` bundle in `src-tauri/target/release/bundle/macos/`. To create a distributable DMG with proper code signing:
+
+```bash
+codesign --force --deep --sign - src-tauri/target/release/bundle/macos/ELVES.app
+hdiutil create -volname "ELVES" -srcfolder src-tauri/target/release/bundle/macos/ELVES.app -ov -format UDZO ELVES.dmg
+```
 
 ---
 

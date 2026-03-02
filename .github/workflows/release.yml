@@ -50,21 +50,61 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and package with Tauri
-        uses: tauri-apps/tauri-action@v0
+      - name: Build .app bundle with Tauri
+        run: npx tauri build
+
+      - name: Ad-hoc codesign the .app bundle
+        run: |
+          APP_PATH="src-tauri/target/release/bundle/macos/ELVES.app"
+          echo "Signing $APP_PATH..."
+          codesign --force --deep --sign - "$APP_PATH"
+
+      - name: Verify codesign
+        run: |
+          APP_PATH="src-tauri/target/release/bundle/macos/ELVES.app"
+          codesign --verify --deep --strict "$APP_PATH"
+          echo "Codesign verification passed."
+
+      - name: Create DMG from signed .app
+        run: |
+          APP_PATH="src-tauri/target/release/bundle/macos/ELVES.app"
+          VERSION="${RELEASE_TAG#v}"
+          DMG_NAME="ELVES_${VERSION}_aarch64.dmg"
+          hdiutil create \
+            -volname "ELVES" \
+            -srcfolder "$APP_PATH" \
+            -ov \
+            -format UDZO \
+            "$DMG_NAME"
+          echo "DMG_NAME=$DMG_NAME" >> "$GITHUB_ENV"
+          echo "Created $DMG_NAME"
+
+      - name: Create draft GitHub Release
+        run: |
+          gh release create "$RELEASE_TAG" \
+            --draft \
+            --title "ELVES $RELEASE_TAG" \
+            --notes "$(cat <<'NOTES'
+          See the [CHANGELOG](https://github.com/mvmcode/elves/blob/main/CHANGELOG.md) for details.
+
+          ## Install
+
+          ### Homebrew (recommended)
+          ```bash
+          brew install --no-quarantine --cask mvmcode/tap/elves
+          ```
+
+          ### Direct Download
+          1. Download `ELVES_<version>_aarch64.dmg` below
+          2. Open the DMG and drag ELVES to Applications
+          3. **Important:** ELVES is not notarized (open-source project). On first launch:
+             - Right-click ELVES.app → **Open** → click **Open** in the dialog
+             - Or run: `xattr -cr /Applications/ELVES.app`
+          NOTES
+          )" \
+            "$DMG_NAME"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ env.RELEASE_TAG }}
-          releaseName: "ELVES ${{ env.RELEASE_TAG }}"
-          releaseBody: |
-            See the [CHANGELOG](https://github.com/mvmcode/elves/blob/main/CHANGELOG.md) for details.
-
-            ## Install
-            - **macOS DMG:** Download `ELVES_${{ env.RELEASE_TAG }}_aarch64.dmg` below
-            - **Homebrew:** `brew install --cask mvmcode/tap/elves` (coming soon)
-          releaseDraft: true
-          prerelease: false
 
   update-homebrew:
     name: Update Homebrew formula
