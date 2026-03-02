@@ -397,10 +397,10 @@ export function Shell(): React.JSX.Element {
 
                 {/* Agent prompt popup — centered above StatusBar when Claude asks a question */}
                 <AnimatePresence>
-                  {needsInput && lastResultText && (
+                  {needsInput && (
                     <AgentPromptPopup
-                      questionText={lastResultText}
-                      promptType={classifyPromptType(lastResultText)}
+                      questionText={lastResultText ?? "Claude is waiting for your input."}
+                      promptType={classifyPromptType(lastResultText ?? "")}
                       leadElf={elves[0] ?? null}
                       onSubmit={handlePromptSubmit}
                       onDismiss={handlePromptDismiss}
