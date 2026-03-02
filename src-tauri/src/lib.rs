@@ -163,6 +163,8 @@ pub fn run() {
             commands::pty::write_pty,
             commands::pty::resize_pty,
             commands::pty::kill_pty,
+            commands::filesystem::list_directory,
+            commands::filesystem::git_status,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");

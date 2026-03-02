@@ -4,7 +4,7 @@ import { create } from "zustand";
 import type { WorkshopViewMode } from "@/types/workshop";
 
 /** Top-level views the shell can render in the main content area. */
-export type AppView = "session" | "memory" | "skills" | "mcp" | "history" | "settings";
+export type AppView = "session" | "files" | "memory" | "skills" | "mcp" | "history" | "settings";
 
 /** Panel width constraints for resizable layout. */
 const SIDEBAR_MIN = 200;

@@ -22,6 +22,7 @@ import ThemePicker from "@/components/settings/ThemePicker";
 import { SkillEditor } from "@/components/editors/SkillEditor";
 import { McpManager } from "@/components/editors/McpManager";
 import { SessionHistory } from "@/components/project/SessionHistory";
+import { FileExplorer } from "@/components/files/FileExplorer";
 import { BottomTerminalPanel } from "@/components/terminal/BottomTerminalPanel";
 import { ShortcutOverlay } from "@/components/shared/ShortcutOverlay";
 import { ToastContainer } from "@/components/shared/Toast";
@@ -233,7 +234,11 @@ export function Shell(): React.JSX.Element {
         <FloorBar />
 
         {/* View routing — session workshop, memory, skills, MCP, history, settings */}
-        {activeView === "memory" ? (
+        {activeView === "files" ? (
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <FileExplorer />
+          </div>
+        ) : activeView === "memory" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <MemoryExplorer
               onCreateMemory={handleCreateMemory}
