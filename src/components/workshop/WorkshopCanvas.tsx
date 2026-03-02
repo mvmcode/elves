@@ -102,18 +102,41 @@ export function WorkshopCanvas({ elves, events }: WorkshopCanvasProps): React.JS
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Sync elf spawns/removes with the scene. */
+  /** Sync elf spawns/removes with the scene.
+   * On remount (e.g. switching back from card view), spawns elves via synthetic
+   * spawn events so they get proper workbench assignment. Cancels the matrix
+   * entrance animation since the elf was already visible before the switch. */
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
 
     const currentElfIds = new Set(elves.map((elf) => elf.id));
     const known = knownElfIdsRef.current;
+    const isRemount = known.size === 0 && elves.length > 0;
 
-    /* Spawn new elves that appeared in the store. */
+    /* Spawn new elves via synthetic spawn event for full workbench assignment. */
     for (const elf of elves) {
       if (!known.has(elf.id)) {
-        scene.spawnElf(elf.id, elf.name, elf.color, "");
+        scene.processElfEvent({
+          id: `resync-${elf.id}-${Date.now()}`,
+          timestamp: Date.now(),
+          elfId: elf.id,
+          elfName: elf.name,
+          runtime: elf.runtime,
+          type: "spawn",
+          payload: { hatColor: elf.color, accessory: "" },
+        });
+
+        /* On remount, skip the matrix entrance animation — the elf was
+         * already visible before the view switch. Jump straight to idle. */
+        if (isRemount) {
+          const sprite = scene.getElf(elf.id);
+          if (sprite) {
+            sprite.matrixEffect = null;
+            sprite.transitionTo("idle");
+          }
+        }
+
         known.add(elf.id);
       }
     }

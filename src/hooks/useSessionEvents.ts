@@ -101,12 +101,16 @@ function parseClaudePayload(
   }
 
   if (eventType === "result") {
+    /* The result text duplicates the final assistant text block already emitted above.
+     * Only emit a task_update with cost metadata to avoid duplicate output in the card view. */
+    const cost = rawPayload.cost_usd as number | undefined;
     return [{
-      type: "output",
+      type: "task_update",
       payload: {
-        text: String(rawPayload.result ?? ""),
+        status: "completed",
         isFinal: true,
-        cost: rawPayload.cost_usd,
+        cost: cost ?? 0,
+        message: "Session finished",
       },
     }];
   }

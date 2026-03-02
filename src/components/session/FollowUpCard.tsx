@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
+import { MarkdownLite } from "@/lib/markdown-lite";
 import { playSound } from "@/lib/sounds";
 
 interface FollowUpCardProps {
@@ -66,12 +67,13 @@ export function FollowUpCard({
           Claude is asking...
         </p>
 
-        {/* Question text */}
+        {/* Question text — rendered with markdown formatting */}
         {questionText && (
-          <div className="mt-2 border-[2px] border-dashed border-purple-300/40 bg-purple-50/10 px-3 py-2">
-            <p className="font-mono text-sm italic text-text-light/80">
-              {questionText.length > 300 ? `${questionText.slice(0, 300)}...` : questionText}
-            </p>
+          <div className="mt-2 max-h-48 overflow-y-auto border-[2px] border-dashed border-purple-300/40 bg-purple-50/10 px-3 py-2">
+            <MarkdownLite
+              text={questionText}
+              className="font-body text-sm text-text-light/90 [&_pre]:text-[11px] [&_code]:text-[11px] [&_p]:leading-relaxed"
+            />
           </div>
         )}
 
