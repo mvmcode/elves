@@ -3,7 +3,7 @@
 
 cask "elves" do
   version "0.9.0"
-  sha256 "PLACEHOLDER_SHA256"
+  sha256 "a8b796aafb2260437e6aeb82027be22b0a5342721af7207bc2d1fb3452c52869"
 
   url "https://github.com/mvmcode/elves/releases/download/v#{version}/ELVES_#{version}_aarch64.dmg"
   name "ELVES"
