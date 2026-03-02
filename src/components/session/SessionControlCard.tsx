@@ -44,6 +44,11 @@ export function SessionControlCard(): React.JSX.Element | null {
   const clearFloorSession = useSessionStore((s) => s.clearFloorSession);
   const toggleTerminalPanel = useUiStore((s) => s.toggleTerminalPanel);
   const isTerminalPanelOpen = useUiStore((s) => s.isTerminalPanelOpen);
+  const workshopViewMode = useUiStore((s) => s.workshopViewMode);
+  const toggleWorkshopViewMode = useUiStore((s) => s.toggleWorkshopViewMode);
+  const isHistoricalFloor = useSessionStore(
+    (s) => (s.activeFloorId ? s.floors[s.activeFloorId]?.isHistorical : false) ?? false,
+  );
   const needsInput = useSessionStore((s) => s.needsInput);
   const lastResultText = useSessionStore((s) => s.lastResultText);
   const setNeedsInputOnFloor = useSessionStore((s) => s.setNeedsInputOnFloor);
@@ -193,6 +198,21 @@ export function SessionControlCard(): React.JSX.Element | null {
         )}
 
         <div className="flex-1" />
+
+        {/* View toggle — pixel art vs card view */}
+        {!isHistoricalFloor && (
+          <button
+            onClick={toggleWorkshopViewMode}
+            className={[
+              "cursor-pointer border-[2px] border-border px-3 py-1 font-display text-[10px] font-bold uppercase tracking-widest shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none",
+              workshopViewMode === "workshop" ? "bg-purple-100" : "bg-white",
+            ].join(" ")}
+            data-testid="control-view-toggle"
+            title={`Switch to ${workshopViewMode === "workshop" ? "card" : "pixel art"} view (Space)`}
+          >
+            {workshopViewMode === "workshop" ? "\u2630 CARDS" : "\u2B1A PIXEL"}
+          </button>
+        )}
 
         <button
           onClick={toggleTerminalPanel}
