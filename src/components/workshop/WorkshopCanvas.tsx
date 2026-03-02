@@ -103,40 +103,38 @@ export function WorkshopCanvas({ elves, events }: WorkshopCanvasProps): React.JS
   }, []);
 
   /** Sync elf spawns/removes with the scene.
-   * On remount (e.g. switching back from card view), spawns elves via synthetic
-   * spawn events so they get proper workbench assignment. Cancels the matrix
-   * entrance animation since the elf was already visible before the switch. */
+   *
+   * Two spawn paths:
+   * - Fresh session (events empty): full spawn with door entrance + matrix animation
+   * - View switch back (events exist): teleport elf directly to workbench, no animation
+   */
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
 
     const currentElfIds = new Set(elves.map((elf) => elf.id));
     const known = knownElfIdsRef.current;
-    const isRemount = known.size === 0 && elves.length > 0;
 
-    /* Spawn new elves via synthetic spawn event for full workbench assignment. */
+    /* Detect if this is a view-switch re-sync: events already exist from before the switch */
+    const isResync = events.length > 0 && known.size === 0 && elves.length > 0;
+
     for (const elf of elves) {
       if (!known.has(elf.id)) {
-        scene.processElfEvent({
-          id: `resync-${elf.id}-${Date.now()}`,
-          timestamp: Date.now(),
-          elfId: elf.id,
-          elfName: elf.name,
-          runtime: elf.runtime,
-          type: "spawn",
-          payload: { hatColor: elf.color, accessory: "" },
-        });
-
-        /* On remount, skip the matrix entrance animation — the elf was
-         * already visible before the view switch. Jump straight to idle. */
-        if (isRemount) {
-          const sprite = scene.getElf(elf.id);
-          if (sprite) {
-            sprite.matrixEffect = null;
-            sprite.transitionTo("idle");
-          }
+        if (isResync) {
+          /* View switch: place elf directly at workbench, no animation */
+          scene.spawnElfAtBench(elf.id, elf.name, elf.color, "");
+        } else {
+          /* Fresh session: normal spawn via EventProcessor for door entrance */
+          scene.processElfEvent({
+            id: `sync-spawn-${elf.id}-${Date.now()}`,
+            timestamp: Date.now(),
+            elfId: elf.id,
+            elfName: elf.name,
+            runtime: elf.runtime,
+            type: "spawn",
+            payload: { hatColor: elf.color, accessory: "" },
+          });
         }
-
         known.add(elf.id);
       }
     }
@@ -148,7 +146,7 @@ export function WorkshopCanvas({ elves, events }: WorkshopCanvasProps): React.JS
         known.delete(knownId);
       }
     }
-  }, [elves]);
+  }, [elves, events.length]);
 
   /** Feed new ElfEvents into the scene as they arrive. */
   useEffect(() => {

@@ -266,6 +266,64 @@ export class WorkshopScene {
   }
 
   /**
+   * Spawn an elf directly at a workbench with no entrance animation.
+   * Used when re-syncing after a view switch (cards -> workshop) where the elf
+   * was already visible. Places the elf at the workbench stand position immediately.
+   */
+  spawnElfAtBench(
+    id: string,
+    name: string,
+    hatColor: string,
+    accessory: string,
+  ): void {
+    if (this.elves.has(id)) return;
+
+    /* Pick a diverse palette based on what's already in use */
+    const usedIndices = Array.from(this.elves.values()).map((elf) => elf.paletteIndex);
+    const { index: paletteIndex } = pickDiversePalette(usedIndices);
+
+    /* Find a free workbench and compute its stand position */
+    let benchId: number | null = null;
+    let position = this.pathfinder.tileToPixel(DOOR_POS);
+    for (const bench of WORKBENCHES) {
+      if (bench.assignedElfId === null) {
+        benchId = bench.id;
+        position = {
+          x: bench.x * ST + ST * 1.5,
+          y: (bench.y + 2) * ST + ST * 0.5,
+        };
+        bench.assignedElfId = id;
+        break;
+      }
+    }
+
+    const config = {
+      id,
+      name,
+      position,
+      targetPosition: null,
+      path: [],
+      state: "idle" as const,
+      facing: "up" as const,
+      animFrame: 0,
+      animTimer: 0,
+      workbenchId: benchId,
+      workAnimation: "type" as const,
+      carryItem: null,
+      speechBubble: null,
+      actionQueue: [],
+      hatColor,
+      accessory,
+      bodyColor: "#FFD93D",
+      paletteIndex,
+      isActive: true,
+    };
+    const elf = new ElfSprite(config);
+    /* No matrix effect — elf appears instantly at workbench */
+    this.elves.set(id, elf);
+  }
+
+  /**
    * Remove an elf from the workshop scene.
    * Starts a matrix despawn effect. The elf is deleted after the effect completes.
    * Frees the elf's assigned workbench immediately so others can claim it.
