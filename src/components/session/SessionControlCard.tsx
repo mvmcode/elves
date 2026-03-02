@@ -7,7 +7,6 @@ import { useSessionStore } from "@/stores/session";
 import { useUiStore } from "@/stores/ui";
 import { useStallDetection } from "@/hooks/useStallDetection";
 import { useTeamSession } from "@/hooks/useTeamSession";
-import { FollowUpCard } from "./FollowUpCard";
 
 /** Format elapsed seconds to "M:SS" or "H:MM:SS". */
 function formatElapsed(seconds: number): string {
@@ -50,10 +49,7 @@ export function SessionControlCard(): React.JSX.Element | null {
     (s) => (s.activeFloorId ? s.floors[s.activeFloorId]?.isHistorical : false) ?? false,
   );
   const needsInput = useSessionStore((s) => s.needsInput);
-  const lastResultText = useSessionStore((s) => s.lastResultText);
-  const setNeedsInputOnFloor = useSessionStore((s) => s.setNeedsInputOnFloor);
-  const { stopSession, continueSession } = useTeamSession();
-  const [isFollowUpSubmitting, setIsFollowUpSubmitting] = useState(false);
+  const { stopSession } = useTeamSession();
 
   const isActive = activeSession?.status === "active";
   const isCompleted = activeSession?.status === "completed";
@@ -86,17 +82,6 @@ export function SessionControlCard(): React.JSX.Element | null {
       clearFloorSession(activeFloorId);
     }
   }, [activeFloorId, clearFloorSession]);
-
-  const handleFollowUpSubmit = useCallback((message: string): void => {
-    setIsFollowUpSubmitting(true);
-    void continueSession(message).finally(() => setIsFollowUpSubmitting(false));
-  }, [continueSession]);
-
-  const handleFollowUpDismiss = useCallback((): void => {
-    if (activeFloorId) {
-      setNeedsInputOnFloor(activeFloorId, false, null);
-    }
-  }, [activeFloorId, setNeedsInputOnFloor]);
 
   const isCancelled = activeSession?.status === "cancelled";
 
@@ -226,18 +211,6 @@ export function SessionControlCard(): React.JSX.Element | null {
           {isTerminalPanelOpen ? "\u25BC TERMINAL" : "\u25B6 TERMINAL"}
         </button>
       </div>
-
-      {/* Follow-up card when Claude asks a question */}
-      {isCompleted && needsInput && (
-        <div className="border-t-[2px] border-border/30 px-3 py-2">
-          <FollowUpCard
-            questionText={lastResultText}
-            onSubmit={handleFollowUpSubmit}
-            onDismiss={handleFollowUpDismiss}
-            isSubmitting={isFollowUpSubmitting}
-          />
-        </div>
-      )}
     </div>
   );
 }

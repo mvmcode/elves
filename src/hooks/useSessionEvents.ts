@@ -12,7 +12,8 @@ import { useSessionStore } from "@/stores/session";
 import { useSettingsStore } from "@/stores/settings";
 import { useToastStore } from "@/stores/toast";
 import { onEvent, extractSessionMemories } from "@/lib/tauri";
-import { getStatusMessage } from "@/lib/elf-names";
+import { generateElf, getStatusMessage } from "@/lib/elf-names";
+import { playSound } from "@/lib/sounds";
 import type { ElfEventType, ElfStatus } from "@/types/elf";
 
 /** Payload shape for `elf:event` Tauri events emitted by the Rust backend. */
@@ -239,6 +240,59 @@ export function useSessionEvents(): void {
             payload: entry.payload,
             funnyStatus: getStatusMessage(targetElf.name, targetElf.status),
           });
+
+          /* Detect Agent tool calls — create a new elf for each spawned sub-agent.
+           * The lead elf (elves[0]) is already the leader; new agents get their own elf. */
+          if (entry.type === "tool_call" && entry.payload.tool === "Agent") {
+            const usedNames = floor.elves.map((e) => e.name);
+            const personality = generateElf(usedNames);
+            const agentDesc = String(entry.payload.input && typeof entry.payload.input === "object"
+              ? (entry.payload.input as Record<string, unknown>).description ?? ""
+              : "");
+            const agentType = String(entry.payload.input && typeof entry.payload.input === "object"
+              ? (entry.payload.input as Record<string, unknown>).subagent_type ?? "Agent"
+              : "Agent");
+            const roleName = agentType === "Agent" ? "Worker" : agentType;
+            const elfId = `elf-agent-${data.sessionId}-${data.timestamp}-${Math.random().toString(36).slice(2, 6)}`;
+
+            store.addElfToFloor(floorId, {
+              id: elfId,
+              sessionId: data.sessionId,
+              name: personality.name,
+              role: roleName,
+              avatar: personality.avatar,
+              color: personality.color,
+              quirk: personality.quirk,
+              runtime: targetElf.runtime,
+              status: "spawning",
+              spawnedAt: Date.now(),
+              finishedAt: null,
+              parentElfId: targetElf.id,
+              toolsUsed: [],
+            });
+
+            store.addEventToFloor(floorId, {
+              id: `event-agent-spawn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              timestamp: Date.now(),
+              elfId,
+              elfName: personality.name,
+              runtime: targetElf.runtime,
+              type: "spawn",
+              payload: { role: roleName, description: agentDesc },
+              funnyStatus: getStatusMessage(personality.name, "spawning"),
+            });
+
+            playSound("spawn");
+
+            /* Transition to working after brief delay */
+            setTimeout(() => {
+              const currentStore = useSessionStore.getState();
+              const currentFloor = currentStore.floors[floorId];
+              if (currentFloor?.elves.some((e) => e.id === elfId)) {
+                currentStore.updateElfStatusOnFloor(floorId, elfId, "working");
+              }
+            }, 1500);
+          }
         }
 
         /* Update elf status based on raw event type */
