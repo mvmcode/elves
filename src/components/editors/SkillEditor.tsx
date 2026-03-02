@@ -49,6 +49,7 @@ export function SkillEditor(): React.JSX.Element {
   } = useSkillActions();
 
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
   /* Local editor state */
   const [editName, setEditName] = useState("");
@@ -82,18 +83,29 @@ export function SkillEditor(): React.JSX.Element {
 
   const handleSave = useCallback((): void => {
     if (!activeSkill || !editName.trim()) return;
+    setSaveStatus("Saving...");
     void handleUpdateSkill(
       activeSkill.id,
       editName.trim(),
       editContent,
       editDescription.trim() || undefined,
       editTrigger.trim() || undefined,
-    );
-    setIsDirty(false);
+    ).then(() => {
+      setIsDirty(false);
+      setSaveStatus("Saved");
+      setTimeout(() => setSaveStatus(null), 2000);
+    }).catch(() => {
+      setSaveStatus("Save failed");
+      setTimeout(() => setSaveStatus(null), 3000);
+    });
   }, [activeSkill, editName, editContent, editDescription, editTrigger, handleUpdateSkill]);
 
   const handleNewSkill = useCallback((): void => {
-    void handleCreateSkill("New Skill", NEW_SKILL_TEMPLATE, "A new custom skill");
+    setSaveStatus("Creating...");
+    void handleCreateSkill("New Skill", NEW_SKILL_TEMPLATE, "A new custom skill").then(() => {
+      setSaveStatus("Created");
+      setTimeout(() => setSaveStatus(null), 2000);
+    });
   }, [handleCreateSkill]);
 
   const handleDelete = useCallback((): void => {
@@ -216,6 +228,7 @@ export function SkillEditor(): React.JSX.Element {
                   data-testid="skill-name-input"
                 />
                 {isDirty && <Badge variant="warning">Unsaved</Badge>}
+                {saveStatus && <Badge variant={saveStatus === "Save failed" ? "error" : "success"}>{saveStatus}</Badge>}
               </div>
               <input
                 type="text"
