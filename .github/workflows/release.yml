@@ -86,10 +86,9 @@ jobs:
           path: ${{ env.DMG_NAME }}
           retention-days: 1
 
-      - name: Create draft GitHub Release
+      - name: Create GitHub Release
         run: |
           gh release create "$RELEASE_TAG" \
-            --draft \
             --title "ELVES $RELEASE_TAG" \
             --notes "$(cat <<'NOTES'
           See the [CHANGELOG](https://github.com/mvmcode/elves/blob/main/CHANGELOG.md) for details.
