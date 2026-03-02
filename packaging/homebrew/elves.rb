@@ -2,7 +2,7 @@
 # Template: update version, sha256, and URL for each release.
 
 cask "elves" do
-  version "0.1.0"
+  version "0.9.0"
   sha256 "PLACEHOLDER_SHA256"
 
   url "https://github.com/mvmcode/elves/releases/download/v#{version}/ELVES_v#{version}_aarch64.dmg"

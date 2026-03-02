@@ -1,4 +1,5 @@
 # Release pipeline for ELVES — builds macOS DMG and creates a GitHub Release on tag push.
+# Also supports manual dispatch to re-run formula update against an existing release.
 
 name: Release
 
@@ -6,16 +7,24 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.9.0)"
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 env:
   NODE_VERSION: "20"
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
   build-macos:
     name: Build macOS DMG
+    if: github.event_name == 'push'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,13 +55,60 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "ELVES ${{ github.ref_name }}"
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: "ELVES ${{ env.RELEASE_TAG }}"
           releaseBody: |
             See the [CHANGELOG](https://github.com/mvmcode/elves/blob/main/CHANGELOG.md) for details.
 
             ## Install
-            - **macOS DMG:** Download `ELVES_${{ github.ref_name }}_aarch64.dmg` below
+            - **macOS DMG:** Download `ELVES_${{ env.RELEASE_TAG }}_aarch64.dmg` below
             - **Homebrew:** `brew install --cask mvmcode/tap/elves` (coming soon)
           releaseDraft: true
           prerelease: false
+
+  update-homebrew:
+    name: Update Homebrew formula
+    needs: build-macos
+    if: always() && (needs.build-macos.result == 'success' || needs.build-macos.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+
+      - name: Download DMG from release
+        run: gh release download "$RELEASE_TAG" --pattern "*.dmg" --dir /tmp/dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+
+      - name: Compute SHA256
+        id: sha
+        run: |
+          DMG_FILE=$(ls /tmp/dmg/*.dmg)
+          SHA=$(sha256sum "$DMG_FILE" | awk '{print $1}')
+          echo "SHA256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Computed SHA256: $SHA"
+
+      - name: Update Homebrew formula
+        run: |
+          sed -i "s/version \".*\"/version \"${{ steps.version.outputs.VERSION }}\"/" packaging/homebrew/elves.rb
+          sed -i "s/sha256 \".*\"/sha256 \"${{ steps.sha.outputs.SHA256 }}\"/" packaging/homebrew/elves.rb
+
+      - name: Verify formula update
+        run: cat packaging/homebrew/elves.rb
+
+      - name: Commit and push updated formula
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add packaging/homebrew/elves.rb
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "chore(homebrew): update formula to ${{ env.RELEASE_TAG }}"
+          git push origin main
