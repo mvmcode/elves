@@ -18,6 +18,8 @@ export interface FloorSession {
   readonly isPlanPreview: boolean;
   readonly pendingPlan: TaskPlan | null;
   readonly isInteractiveMode: boolean;
+  readonly needsInput: boolean;
+  readonly lastResultText: string | null;
   readonly lastEventAt: number;
   readonly order: number;
   readonly isHistorical: boolean;
@@ -35,6 +37,8 @@ export function createEmptyFloor(id: FloorId, order: number, label?: string): Fl
     isPlanPreview: false,
     pendingPlan: null,
     isInteractiveMode: false,
+    needsInput: false,
+    lastResultText: null,
     lastEventAt: 0,
     order,
     isHistorical: false,

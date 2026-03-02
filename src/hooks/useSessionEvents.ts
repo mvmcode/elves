@@ -5,6 +5,7 @@
 import { useEffect, useRef } from "react";
 import { useSessionStore } from "@/stores/session";
 import { useSettingsStore } from "@/stores/settings";
+import { useToastStore } from "@/stores/toast";
 import { onEvent, extractSessionMemories } from "@/lib/tauri";
 import { getStatusMessage } from "@/lib/elf-names";
 import type { ElfEventType, ElfStatus } from "@/types/elf";
@@ -20,6 +21,8 @@ interface ElfEventPayload {
 /** Payload shape for `session:completed` Tauri events emitted when the Claude process exits. */
 interface SessionCompletedPayload {
   readonly sessionId: string;
+  readonly needsInput?: boolean;
+  readonly lastResult?: string;
 }
 
 /** Payload shape for `session:cancelled` Tauri events emitted when the user stops a task. */
@@ -284,6 +287,11 @@ export function useSessionEvents(): void {
         funnyStatus: `${leadName} declares victory!`,
       });
 
+      /* Set needsInput flag if Claude asked a question */
+      if (data.needsInput) {
+        store.setNeedsInputOnFloor(floorId, true, data.lastResult ?? null);
+      }
+
       /* Extract memories if auto-learn is enabled */
       const autoLearn = useSettingsStore.getState().autoLearn;
       if (autoLearn) {
@@ -293,6 +301,32 @@ export function useSessionEvents(): void {
       }
 
       store.endSessionOnFloor(floorId, "completed");
+
+      /* Toast for cross-floor events — only when this session is on a non-active floor */
+      if (store.activeFloorId !== floorId) {
+        const floorLabel = floor.label || "another floor";
+        if (data.needsInput) {
+          useToastStore.getState().addToast({
+            message: `Claude is asking a question on "${floorLabel}"`,
+            variant: "warning",
+            duration: 8000,
+            action: {
+              label: "GO TO FLOOR",
+              onClick: () => useSessionStore.getState().switchFloor(floorId),
+            },
+          });
+        } else {
+          useToastStore.getState().addToast({
+            message: `Session completed on "${floorLabel}"`,
+            variant: "success",
+            duration: 5000,
+            action: {
+              label: "VIEW",
+              onClick: () => useSessionStore.getState().switchFloor(floorId),
+            },
+          });
+        }
+      }
     });
 
     sessionCompletePromise
@@ -329,6 +363,17 @@ export function useSessionEvents(): void {
 
       store.updateAllElfStatusOnFloor(floorId, "done");
       store.endSessionOnFloor(floorId, "cancelled");
+
+      /* Toast for cross-floor cancellation */
+      if (store.activeFloorId !== floorId) {
+        const floor = store.floors[floorId];
+        const floorLabel = floor?.label || "another floor";
+        useToastStore.getState().addToast({
+          message: `Session cancelled on "${floorLabel}"`,
+          variant: "info",
+          duration: 4000,
+        });
+      }
     });
 
     sessionCancelledPromise

@@ -68,6 +68,10 @@ interface SessionState {
   readonly pendingPlan: TaskPlan | null;
   /** Whether the session transitioned to interactive PTY terminal mode */
   readonly isInteractiveMode: boolean;
+  /** Whether Claude asked a question that needs user input */
+  readonly needsInput: boolean;
+  /** The last result text from Claude (used for follow-up card) */
+  readonly lastResultText: string | null;
   /** Timestamp of the last event received — used for stall detection */
   readonly lastEventAt: number;
 
@@ -124,6 +128,8 @@ interface SessionState {
   setInteractiveMode: (interactive: boolean) => void;
   /** Set interactive mode on a specific floor */
   setInteractiveModeOnFloor: (floorId: FloorId, interactive: boolean) => void;
+  /** Set needsInput flag and last result text on a specific floor */
+  setNeedsInputOnFloor: (floorId: FloorId, needsInput: boolean, lastResultText: string | null) => void;
   /** Reactivate a completed session for a follow-up turn */
   reactivateSession: () => void;
   /** Reactivate a session on a specific floor */
@@ -151,6 +157,8 @@ function snapshotFromFloor(floor: FloorSession): {
   isPlanPreview: boolean;
   pendingPlan: TaskPlan | null;
   isInteractiveMode: boolean;
+  needsInput: boolean;
+  lastResultText: string | null;
   lastEventAt: number;
 } {
   return {
@@ -161,6 +169,8 @@ function snapshotFromFloor(floor: FloorSession): {
     isPlanPreview: floor.isPlanPreview,
     pendingPlan: floor.pendingPlan,
     isInteractiveMode: floor.isInteractiveMode,
+    needsInput: floor.needsInput,
+    lastResultText: floor.lastResultText,
     lastEventAt: floor.lastEventAt,
   };
 }
@@ -174,6 +184,8 @@ const EMPTY_SNAPSHOT = {
   isPlanPreview: false,
   pendingPlan: null,
   isInteractiveMode: false,
+  needsInput: false,
+  lastResultText: null as string | null,
   lastEventAt: 0,
 } as const;
 
@@ -409,6 +421,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       isPlanPreview: false,
       pendingPlan: null,
       isInteractiveMode: false,
+      needsInput: false,
+      lastResultText: null,
       lastEventAt: session.startedAt,
       order: nextOrder,
       isHistorical: true,
@@ -447,6 +461,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         isPlanPreview: false,
         pendingPlan: null,
         isInteractiveMode: false,
+        needsInput: false,
+        lastResultText: null,
         lastEventAt: 0,
         label: "New Floor",
         isHistorical: false,
@@ -496,6 +512,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         isPlanPreview: false,
         pendingPlan: null,
         isInteractiveMode: false,
+        needsInput: false,
+        lastResultText: null,
         lastEventAt: Date.now(),
         isHistorical: false,
       };
@@ -533,6 +551,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         isPlanPreview: false,
         pendingPlan: null,
         isInteractiveMode: false,
+        needsInput: false,
+        lastResultText: null,
         lastEventAt: Date.now(),
         isHistorical: false,
       };
@@ -884,6 +904,26 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     });
   },
 
+  setNeedsInputOnFloor: (floorId: FloorId, needsInput: boolean, lastResultText: string | null): void => {
+    set((state) => {
+      const floor = state.floors[floorId];
+      if (!floor) return state;
+
+      const updatedFloor: FloorSession = {
+        ...floor,
+        needsInput,
+        lastResultText,
+      };
+
+      const newFloors = { ...state.floors, [floorId]: updatedFloor };
+      const isActive = state.activeFloorId === floorId;
+      return {
+        floors: newFloors,
+        ...(isActive ? snapshotFromFloor(updatedFloor) : {}),
+      };
+    });
+  },
+
   reactivateSession: (): void => {
     set((state) => {
       const floorId = state.activeFloorId;
@@ -895,6 +935,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         ...floor,
         session: { ...floor.session, status: "active" },
         isInteractiveMode: false,
+        needsInput: false,
+        lastResultText: null,
         lastEventAt: Date.now(),
       };
 
@@ -914,6 +956,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         ...floor,
         session: { ...floor.session, status: "active" },
         isInteractiveMode: false,
+        needsInput: false,
+        lastResultText: null,
         lastEventAt: Date.now(),
       };
 
@@ -943,6 +987,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         isPlanPreview: false,
         pendingPlan: null,
         isInteractiveMode: false,
+        needsInput: false,
+        lastResultText: null,
         lastEventAt: 0,
         label: "New Floor",
         isHistorical: false,

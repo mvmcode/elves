@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { ElfEvent, ElfEventType } from "@/types/elf";
+import { ToolCallCard } from "./ToolCallCard";
+import { MarkdownLite } from "@/lib/markdown-lite";
 
 /** Display variant controlling padding and truncation. */
 export type EventBlockVariant = "compact" | "terminal";
@@ -112,31 +114,15 @@ export function EventBlock({
     );
   }
 
-  /* Tool call: blue border, tool name in pill, detail in gray mono */
+  /* Tool call: enhanced card with structured detail per tool type */
   if (event.type === "tool_call") {
-    const toolName = String(payload.tool ?? "tool");
-    const input = payload.input as Record<string, unknown> | undefined;
-    const detail = String(input?.file_path ?? input?.command ?? input?.pattern ?? input?.query ?? input?.url ?? "").slice(0, textLimit);
-
     return (
-      <div
-        className={`border-l-token-normal ${borderColor("tool_call")} ${paddingClass}`}
-        data-testid="event-block"
-        data-event-type="tool_call"
-      >
-        <div className="flex items-center gap-2">
-          <span className="shrink-0 text-text-muted-light font-mono text-xs">[{formatTime(event.timestamp)}]</span>
-          <span
-            className="inline-block border-token-thin border-blue-500/50 bg-blue-500/20 px-2 py-0.5 font-mono text-xs font-bold text-blue-300"
-            data-testid="tool-pill"
-          >
-            {toolName}
-          </span>
-          {detail && (
-            <span className="truncate font-mono text-xs text-text-muted-light">{detail}</span>
-          )}
-        </div>
-      </div>
+      <ToolCallCard
+        toolName={String(payload.tool ?? "tool")}
+        input={(payload.input as Record<string, unknown>) ?? {}}
+        timestamp={event.timestamp}
+        variant={variant}
+      />
     );
   }
 
@@ -178,7 +164,7 @@ export function EventBlock({
     );
   }
 
-  /* Output: white mono text, final output gets green highlight + bold */
+  /* Output: white mono text, final output rendered with markdown */
   if (event.type === "output") {
     const text = String(payload.text ?? "");
     const isFinal = Boolean(payload.isFinal);
@@ -190,14 +176,18 @@ export function EventBlock({
         data-testid="event-block"
         data-event-type="output"
       >
-        <p
-          className={[
-            "font-mono text-xs whitespace-pre-wrap",
-            isFinal ? "font-bold text-green-400" : "text-gray-200",
-          ].join(" ")}
-        >
-          {displayText}
-        </p>
+        {isFinal && displayText.length > 0 ? (
+          <MarkdownLite text={displayText} className="text-green-400" />
+        ) : (
+          <p
+            className={[
+              "font-mono text-xs whitespace-pre-wrap",
+              isFinal ? "font-bold text-green-400" : "text-gray-200",
+            ].join(" ")}
+          >
+            {displayText}
+          </p>
+        )}
       </div>
     );
   }

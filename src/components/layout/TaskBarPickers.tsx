@@ -147,6 +147,18 @@ function ModelPicker(): React.JSX.Element {
   );
 }
 
+/** Returns the tint color class for a selected mode. */
+function modeColorClass(modeId: string | null): string {
+  switch (modeId) {
+    case "default": return "bg-info/20";
+    case "acceptEdits": return "bg-elf-gold/30";
+    case "plan": return "bg-purple-500/20";
+    case "bypassPermissions": return "bg-error/20";
+    case "dontAsk": return "bg-warning/20";
+    default: return "bg-success/20";
+  }
+}
+
 /** Compact neo-brutalist dropdown for selecting an approval mode — options driven by runtime config. */
 function ModePicker(): React.JSX.Element {
   const selectedMode = useAppStore((s) => s.selectedApprovalMode);
@@ -166,11 +178,12 @@ function ModePicker(): React.JSX.Element {
         className={[
           "flex cursor-pointer items-center gap-1 border-token-thin border-border rounded-token-sm px-2 py-1 font-mono text-xs font-bold transition-all duration-100",
           selectedMode !== null
-            ? "bg-success/20 shadow-[2px_2px_0px_0px_#000]"
+            ? `${modeColorClass(selectedMode)} shadow-[2px_2px_0px_0px_#000]`
             : "bg-surface-elevated hover:bg-surface-light",
         ].join(" ")}
       >
         <span className="text-[10px] text-label text-text-light/50">Mode:</span>
+        {selectedMode === "bypassPermissions" && <span className="text-error">&#9888;</span>}
         <span>{modeDisplayLabel(selectedMode, controlConfig.approvalModes)}</span>
         <span className="text-[8px]">{isOpen ? "\u25B2" : "\u25BC"}</span>
       </button>
