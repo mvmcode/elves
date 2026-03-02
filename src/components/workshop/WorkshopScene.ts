@@ -73,6 +73,12 @@ export class WorkshopScene {
   private tasksTotal: number;
 
   constructor(callbacks: WorkshopCallbacks) {
+    /* Reset module-level workbench assignments — they persist across scene instances
+     * since WORKBENCHES is a shared module-level array with mutable assignedElfId. */
+    for (const bench of WORKBENCHES) {
+      bench.assignedElfId = null;
+    }
+
     this.tilemap = new Tilemap();
     this.tilemapExtras = new TilemapExtras();
     this.pathfinder = new Pathfinder(WALKABLE_GRID);
