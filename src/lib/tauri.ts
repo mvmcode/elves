@@ -10,6 +10,7 @@ import type { Skill } from "@/types/skill";
 import type { McpServer } from "@/types/mcp";
 import type { Template } from "@/types/template";
 import type { ClaudeDiscovery, ClaudeSpawnOptions } from "@/types/claude";
+import type { FileEntry } from "@/types/filesystem";
 
 /** Detect available AI runtimes (Claude Code, Codex) on the system */
 export async function detectRuntimes(): Promise<RuntimeInfo> {
@@ -314,6 +315,18 @@ export async function exportSessionHtml(sessionId: string): Promise<string> {
 /** Save a session replay to disk via native save dialog. Returns true if saved, false if cancelled. */
 export async function saveSessionReplay(sessionId: string): Promise<boolean> {
   return invoke<boolean>("save_session_replay", { sessionId });
+}
+
+/* ── Filesystem commands ──────────────────────────────────────── */
+
+/** List one level of directory entries at `path`, sorted directories-first. */
+export async function listDirectory(path: string): Promise<FileEntry[]> {
+  return invoke<FileEntry[]>("list_directory", { path });
+}
+
+/** Get git status for all files in a project. Returns map of relative_path -> status_code. */
+export async function gitStatus(projectPath: string): Promise<Record<string, string>> {
+  return invoke<Record<string, string>>("git_status", { projectPath });
 }
 
 /* ── Event subscription ──────────────────────────────────────── */

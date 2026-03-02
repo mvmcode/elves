@@ -22,8 +22,10 @@ import ThemePicker from "@/components/settings/ThemePicker";
 import { SkillEditor } from "@/components/editors/SkillEditor";
 import { McpManager } from "@/components/editors/McpManager";
 import { SessionHistory } from "@/components/project/SessionHistory";
+import { FileExplorer } from "@/components/files/FileExplorer";
 import { BottomTerminalPanel } from "@/components/terminal/BottomTerminalPanel";
 import { ShortcutOverlay } from "@/components/shared/ShortcutOverlay";
+import { ToastContainer } from "@/components/shared/Toast";
 import { NewProjectDialog } from "@/components/project/NewProjectDialog";
 import { ResizeHandle } from "@/components/shared/ResizeHandle";
 import { useSessionStore } from "@/stores/session";
@@ -232,7 +234,11 @@ export function Shell(): React.JSX.Element {
         <FloorBar />
 
         {/* View routing — session workshop, memory, skills, MCP, history, settings */}
-        {activeView === "memory" ? (
+        {activeView === "files" ? (
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <FileExplorer />
+          </div>
+        ) : activeView === "memory" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <MemoryExplorer
               onCreateMemory={handleCreateMemory}
@@ -455,6 +461,9 @@ export function Shell(): React.JSX.Element {
         isOpen={isNewProjectDialogOpen}
         onClose={() => setNewProjectDialogOpen(false)}
       />
+
+      {/* Toast notification stack — fixed position, bottom-left */}
+      <ToastContainer />
     </div>
   );
 }

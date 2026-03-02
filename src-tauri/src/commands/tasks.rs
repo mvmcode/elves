@@ -567,6 +567,35 @@ fn drain_stderr(stderr: std::process::ChildStderr, session_id: &str) {
     }
 }
 
+/// Detect whether the result text contains a question or prompt for user input.
+///
+/// Checks for trailing question marks and common conversational prompt phrases.
+/// Used to determine if the frontend should show a follow-up input card.
+fn detect_question_in_result(text: &str) -> bool {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let ends_with_question = trimmed.ends_with('?');
+    let lower = trimmed.to_lowercase();
+    let has_prompt_phrase = [
+        "would you like",
+        "shall i",
+        "do you want",
+        "please confirm",
+        "let me know",
+        "what should i",
+        "which option",
+        "should i",
+        "can i",
+        "could you",
+        "any preference",
+    ]
+    .iter()
+    .any(|phrase| lower.contains(phrase));
+    ends_with_question || has_prompt_phrase
+}
+
 /// Read Claude's stdout line-by-line, parse events, and emit them to the frontend.
 ///
 /// Runs in a background thread. For each parsed line:
@@ -734,10 +763,32 @@ fn stream_claude_output(
         );
     }
 
+    // Detect if the result text contains a question that needs user input
+    let needs_input = last_result_payload.as_ref()
+        .and_then(|r| {
+            r.get("result").and_then(|v| v.as_str())
+                .or_else(|| r.get("text").and_then(|v| v.as_str()))
+                .or_else(|| r.get("content").and_then(|v| v.as_str()))
+        })
+        .map(|text| detect_question_in_result(text))
+        .unwrap_or(false);
+
+    let last_result_text = last_result_payload.as_ref()
+        .and_then(|r| {
+            r.get("result").and_then(|v| v.as_str())
+                .or_else(|| r.get("text").and_then(|v| v.as_str()))
+                .or_else(|| r.get("content").and_then(|v| v.as_str()))
+        })
+        .map(|text| {
+            if text.len() > 500 { format!("{}...", &text[..497]) } else { text.to_string() }
+        });
+
     let _ = app.emit(
         "session:completed",
         serde_json::json!({
             "sessionId": session_id,
+            "needsInput": needs_input,
+            "lastResult": last_result_text,
         }),
     );
 }
@@ -834,4 +885,46 @@ fn stream_codex_output(
             "sessionId": session_id,
         }),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detects_trailing_question_mark() {
+        assert!(detect_question_in_result("Would you like me to proceed?"));
+        assert!(detect_question_in_result("What file should I modify?"));
+    }
+
+    #[test]
+    fn detects_prompt_phrases() {
+        assert!(detect_question_in_result("I can fix this. Would you like me to do it now."));
+        assert!(detect_question_in_result("Shall I proceed with the refactor."));
+        assert!(detect_question_in_result("Please confirm the changes are correct."));
+        assert!(detect_question_in_result("Let me know if this approach works for you."));
+        assert!(detect_question_in_result("Should I also update the tests."));
+        assert!(detect_question_in_result("Do you want me to apply the fix."));
+    }
+
+    #[test]
+    fn rejects_non_question_text() {
+        assert!(!detect_question_in_result("Done! All tests pass."));
+        assert!(!detect_question_in_result("I've updated the file successfully."));
+        assert!(!detect_question_in_result("The function now handles edge cases."));
+    }
+
+    #[test]
+    fn handles_empty_and_whitespace() {
+        assert!(!detect_question_in_result(""));
+        assert!(!detect_question_in_result("   "));
+        assert!(!detect_question_in_result("\n\n"));
+    }
+
+    #[test]
+    fn case_insensitive_phrase_match() {
+        assert!(detect_question_in_result("WOULD YOU LIKE me to continue"));
+        assert!(detect_question_in_result("SHALL I proceed"));
+        assert!(detect_question_in_result("Any Preference on the approach"));
+    }
 }

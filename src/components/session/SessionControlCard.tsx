@@ -7,6 +7,7 @@ import { useSessionStore } from "@/stores/session";
 import { useUiStore } from "@/stores/ui";
 import { useStallDetection } from "@/hooks/useStallDetection";
 import { useTeamSession } from "@/hooks/useTeamSession";
+import { FollowUpCard } from "./FollowUpCard";
 
 /** Format elapsed seconds to "M:SS" or "H:MM:SS". */
 function formatElapsed(seconds: number): string {
@@ -43,7 +44,16 @@ export function SessionControlCard(): React.JSX.Element | null {
   const clearFloorSession = useSessionStore((s) => s.clearFloorSession);
   const toggleTerminalPanel = useUiStore((s) => s.toggleTerminalPanel);
   const isTerminalPanelOpen = useUiStore((s) => s.isTerminalPanelOpen);
-  const { stopSession } = useTeamSession();
+  const workshopViewMode = useUiStore((s) => s.workshopViewMode);
+  const toggleWorkshopViewMode = useUiStore((s) => s.toggleWorkshopViewMode);
+  const isHistoricalFloor = useSessionStore(
+    (s) => (s.activeFloorId ? s.floors[s.activeFloorId]?.isHistorical : false) ?? false,
+  );
+  const needsInput = useSessionStore((s) => s.needsInput);
+  const lastResultText = useSessionStore((s) => s.lastResultText);
+  const setNeedsInputOnFloor = useSessionStore((s) => s.setNeedsInputOnFloor);
+  const { stopSession, continueSession } = useTeamSession();
+  const [isFollowUpSubmitting, setIsFollowUpSubmitting] = useState(false);
 
   const isActive = activeSession?.status === "active";
   const isCompleted = activeSession?.status === "completed";
@@ -77,6 +87,17 @@ export function SessionControlCard(): React.JSX.Element | null {
     }
   }, [activeFloorId, clearFloorSession]);
 
+  const handleFollowUpSubmit = useCallback((message: string): void => {
+    setIsFollowUpSubmitting(true);
+    void continueSession(message).finally(() => setIsFollowUpSubmitting(false));
+  }, [continueSession]);
+
+  const handleFollowUpDismiss = useCallback((): void => {
+    if (activeFloorId) {
+      setNeedsInputOnFloor(activeFloorId, false, null);
+    }
+  }, [activeFloorId, setNeedsInputOnFloor]);
+
   const isCancelled = activeSession?.status === "cancelled";
 
   /* Only show when there's a session (active, completed, or cancelled) */
@@ -86,7 +107,7 @@ export function SessionControlCard(): React.JSX.Element | null {
 
   const leadElf = elves[0];
   const statusText = isCompleted
-    ? "Done!"
+    ? needsInput ? "Waiting for reply..." : "Done!"
     : isCancelled
       ? "Cancelled"
       : isInteractiveMode
@@ -94,6 +115,9 @@ export function SessionControlCard(): React.JSX.Element | null {
         : leadElf?.status === "thinking"
           ? "Thinking..."
           : "Working...";
+
+  const permissionMode = activeSession?.appliedOptions?.permissionMode;
+  const showModeBadge = permissionMode != null && permissionMode !== "default";
 
   return (
     <div
@@ -120,6 +144,23 @@ export function SessionControlCard(): React.JSX.Element | null {
             {activeSession.task}
           </p>
         </div>
+
+        {/* Permission mode badge */}
+        {showModeBadge && (
+          <span
+            className={[
+              "border-token-thin border-border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase",
+              permissionMode === "bypassPermissions" ? "bg-error/20 text-error" :
+              permissionMode === "plan" ? "bg-purple-500/20 text-purple-400" :
+              permissionMode === "acceptEdits" ? "bg-elf-gold/30 text-yellow-700" :
+              permissionMode === "dontAsk" ? "bg-warning/20 text-warning" :
+              "bg-info/20 text-info",
+            ].join(" ")}
+            data-testid="mode-badge"
+          >
+            {permissionMode === "bypassPermissions" ? "\u26A0 YOLO" : permissionMode}
+          </span>
+        )}
 
         {/* Stall warning */}
         {isStalled && (
@@ -158,6 +199,21 @@ export function SessionControlCard(): React.JSX.Element | null {
 
         <div className="flex-1" />
 
+        {/* View toggle — pixel art vs card view */}
+        {!isHistoricalFloor && (
+          <button
+            onClick={toggleWorkshopViewMode}
+            className={[
+              "cursor-pointer border-[2px] border-border px-3 py-1 font-display text-[10px] font-bold uppercase tracking-widest shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none",
+              workshopViewMode === "workshop" ? "bg-purple-100" : "bg-white",
+            ].join(" ")}
+            data-testid="control-view-toggle"
+            title={`Switch to ${workshopViewMode === "workshop" ? "card" : "pixel art"} view (Space)`}
+          >
+            {workshopViewMode === "workshop" ? "\u2630 CARDS" : "\u2B1A PIXEL"}
+          </button>
+        )}
+
         <button
           onClick={toggleTerminalPanel}
           className={[
@@ -170,6 +226,18 @@ export function SessionControlCard(): React.JSX.Element | null {
           {isTerminalPanelOpen ? "\u25BC TERMINAL" : "\u25B6 TERMINAL"}
         </button>
       </div>
+
+      {/* Follow-up card when Claude asks a question */}
+      {isCompleted && needsInput && (
+        <div className="border-t-[2px] border-border/30 px-3 py-2">
+          <FollowUpCard
+            questionText={lastResultText}
+            onSubmit={handleFollowUpSubmit}
+            onDismiss={handleFollowUpDismiss}
+            isSubmitting={isFollowUpSubmitting}
+          />
+        </div>
+      )}
     </div>
   );
 }

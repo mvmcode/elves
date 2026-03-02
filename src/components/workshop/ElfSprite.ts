@@ -12,6 +12,8 @@ import type {
   WorkAnimation,
 } from "../../types/workshop";
 import { SCALE } from "./workshop-layout";
+import { MatrixEffect } from "./MatrixEffect";
+import { getPalette, type ElfColorPalette } from "./ElfPalette";
 
 /** Pixel-aligned rectangle draw helper — all coordinates are floored for crisp pixel art. */
 function drawPixelRect(
@@ -38,11 +40,7 @@ const DEFAULT_BUBBLE_DURATION = 150;
 /** Blink occurs every N frames — eyes close for 1 frame out of this cycle. */
 const BLINK_CYCLE = 40;
 
-/** Boot color for all elves. */
-const BOOT_COLOR = "#5A3A2A";
-
-/** Apron color (info blue from design system). */
-const APRON_COLOR = "#4D96FF";
+/* Boot and apron colors now come from the palette system (ElfPalette.ts). */
 
 /**
  * Elf character in the workshop scene.
@@ -73,9 +71,20 @@ export class ElfSprite {
   readonly bodyColor: string;
   readonly accessory: string;
 
+  /** Color palette for visual diversity — determines skin, body, hat, apron, boot colors. */
+  readonly palette: ElfColorPalette;
+  readonly paletteIndex: number;
+
   position: Vec2;
   facing: Direction;
   state: ElfSpriteState;
+
+  /** Whether this elf is actively working. Drives wander vs work transitions.
+   * Set to true on tool_call/thinking events, false on session_complete. */
+  isActive: boolean;
+
+  /** Active matrix rain effect, or null when no effect is playing. */
+  matrixEffect: MatrixEffect | null = null;
 
   private path: Vec2[] = [];
   private workAnimation: WorkAnimation;
@@ -94,6 +103,9 @@ export class ElfSprite {
     this.hatColor = config.hatColor;
     this.bodyColor = config.bodyColor;
     this.accessory = config.accessory;
+    this.paletteIndex = config.paletteIndex;
+    this.palette = getPalette(config.paletteIndex);
+    this.isActive = config.isActive;
     this.position = { ...config.position };
     this.facing = config.facing;
     this.state = config.state;
@@ -131,12 +143,28 @@ export class ElfSprite {
 
   /**
    * Per-frame update. Advances animation timers, processes walking,
-   * handles speech bubble decay, and pops queued actions.
+   * handles speech bubble decay, matrix effects, and pops queued actions.
    *
    * @param dt - Time delta in milliseconds since last frame
    * @param time - Absolute time in milliseconds (for sin-wave animations)
    */
   update(dt: number, time: number): void {
+    /* Update matrix effect if active — suppress normal FSM during effect */
+    if (this.matrixEffect) {
+      const done = this.matrixEffect.update(dt / 1000);
+      if (done) {
+        if (this.matrixEffect.type === 'despawn') {
+          /* Despawn complete — elf should be removed by scene */
+          this.matrixEffect = null;
+          this.state = 'exiting';
+          return;
+        }
+        /* Spawn complete — resume normal behavior */
+        this.matrixEffect = null;
+      }
+      return;
+    }
+
     const frameDt = Math.min(dt, 32) / 16;
     this.animTimer += frameDt;
 
@@ -150,6 +178,7 @@ export class ElfSprite {
    *
    * Draw order: shadow -> boots -> body -> apron -> arms -> head -> ears ->
    * eyes -> mouth -> hat -> name tag -> speech bubble.
+   * When a matrix effect is active, draws the rain overlay and adjusts elf opacity.
    *
    * @param ctx - Canvas 2D rendering context
    * @param time - Absolute time in ms for animation calculations
@@ -160,7 +189,38 @@ export class ElfSprite {
     const bounce = this.calculateBounce(time);
     const by = y - bounce;
 
+    /* If matrix effect is active, handle special rendering */
+    if (this.matrixEffect) {
+      /* Draw shadow always */
+      this.drawShadow(ctx, x, y);
+
+      /* Draw elf with alpha based on effect progress */
+      if (this.matrixEffect.shouldDrawElf) {
+        ctx.save();
+        ctx.globalAlpha = this.matrixEffect.elfAlpha;
+        this.drawElfBody(ctx, x, by, time);
+        ctx.restore();
+      }
+
+      /* Draw matrix rain columns on top */
+      this.matrixEffect.draw(ctx, x, y + SCALE * 8);
+
+      /* Always show name tag during effect */
+      this.drawNameTag(ctx, x, by);
+      return;
+    }
+
     this.drawShadow(ctx, x, y);
+    this.drawElfBody(ctx, x, by, time);
+    this.drawNameTag(ctx, x, by);
+
+    if (this.speechBubble) {
+      this.drawSpeechBubble(ctx, x, by - SCALE * 24);
+    }
+  }
+
+  /** Draw the complete elf body (everything except shadow, name tag, and speech bubble). */
+  private drawElfBody(ctx: CanvasRenderingContext2D, x: number, by: number, time: number): void {
     this.drawBoots(ctx, x, by);
     this.drawBody(ctx, x, by);
     this.drawApron(ctx, x, by);
@@ -170,11 +230,16 @@ export class ElfSprite {
     this.drawEyes(ctx, x, by, time);
     this.drawMouth(ctx, x, by);
     this.drawHat(ctx, x, by);
-    this.drawNameTag(ctx, x, by);
+  }
 
-    if (this.speechBubble) {
-      this.drawSpeechBubble(ctx, x, by - SCALE * 24);
-    }
+  /** Start a matrix spawn effect on this elf. */
+  startMatrixSpawn(): void {
+    this.matrixEffect = new MatrixEffect('spawn');
+  }
+
+  /** Start a matrix despawn effect on this elf. */
+  startMatrixDespawn(): void {
+    this.matrixEffect = new MatrixEffect('despawn');
   }
 
   /** Queue an action to perform after the current state completes. */
@@ -271,6 +336,7 @@ export class ElfSprite {
   private updateStateLogic(frameDt: number, _time: number): void {
     switch (this.state) {
       case "walking":
+      case "wandering":
       case "carrying":
       case "entering":
       case "exiting":
@@ -297,6 +363,9 @@ export class ElfSprite {
         this.transition("idle");
       } else if (this.state === "carrying") {
         this.transition("delivering", { carryItem: this.carryItem });
+      } else if (this.state === "wandering") {
+        // Wander walk complete — return to idle, BehaviorSequencer handles next wander
+        this.transition("idle");
       } else {
         this.transition("idle");
       }
@@ -403,6 +472,7 @@ export class ElfSprite {
       case "working":
         return Math.sin(time * 0.008) * SCALE;
       case "walking":
+      case "wandering":
       case "carrying":
       case "entering":
       case "exiting":
@@ -426,24 +496,25 @@ export class ElfSprite {
   }
 
   private drawBoots(ctx: CanvasRenderingContext2D, x: number, by: number): void {
+    const bootColor = this.palette.boots;
     // Left boot
-    drawPixelRect(ctx, x - SCALE * 3, by + SCALE * 4, SCALE * 3, SCALE * 4, BOOT_COLOR);
+    drawPixelRect(ctx, x - SCALE * 3, by + SCALE * 4, SCALE * 3, SCALE * 4, bootColor);
     // Right boot
-    drawPixelRect(ctx, x + SCALE, by + SCALE * 4, SCALE * 3, SCALE * 4, BOOT_COLOR);
+    drawPixelRect(ctx, x + SCALE, by + SCALE * 4, SCALE * 3, SCALE * 4, bootColor);
     // Curled toes
-    drawPixelRect(ctx, x - SCALE * 4, by + SCALE * 6, SCALE * 2, SCALE * 2, BOOT_COLOR);
-    drawPixelRect(ctx, x + SCALE * 3, by + SCALE * 6, SCALE * 2, SCALE * 2, BOOT_COLOR);
+    drawPixelRect(ctx, x - SCALE * 4, by + SCALE * 6, SCALE * 2, SCALE * 2, bootColor);
+    drawPixelRect(ctx, x + SCALE * 3, by + SCALE * 6, SCALE * 2, SCALE * 2, bootColor);
   }
 
   private drawBody(ctx: CanvasRenderingContext2D, x: number, by: number): void {
-    drawPixelRect(ctx, x - SCALE * 4, by - SCALE * 4, SCALE * 8, SCALE * 10, this.bodyColor);
+    drawPixelRect(ctx, x - SCALE * 4, by - SCALE * 4, SCALE * 8, SCALE * 10, this.palette.body);
     ctx.strokeStyle = "#000";
     ctx.lineWidth = SCALE * 0.8;
     ctx.strokeRect(x - SCALE * 4, by - SCALE * 4, SCALE * 8, SCALE * 10);
   }
 
   private drawApron(ctx: CanvasRenderingContext2D, x: number, by: number): void {
-    drawPixelRect(ctx, x - SCALE * 3, by, SCALE * 6, SCALE * 6, APRON_COLOR);
+    drawPixelRect(ctx, x - SCALE * 3, by, SCALE * 6, SCALE * 6, this.palette.apron);
     ctx.strokeStyle = "#000";
     ctx.lineWidth = SCALE * 0.5;
     ctx.strokeRect(x - SCALE * 3, by, SCALE * 6, SCALE * 6);
@@ -455,48 +526,49 @@ export class ElfSprite {
     by: number,
     time: number,
   ): void {
+    const armColor = this.palette.body;
     if (this.state === "working" && this.workAnimation === "type") {
       // Typing animation — arms forward with alternating wave
       const armWave = Math.sin(time * 0.015) * SCALE;
-      drawPixelRect(ctx, x - SCALE * 6, by - SCALE + armWave, SCALE * 3, SCALE * 3, this.bodyColor);
-      drawPixelRect(ctx, x + SCALE * 4, by - SCALE - armWave, SCALE * 3, SCALE * 3, this.bodyColor);
+      drawPixelRect(ctx, x - SCALE * 6, by - SCALE + armWave, SCALE * 3, SCALE * 3, armColor);
+      drawPixelRect(ctx, x + SCALE * 4, by - SCALE - armWave, SCALE * 3, SCALE * 3, armColor);
     } else if (this.state === "working" && this.workAnimation === "read") {
       // Reading — arms at sides, slight inward angle
-      drawPixelRect(ctx, x - SCALE * 6, by - SCALE * 2, SCALE * 3, SCALE * 5, this.bodyColor);
-      drawPixelRect(ctx, x + SCALE * 4, by - SCALE * 2, SCALE * 3, SCALE * 5, this.bodyColor);
+      drawPixelRect(ctx, x - SCALE * 6, by - SCALE * 2, SCALE * 3, SCALE * 5, armColor);
+      drawPixelRect(ctx, x + SCALE * 4, by - SCALE * 2, SCALE * 3, SCALE * 5, armColor);
     } else if (this.carryItem !== null) {
       // Carrying — arms overhead holding item
-      drawPixelRect(ctx, x - SCALE * 2, by - SCALE * 10, SCALE * 4, SCALE * 3, this.bodyColor);
+      drawPixelRect(ctx, x - SCALE * 2, by - SCALE * 10, SCALE * 4, SCALE * 3, armColor);
       // Carried item box
-      drawPixelRect(ctx, x - SCALE * 3, by - SCALE * 13, SCALE * 6, SCALE * 4, APRON_COLOR);
+      drawPixelRect(ctx, x - SCALE * 3, by - SCALE * 13, SCALE * 6, SCALE * 4, this.palette.apron);
       ctx.strokeStyle = "#000";
       ctx.lineWidth = SCALE * 0.5;
       ctx.strokeRect(x - SCALE * 3, by - SCALE * 13, SCALE * 6, SCALE * 4);
     } else if (this.state === "permission" || this.state === "waiting") {
       // Arms raised — requesting permission
-      drawPixelRect(ctx, x - SCALE * 6, by - SCALE * 8, SCALE * 3, SCALE * 5, this.bodyColor);
-      drawPixelRect(ctx, x + SCALE * 4, by - SCALE * 8, SCALE * 3, SCALE * 5, this.bodyColor);
+      drawPixelRect(ctx, x - SCALE * 6, by - SCALE * 8, SCALE * 3, SCALE * 5, armColor);
+      drawPixelRect(ctx, x + SCALE * 4, by - SCALE * 8, SCALE * 3, SCALE * 5, armColor);
     } else if (this.state === "celebrating") {
       // Arms up in celebration
       const wave = Math.sin(time * 0.02) * SCALE;
-      drawPixelRect(ctx, x - SCALE * 7, by - SCALE * 7 + wave, SCALE * 3, SCALE * 4, this.bodyColor);
-      drawPixelRect(ctx, x + SCALE * 5, by - SCALE * 7 - wave, SCALE * 3, SCALE * 4, this.bodyColor);
+      drawPixelRect(ctx, x - SCALE * 7, by - SCALE * 7 + wave, SCALE * 3, SCALE * 4, armColor);
+      drawPixelRect(ctx, x + SCALE * 5, by - SCALE * 7 - wave, SCALE * 3, SCALE * 4, armColor);
     } else {
       // Default — arms at sides
-      drawPixelRect(ctx, x - SCALE * 6, by - SCALE * 2, SCALE * 3, SCALE * 5, this.bodyColor);
-      drawPixelRect(ctx, x + SCALE * 4, by - SCALE * 2, SCALE * 3, SCALE * 5, this.bodyColor);
+      drawPixelRect(ctx, x - SCALE * 6, by - SCALE * 2, SCALE * 3, SCALE * 5, armColor);
+      drawPixelRect(ctx, x + SCALE * 4, by - SCALE * 2, SCALE * 3, SCALE * 5, armColor);
     }
   }
 
   private drawHead(ctx: CanvasRenderingContext2D, x: number, by: number): void {
-    drawPixelRect(ctx, x - SCALE * 5, by - SCALE * 12, SCALE * 10, SCALE * 9, this.bodyColor);
+    drawPixelRect(ctx, x - SCALE * 5, by - SCALE * 12, SCALE * 10, SCALE * 9, this.palette.skin);
     ctx.strokeStyle = "#000";
     ctx.lineWidth = SCALE * 0.8;
     ctx.strokeRect(x - SCALE * 5, by - SCALE * 12, SCALE * 10, SCALE * 9);
   }
 
   private drawEars(ctx: CanvasRenderingContext2D, x: number, by: number): void {
-    ctx.fillStyle = this.bodyColor;
+    ctx.fillStyle = this.palette.skin;
     ctx.strokeStyle = "#000";
     ctx.lineWidth = SCALE * 0.8;
 
@@ -546,8 +618,9 @@ export class ElfSprite {
   }
 
   private drawHat(ctx: CanvasRenderingContext2D, x: number, by: number): void {
+    const hatCol = this.palette.hat;
     // Pointy hat triangle
-    ctx.fillStyle = this.hatColor;
+    ctx.fillStyle = hatCol;
     ctx.beginPath();
     ctx.moveTo(x - SCALE * 5, by - SCALE * 12);
     ctx.lineTo(x, by - SCALE * 20);
@@ -558,7 +631,7 @@ export class ElfSprite {
     ctx.stroke();
 
     // Hat brim
-    drawPixelRect(ctx, x - SCALE * 6, by - SCALE * 13, SCALE * 12, SCALE * 2, this.hatColor);
+    drawPixelRect(ctx, x - SCALE * 6, by - SCALE * 13, SCALE * 12, SCALE * 2, hatCol);
     ctx.strokeRect(x - SCALE * 6, by - SCALE * 13, SCALE * 12, SCALE * 2);
 
     // White pom pom at tip

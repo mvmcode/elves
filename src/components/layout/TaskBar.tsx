@@ -41,6 +41,7 @@ export function TaskBar(): React.JSX.Element {
   const isHistoricalFloor = useSessionStore(
     (s) => (s.activeFloorId ? s.floors[s.activeFloorId]?.isHistorical : false) ?? false,
   );
+  const needsInput = useSessionStore((s) => s.needsInput);
 
   const canDeploy = taskText.trim().length > 0 && activeProjectId !== null && !isSessionActive && !isPlanPreview;
   const canFollowUp = taskText.trim().length > 0 && isSessionCompleted;
@@ -128,9 +129,11 @@ export function TaskBar(): React.JSX.Element {
                     ? "Ask a follow-up or continue this session... (Cmd+K)"
                     : isSessionActive
                       ? "Elves are working... (Cmd+K)"
-                      : isSessionCompleted
-                        ? "Reply to continue the conversation... (Cmd+K)"
-                        : "What do you want the elves to do? (Cmd+K)"
+                      : isSessionCompleted && needsInput
+                        ? "Claude asked a question \u2014 type your reply... (Cmd+K)"
+                        : isSessionCompleted
+                          ? "Reply to continue the conversation... (Cmd+K)"
+                          : "What do you want the elves to do? (Cmd+K)"
             }
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}

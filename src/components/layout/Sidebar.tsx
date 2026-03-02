@@ -16,6 +16,14 @@ function IconWorkshop(): React.JSX.Element {
   );
 }
 
+function IconFiles(): React.JSX.Element {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+    </svg>
+  );
+}
+
 function IconMemory(): React.JSX.Element {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -82,6 +90,7 @@ function IconExpand(): React.JSX.Element {
 /** Navigation items with SVG icon components. */
 const NAV_ITEMS: readonly { view: AppView; label: string; Icon: () => React.JSX.Element }[] = [
   { view: "session", label: "Workshop", Icon: IconWorkshop },
+  { view: "files", label: "Files", Icon: IconFiles },
   { view: "memory", label: "Memory", Icon: IconMemory },
   { view: "skills", label: "Skills", Icon: IconSkills },
   { view: "mcp", label: "MCP Servers", Icon: IconMcp },

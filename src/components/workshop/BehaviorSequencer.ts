@@ -3,7 +3,7 @@
 import type { DeliveryWalkState, CeremonyState, Vec2 } from '../../types/workshop';
 import type { WorkshopScene } from './WorkshopScene';
 import type { ElfSprite } from './ElfSprite';
-import { COTS_POS, ST, WORKBENCHES } from './workshop-layout';
+import { COTS_POS, ST, WORKBENCHES, WALKABLE_GRID } from './workshop-layout';
 
 /** Duration of the scroll pickup animation before walking starts (ms). */
 const PICKUP_DURATION_MS = 500;
@@ -22,6 +22,43 @@ const SPARKLE_BURST_DURATION_MS = 1000;
 
 /** Idle time threshold before an elf auto-walks to cots to sleep (ms). */
 const IDLE_THRESHOLD_MS = 30000;
+
+/** Minimum wander pause time in ms (time idle before starting a wander walk). */
+const WANDER_PAUSE_MIN_MS = 3000;
+
+/** Maximum wander pause time in ms. */
+const WANDER_PAUSE_MAX_MS = 8000;
+
+/** Minimum wander moves before returning to workbench to rest. */
+const WANDER_MOVES_MIN = 3;
+
+/** Maximum wander moves before returning to workbench to rest. */
+const WANDER_MOVES_MAX = 6;
+
+/** Minimum rest time at workbench after a wander cycle (ms). */
+const WANDER_REST_MIN_MS = 15000;
+
+/** Maximum rest time at workbench after a wander cycle (ms). */
+const WANDER_REST_MAX_MS = 30000;
+
+/** Per-elf wander behavior state. */
+interface WanderState {
+  /** Countdown timer until next wander walk starts. */
+  pauseTimer: number;
+  /** How many wander walks completed in this cycle. */
+  wanderCount: number;
+  /** How many wander walks before returning to bench. */
+  wanderLimit: number;
+  /** Whether resting at bench after a wander cycle. */
+  isResting: boolean;
+  /** Rest countdown timer. */
+  restTimer: number;
+}
+
+/** Generates a random number between min and max (inclusive). */
+function randomBetween(min: number, max: number): number {
+  return min + Math.random() * (max - min);
+}
 
 /** Sparkle count for ceremony burst. */
 const CEREMONY_SPARKLE_COUNT = 15;
@@ -68,6 +105,7 @@ export class BehaviorSequencer {
   private readonly activeDeliveries: Map<string, DeliveryWalkState> = new Map();
   private activeCeremony: CeremonyState | null = null;
   private readonly idleTimers: Map<string, number> = new Map();
+  private readonly wanderStates: Map<string, WanderState> = new Map();
 
   /**
    * Start an inter-elf chat delivery sequence.
@@ -161,8 +199,44 @@ export class BehaviorSequencer {
   }
 
   /**
+   * Start or reset the wander cycle for an elf.
+   * Called when an elf becomes inactive (no more events).
+   */
+  startWander(elfId: string): void {
+    if (this.wanderStates.has(elfId)) return;
+    this.wanderStates.set(elfId, {
+      pauseTimer: randomBetween(WANDER_PAUSE_MIN_MS, WANDER_PAUSE_MAX_MS),
+      wanderCount: 0,
+      wanderLimit: Math.floor(randomBetween(WANDER_MOVES_MIN, WANDER_MOVES_MAX + 1)),
+      isResting: false,
+      restTimer: 0,
+    });
+  }
+
+  /**
+   * Stop wandering for an elf. Called when the elf becomes active (new events).
+   * If the elf is currently wandering (walking), it will be redirected to its workbench.
+   */
+  stopWander(elfId: string, scene: WorkshopScene): void {
+    this.wanderStates.delete(elfId);
+    const elf = scene.getElf(elfId);
+    if (!elf) return;
+
+    /* If elf is in a wander walk, redirect to workbench */
+    if (elf.getState() === 'wandering') {
+      const benchId = elf.getWorkbenchId();
+      if (benchId !== null) {
+        const benchPos = getWorkbenchStandPosition(benchId);
+        scene.walkElfTo(elfId, benchPos.x, benchPos.y);
+      } else {
+        elf.transition('idle');
+      }
+    }
+  }
+
+  /**
    * Advance all active choreography sequences by the elapsed time delta.
-   * Processes delivery walks, ceremony phases, and idle timers.
+   * Processes delivery walks, ceremony phases, idle timers, and wander behavior.
    *
    * @param dt - Time elapsed since last frame in milliseconds
    * @param scene - The workshop scene for querying elves and emitting particles
@@ -171,6 +245,7 @@ export class BehaviorSequencer {
     this.updateDeliveries(dt, scene);
     this.updateCeremony(dt, scene);
     this.updateIdleTimers(dt, scene);
+    this.updateWander(dt, scene);
   }
 
   /**
@@ -359,5 +434,112 @@ export class BehaviorSequencer {
         this.idleTimers.delete(elfId);
       }
     }
+  }
+
+  /**
+   * Update wander behavior for inactive elves.
+   *
+   * Mimics pixel-agents' wander system: when an elf is not actively working,
+   * it periodically wanders to random walkable tiles in the workshop, then
+   * returns to its workbench after a set number of moves to rest.
+   *
+   * Wander cycle: pause → walk to random tile → pause → walk → ... → return to bench → rest → repeat
+   */
+  private updateWander(dt: number, scene: WorkshopScene): void {
+    for (const [elfId, state] of this.wanderStates) {
+      const elf = scene.getElf(elfId);
+      if (!elf) {
+        this.wanderStates.delete(elfId);
+        continue;
+      }
+
+      /* Skip elves that are active (working), in deliveries, in a ceremony, or have a matrix effect */
+      if (elf.isActive || this.hasActiveDelivery(elfId) || elf.matrixEffect !== null) {
+        continue;
+      }
+
+      /* Skip if elf is in a non-idle/non-wandering state that shouldn't be interrupted */
+      const elfState = elf.getState();
+      if (elfState === 'entering' || elfState === 'exiting' || elfState === 'celebrating' ||
+          elfState === 'sleeping' || elfState === 'error' || elfState === 'permission' ||
+          elfState === 'carrying' || elfState === 'delivering') {
+        continue;
+      }
+
+      /* Handle resting phase (at workbench between wander cycles) */
+      if (state.isResting) {
+        state.restTimer -= dt;
+        if (state.restTimer <= 0) {
+          /* Rest complete — start a new wander cycle */
+          state.isResting = false;
+          state.wanderCount = 0;
+          state.wanderLimit = Math.floor(randomBetween(WANDER_MOVES_MIN, WANDER_MOVES_MAX + 1));
+          state.pauseTimer = randomBetween(WANDER_PAUSE_MIN_MS, WANDER_PAUSE_MAX_MS);
+        }
+        continue;
+      }
+
+      /* Only tick pause timer when elf is idle (not mid-wander-walk) */
+      if (elfState !== 'idle') {
+        continue;
+      }
+
+      /* Count down the pause between wander walks */
+      state.pauseTimer -= dt;
+      if (state.pauseTimer > 0) {
+        continue;
+      }
+
+      /* Wander limit reached — walk back to workbench and rest */
+      if (state.wanderCount >= state.wanderLimit) {
+        const benchId = elf.getWorkbenchId();
+        if (benchId !== null) {
+          const benchPos = getWorkbenchStandPosition(benchId);
+          scene.walkElfTo(elfId, benchPos.x, benchPos.y);
+        }
+        state.isResting = true;
+        state.restTimer = randomBetween(WANDER_REST_MIN_MS, WANDER_REST_MAX_MS);
+        continue;
+      }
+
+      /* Pick a random walkable tile and start a wander walk */
+      const pathfinder = scene.getPathfinder();
+      const randomTile = this.pickRandomWalkableTile();
+      if (randomTile) {
+        const elfTile = pathfinder.pixelToTile(elf.getPosition());
+        const path = pathfinder.findPath(elfTile, randomTile);
+
+        if (path.length > 0 && path.length <= 15) {
+          /* Convert tile path to pixel waypoints */
+          const pixelPath = path.map((tile) => pathfinder.tileToPixel(tile));
+          elf.setPath(pixelPath);
+          elf.transition('wandering');
+          state.wanderCount++;
+        }
+      }
+
+      /* Set next pause timer regardless */
+      state.pauseTimer = randomBetween(WANDER_PAUSE_MIN_MS, WANDER_PAUSE_MAX_MS);
+    }
+  }
+
+  /**
+   * Pick a random walkable tile from the workshop grid.
+   * Avoids workbench tiles, wall tiles, and the conveyor belt.
+   */
+  private pickRandomWalkableTile(): { col: number; row: number } | null {
+    const walkableTiles: Array<{ col: number; row: number }> = [];
+
+    for (let row = 3; row < 17; row++) {
+      for (let col = 1; col < 27; col++) {
+        /* Use the WALKABLE_GRID imported by the pathfinder via workshop-layout */
+        if (WALKABLE_GRID[row]?.[col]) {
+          walkableTiles.push({ col, row });
+        }
+      }
+    }
+
+    if (walkableTiles.length === 0) return null;
+    return walkableTiles[Math.floor(Math.random() * walkableTiles.length)] ?? null;
   }
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUiStore } from "@/stores/ui";
+import { MusicPlayer } from "@/components/shared/MusicPlayer";
 import type { Elf, ElfEvent } from "@/types/elf";
 
 interface WorkshopOverlayProps {
@@ -132,6 +133,11 @@ export function WorkshopOverlay({
         >
           {elves.length} ELVES DEPLOYED · {formatElapsed(elapsed)} ELAPSED
         </p>
+      </div>
+
+      {/* Music controls — top-right */}
+      <div className="absolute right-4 top-4 z-10">
+        <MusicPlayer />
       </div>
 
       {/* Status bar — bottom */}

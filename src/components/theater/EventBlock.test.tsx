@@ -77,14 +77,15 @@ describe("EventBlock", () => {
     expect(screen.getByTestId("event-block").textContent).toContain("Processing...");
   });
 
-  it("renders final output with green bold text", () => {
+  it("renders final output with green text via MarkdownLite", () => {
     const event = createEvent({ type: "output", payload: { text: "Done!", isFinal: true } });
     render(<EventBlock event={event} variant="terminal" />);
     const block = screen.getByTestId("event-block");
     expect(block.getAttribute("data-event-type")).toBe("output");
-    const p = block.querySelector("p");
-    expect(p?.className).toContain("font-bold");
-    expect(p?.className).toContain("text-green-400");
+    /* Final output uses MarkdownLite: green class is on the wrapper div, not the <p> */
+    const greenDiv = block.querySelector(".text-green-400");
+    expect(greenDiv).not.toBeNull();
+    expect(block.textContent).toContain("Done!");
   });
 
   it("renders error event with red bold text", () => {

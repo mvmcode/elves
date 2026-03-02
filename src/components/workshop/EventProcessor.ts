@@ -31,11 +31,31 @@ const BUBBLE_PREVIEW_MAX_LENGTH = 24;
 /** Duration in seconds for standard speech bubbles */
 const BUBBLE_DURATION = 3.0;
 
-/** Duration in seconds for thought bubbles (shorter, more transient) */
-const THOUGHT_BUBBLE_DURATION = 2.0;
-
 /** Duration in seconds for alert bubbles (longer, needs attention) */
 const ALERT_BUBBLE_DURATION = 5.0;
+
+/** Duration in seconds for progress chant bubbles (persistent, shows activity) */
+const CHANT_BUBBLE_DURATION = 4.0;
+
+/** Fun chant messages shown while elves are using specific tool types */
+const TOOL_CHANTS: Record<string, readonly string[]> = {
+  type: ['tap tap tap...', 'writing code!', 'typing away~', 'clackity clack!', 'scribble scribble'],
+  read: ['hmm let me see...', 'reading closely', 'scanning files...', 'studying this...', 'interesting...'],
+  hammer: ['bash bash bash!', 'building things!', 'hammering away!', 'executing...', 'compiling!'],
+  mix: ['testing testing...', 'mixing potions!', 'checking quality', 'validating...', 'stirring the pot'],
+};
+
+/** Generic thinking chants shown during extended reasoning */
+const THINKING_CHANTS: readonly string[] = [
+  'hmm...',
+  'pondering...',
+  'let me think...',
+  'processing...',
+  'aha...',
+  'interesting...',
+  'considering...',
+  'one moment...',
+];
 
 /**
  * Maps a tool name string to the appropriate workshop work animation.
@@ -188,35 +208,43 @@ export class EventProcessor {
 
   /**
    * Thinking event: elf transitions to 'working' with 'read' animation
-   * and shows a thought bubble with '...' or a preview of what they're thinking about.
+   * and shows a chant bubble with a fun thinking message.
+   * Marks elf as active and stops wandering.
    */
   private handleThinking = (event: ElfEvent, scene: WorkshopScene): void => {
     const elf = scene.getElf(event.elfId);
     if (!elf) return;
 
+    this.activateElf(elf, scene);
     elf.transitionTo('working', 'read');
-    const preview = extractMessagePreview(event.payload);
-    elf.showBubble(preview, 'thought', THOUGHT_BUBBLE_DURATION);
+    const chant = THINKING_CHANTS[Math.floor(Math.random() * THINKING_CHANTS.length)] ?? 'hmm...';
+    elf.showBubble(chant, 'thought', CHANT_BUBBLE_DURATION);
   };
 
   /**
    * Tool call event: elf transitions to 'working' with animation based on tool name.
-   * Emits sparkle particles at the elf's position.
+   * Shows a chant bubble with the tool action. Emits sparkle particles. Marks elf as active.
    */
   private handleToolCall = (event: ElfEvent, scene: WorkshopScene): void => {
     const elf = scene.getElf(event.elfId);
     if (!elf) return;
 
+    this.activateElf(elf, scene);
     const toolName = (event.payload['tool'] as string | undefined) ?? '';
     const animation = getToolAnimation(toolName);
     elf.transitionTo('working', animation);
+
+    /* Pick a fun chant message matching the tool animation type */
+    const chants = TOOL_CHANTS[animation] ?? TOOL_CHANTS['type']!;
+    const chant = chants[Math.floor(Math.random() * chants.length)] ?? 'working...';
+    elf.showBubble(chant, 'speech', CHANT_BUBBLE_DURATION);
 
     /* Sparkle burst at elf position for visual feedback */
     scene.emitSparkles(elf.getPosition().x, elf.getPosition().y, '#FFD93D', 5);
   };
 
   /**
-   * Tool result event: green sparkle burst on success, smoke puff on error.
+   * Tool result event: green sparkle burst on success with cheer, smoke puff on error.
    */
   private handleToolResult = (event: ElfEvent, scene: WorkshopScene): void => {
     const elf = scene.getElf(event.elfId);
@@ -229,9 +257,14 @@ export class EventProcessor {
 
     if (isError) {
       scene.emitSmoke(position.x, position.y, 4);
-      elf.showBubble('!', 'alert', BUBBLE_DURATION);
+      const errorChants = ['oops!', 'uh oh!', 'hmm, trouble!', 'not quite...'];
+      const chant = errorChants[Math.floor(Math.random() * errorChants.length)] ?? 'oops!';
+      elf.showBubble(chant, 'alert', BUBBLE_DURATION);
     } else {
       scene.emitSparkles(position.x, position.y, '#6BCB77', 8);
+      const successChants = ['nice!', 'got it!', 'done!', 'perfect!', 'onwards!'];
+      const chant = successChants[Math.floor(Math.random() * successChants.length)] ?? 'nice!';
+      elf.showBubble(chant, 'speech', 1.5);
     }
   };
 
@@ -343,16 +376,30 @@ export class EventProcessor {
 
   /**
    * Session complete: all elves celebrate with sparkle bursts.
-   * When BehaviorSequencer is wired, this will delegate to startCeremony().
+   * Deactivates all elves and starts wander behavior after celebration.
    */
   private handleSessionComplete = (_event: ElfEvent, scene: WorkshopScene): void => {
     const elves = scene.getAllElves();
     for (const elf of elves) {
+      elf.isActive = false;
       elf.transitionTo('celebrating');
       elf.showBubble('Done!', 'speech', 3.0);
       const pos = elf.getPosition();
       scene.emitSparkles(pos.x, pos.y, '#FFD93D', 15);
+
+      /* Start wander behavior after celebration finishes */
+      scene.getBehaviorSequencer().startWander(elf.getId());
     }
-    /* BehaviorSequencer.startCeremony() will handle the full sequence when wired */
   };
+
+  /**
+   * Mark an elf as active and stop its wander behavior.
+   * Called when the elf starts receiving work events.
+   */
+  private activateElf(elf: import('./ElfSprite').ElfSprite, scene: WorkshopScene): void {
+    if (!elf.isActive) {
+      elf.isActive = true;
+      scene.getBehaviorSequencer().stopWander(elf.getId(), scene);
+    }
+  }
 }

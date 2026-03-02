@@ -1,13 +1,14 @@
 /* BottomTerminalPanel — VS Code-style terminal panel that slides up from the bottom.
- * Renders between the content area and FloorBar when open. Connects to the active
- * floor's session via PTY for interactive terminal access. */
+ * During active sessions: shows a read-only live event stream (LiveEventTerminal).
+ * During completed/interactive sessions: spawns a PTY with `claude --resume` (SessionTerminal).
+ * Does NOT auto-kill the --print process when opened. */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { SessionTerminal } from "./SessionTerminal";
+import { LiveEventTerminal } from "./LiveEventTerminal";
 import { useSessionStore } from "@/stores/session";
 import { useUiStore } from "@/stores/ui";
 import { useProjectStore } from "@/stores/project";
-import { transitionToInteractive } from "@/lib/tauri";
 
 /** Minimum panel height in pixels. */
 const MIN_HEIGHT = 150;
@@ -16,9 +17,12 @@ const MIN_HEIGHT = 150;
 const MAX_HEIGHT_FRACTION = 0.8;
 
 /**
- * Bottom terminal panel with resize drag handle, LIVE/ENDED badge, and close button.
- * When opened during an active --print session, transitions to interactive mode
- * by killing the print process and resuming via PTY.
+ * Bottom terminal panel with resize drag handle and close button.
+ *
+ * Mode selection:
+ * - Active --print session → LiveEventTerminal (read-only, shows live events)
+ * - Interactive mode (user explicitly transitioned) → SessionTerminal (PTY)
+ * - Completed session → SessionTerminal (--resume PTY for follow-up)
  */
 export function BottomTerminalPanel(): React.JSX.Element | null {
   const activeSession = useSessionStore((s) => s.activeSession);
@@ -29,31 +33,26 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
   const projects = useProjectStore((s) => s.projects);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
 
-  const [hasTransitioned, setHasTransitioned] = useState(false);
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
   const sessionId = activeSession?.id;
   const claudeSessionId = activeSession?.claudeSessionId;
   const isSessionActive = activeSession?.status === "active";
+  const isSessionCompleted = activeSession?.status === "completed";
   const projectPath = projects.find((p) => p.id === activeProjectId)?.path ?? "";
   const taskLabel = activeSession?.task ?? "";
 
-  /* Transition to interactive mode when terminal opens during active session */
-  const handleTransition = useCallback((): void => {
-    if (isSessionActive && !hasTransitioned && !isInteractiveMode && sessionId) {
-      setHasTransitioned(true);
-      transitionToInteractive(sessionId).catch((error: unknown) => {
-        console.error("Failed to transition to interactive:", error);
-      });
-    }
-  }, [sessionId, isSessionActive, hasTransitioned, isInteractiveMode]);
+  /* Determine which terminal mode to use:
+   * - "live": Active --print session, show read-only event stream
+   * - "interactive": PTY mode (user transitioned or session completed) */
+  const terminalMode = isSessionActive && !isInteractiveMode ? "live" : "interactive";
 
   /* Complete session when PTY exits in interactive mode */
   const handlePtyExit = useCallback((): void => {
-    if (isInteractiveMode) {
+    if (isInteractiveMode || isSessionCompleted) {
       useSessionStore.getState().endSession("completed");
     }
-  }, [isInteractiveMode]);
+  }, [isInteractiveMode, isSessionCompleted]);
 
   /* Resize drag handlers */
   const handleDragStart = useCallback(
@@ -81,27 +80,19 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
     [terminalPanelHeight, setTerminalPanelHeight],
   );
 
-  /* Auto-transition on mount if session is active */
-  if (isSessionActive && !hasTransitioned && !isInteractiveMode) {
-    handleTransition();
-  }
-
-  /* No terminal if there's no Claude session ID */
-  if (!claudeSessionId || !sessionId) {
+  /* No terminal content if there's no session at all */
+  if (!sessionId) {
     return (
       <div
         className="shrink-0 border-t-[3px] border-border bg-[#1A1A2E]"
         style={{ height: terminalPanelHeight }}
         data-testid="bottom-terminal-panel"
       >
-        {/* Resize drag handle */}
         <div
           className="flex h-1.5 cursor-row-resize items-center justify-center bg-border/20 hover:bg-elf-gold/50"
           onMouseDown={handleDragStart}
           data-testid="terminal-resize-handle"
         />
-
-        {/* Header */}
         <div className="flex items-center justify-between border-b-[2px] border-border/30 px-3 py-1.5">
           <span className="font-display text-xs font-bold uppercase tracking-wider text-gray-500">
             Terminal
@@ -114,11 +105,8 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
             CLOSE
           </button>
         </div>
-
         <div className="flex flex-1 items-center justify-center">
-          <p className="font-mono text-sm text-gray-500">
-            Waiting for session to connect...
-          </p>
+          <p className="font-mono text-sm text-gray-500">No active session</p>
         </div>
       </div>
     );
@@ -137,16 +125,41 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
         data-testid="terminal-resize-handle"
       />
 
-      {/* Terminal content */}
+      {/* Terminal content — live stream or interactive PTY */}
       <div className="flex h-[calc(100%-6px)] flex-col">
-        <SessionTerminal
-          sessionId={sessionId}
-          claudeSessionId={claudeSessionId}
-          projectPath={projectPath}
-          taskLabel={taskLabel}
-          onClose={toggleTerminalPanel}
-          onPtyExit={handlePtyExit}
-        />
+        {terminalMode === "live" ? (
+          <LiveEventTerminal
+            sessionId={sessionId}
+            claudeSessionId={claudeSessionId ?? ""}
+            projectPath={projectPath}
+            taskLabel={taskLabel}
+            onClose={toggleTerminalPanel}
+          />
+        ) : claudeSessionId ? (
+          <SessionTerminal
+            sessionId={sessionId}
+            claudeSessionId={claudeSessionId}
+            projectPath={projectPath}
+            taskLabel={taskLabel}
+            onClose={toggleTerminalPanel}
+            onPtyExit={handlePtyExit}
+          />
+        ) : (
+          <div className="flex h-full flex-col border-token-normal border-border bg-[#1A1A2E]">
+            <div className="flex items-center justify-between border-b-token-normal border-border bg-surface-elevated px-3 py-2">
+              <span className="font-display text-xs font-bold uppercase tracking-wider text-gray-500">Terminal</span>
+              <button
+                onClick={toggleTerminalPanel}
+                className="shrink-0 cursor-pointer border-token-thin border-border bg-surface-elevated rounded-token-sm px-2 py-0.5 font-display text-[10px] text-label transition-all duration-100 hover:bg-error hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+            <div className="flex flex-1 items-center justify-center">
+              <p className="font-mono text-sm text-gray-500">Waiting for Claude session ID...</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -102,7 +102,12 @@ export function WorkshopCanvas({ elves, events }: WorkshopCanvasProps): React.JS
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Sync elf spawns/removes with the scene. */
+  /** Sync elf spawns/removes with the scene.
+   *
+   * Two spawn paths:
+   * - Fresh session (events empty): full spawn with door entrance + matrix animation
+   * - View switch back (events exist): teleport elf directly to workbench, no animation
+   */
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
@@ -110,10 +115,26 @@ export function WorkshopCanvas({ elves, events }: WorkshopCanvasProps): React.JS
     const currentElfIds = new Set(elves.map((elf) => elf.id));
     const known = knownElfIdsRef.current;
 
-    /* Spawn new elves that appeared in the store. */
+    /* Detect if this is a view-switch re-sync: events already exist from before the switch */
+    const isResync = events.length > 0 && known.size === 0 && elves.length > 0;
+
     for (const elf of elves) {
       if (!known.has(elf.id)) {
-        scene.spawnElf(elf.id, elf.name, elf.color, "");
+        if (isResync) {
+          /* View switch: place elf directly at workbench, no animation */
+          scene.spawnElfAtBench(elf.id, elf.name, elf.color, "");
+        } else {
+          /* Fresh session: normal spawn via EventProcessor for door entrance */
+          scene.processElfEvent({
+            id: `sync-spawn-${elf.id}-${Date.now()}`,
+            timestamp: Date.now(),
+            elfId: elf.id,
+            elfName: elf.name,
+            runtime: elf.runtime,
+            type: "spawn",
+            payload: { hatColor: elf.color, accessory: "" },
+          });
+        }
         known.add(elf.id);
       }
     }
@@ -125,7 +146,7 @@ export function WorkshopCanvas({ elves, events }: WorkshopCanvasProps): React.JS
         known.delete(knownId);
       }
     }
-  }, [elves]);
+  }, [elves, events.length]);
 
   /** Feed new ElfEvents into the scene as they arrive. */
   useEffect(() => {
