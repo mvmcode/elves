@@ -1,11 +1,14 @@
 /* ContextEditor — section-based editor for the project's agent context (CLAUDE.md). */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useProjectStore } from "@/stores/project";
 import { useAppStore } from "@/stores/app";
 import { getRuntimeControlConfig } from "@/lib/runtime-controls";
-import { buildProjectContext } from "@/lib/tauri";
+import { buildProjectContext, writeTextToFile, readTextFromFile } from "@/lib/tauri";
+import { generateUnifiedDiff } from "@/lib/simple-diff";
+import { DiffViewer } from "@/components/git/DiffViewer";
 import { Button } from "@/components/shared/Button";
+import { Badge } from "@/components/shared/Badge";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 /** Predefined context sections with default content. */
@@ -53,17 +56,60 @@ const DEFAULT_SECTIONS: readonly ContextSection[] = [
  * Each section has a toggle to enable/disable and a textarea for content.
  * Includes a read-only preview of auto-generated memory context and a
  * full preview button that combines all sections.
+ * Supports saving to disk, a dirty indicator, and an inline diff view.
  */
 export function ContextEditor(): React.JSX.Element {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const projects = useProjectStore((s) => s.projects);
   const defaultRuntime = useAppStore((s) => s.defaultRuntime);
   const controlConfig = getRuntimeControlConfig(defaultRuntime);
   const contextFileName = controlConfig.contextFileName ?? "CLAUDE.md";
+
+  const activeProject = projects.find((p) => p.id === activeProjectId) ?? null;
+  const contextFilePath = activeProject ? `${activeProject.path}/${contextFileName}` : null;
 
   const [sections, setSections] = useState<readonly ContextSection[]>(DEFAULT_SECTIONS);
   const [autoContext, setAutoContext] = useState<string | null>(null);
   const [isLoadingContext, setIsLoadingContext] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+
+  /** The last content that was written to (or read from) disk. Empty string = file not loaded yet. */
+  const [savedContent, setSavedContent] = useState<string>("");
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  /** Build the full context preview from all enabled sections. */
+  const buildFullPreview = useCallback((): string => {
+    const parts: string[] = [];
+    for (const section of sections) {
+      if (section.enabled && section.content.trim()) {
+        parts.push(`## ${section.title}\n\n${section.content.trim()}`);
+      }
+    }
+    if (autoContext) {
+      parts.push(`## Auto-Context (from Memory)\n\n${autoContext}`);
+    }
+    return parts.length > 0
+      ? parts.join("\n\n---\n\n")
+      : "No context configured. Add content to the sections above.";
+  }, [sections, autoContext]);
+
+  const currentPreview = buildFullPreview();
+  const isDirty = currentPreview !== savedContent;
+
+  /** On mount / when project changes: try to load existing context file from disk. */
+  useEffect(() => {
+    if (!contextFilePath) return;
+    void (async () => {
+      try {
+        const fileContent = await readTextFromFile(contextFilePath);
+        setSavedContent(fileContent);
+      } catch {
+        /* File likely doesn't exist yet — treat saved content as empty. */
+        setSavedContent("");
+      }
+    })();
+  }, [contextFilePath]);
 
   /** Toggle a section on or off. */
   const handleToggleSection = useCallback((sectionId: string): void => {
@@ -96,21 +142,26 @@ export function ContextEditor(): React.JSX.Element {
     })();
   }, [activeProjectId]);
 
-  /** Build the full context preview from all enabled sections. */
-  const buildFullPreview = useCallback((): string => {
-    const parts: string[] = [];
-    for (const section of sections) {
-      if (section.enabled && section.content.trim()) {
-        parts.push(`## ${section.title}\n\n${section.content.trim()}`);
+  /** Write the current full preview to the context file on disk. */
+  const handleSaveToFile = useCallback((): void => {
+    if (!contextFilePath) return;
+    const content = buildFullPreview();
+    setSaveStatus("Saving...");
+    void (async () => {
+      try {
+        await writeTextToFile(contextFilePath, content);
+        setSavedContent(content);
+        setSaveStatus("Saved");
+        setTimeout(() => setSaveStatus(null), 2000);
+      } catch (error) {
+        console.error("Failed to save context file:", error);
+        setSaveStatus("Save failed");
+        setTimeout(() => setSaveStatus(null), 3000);
       }
-    }
-    if (autoContext) {
-      parts.push(`## Auto-Context (from Memory)\n\n${autoContext}`);
-    }
-    return parts.length > 0
-      ? parts.join("\n\n---\n\n")
-      : "No context configured. Add content to the sections above.";
-  }, [sections, autoContext]);
+    })();
+  }, [contextFilePath, buildFullPreview]);
+
+  const diffText = generateUnifiedDiff(savedContent, currentPreview, contextFileName);
 
   if (!activeProjectId) {
     return (
@@ -131,18 +182,56 @@ export function ContextEditor(): React.JSX.Element {
           <h2 className="font-display text-2xl text-heading tracking-tight">
             Context Editor
           </h2>
-          <p className="font-mono text-xs font-bold text-text-light/50" data-testid="context-file-label">
-            Editing {contextFileName}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="font-mono text-xs font-bold text-text-light/50" data-testid="context-file-label">
+              Editing {contextFileName}
+            </p>
+            {isDirty && <Badge variant="warning" data-testid="context-dirty-badge">Unsaved</Badge>}
+            {saveStatus && (
+              <Badge variant={saveStatus === "Save failed" ? "error" : "success"}>
+                {saveStatus}
+              </Badge>
+            )}
+          </div>
         </div>
-        <Button
-          variant="primary"
-          className="text-xs"
-          onClick={() => setShowPreview(!showPreview)}
-        >
-          {showPreview ? "Hide Preview" : "Preview Full Context"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            className="text-xs"
+            onClick={() => setShowDiff(!showDiff)}
+            disabled={!isDirty && !diffText}
+            data-testid="context-show-diff-btn"
+          >
+            {showDiff ? "Hide Diff" : "Show Diff"}
+          </Button>
+          <Button
+            variant="secondary"
+            className="text-xs"
+            onClick={() => setShowPreview(!showPreview)}
+          >
+            {showPreview ? "Hide Preview" : "Preview Full Context"}
+          </Button>
+          <Button
+            variant="primary"
+            className="text-xs"
+            onClick={handleSaveToFile}
+            disabled={!isDirty}
+            data-testid="context-save-btn"
+          >
+            Save to File
+          </Button>
+        </div>
       </div>
+
+      {/* Diff view */}
+      {showDiff && (
+        <div className="mb-4" data-testid="context-diff-view">
+          <DiffViewer
+            diff={diffText || `--- ${contextFileName}\n+++ ${contextFileName}\n (no changes)`}
+            onClose={() => setShowDiff(false)}
+          />
+        </div>
+      )}
 
       {/* Full context preview */}
       {showPreview && (
@@ -151,7 +240,7 @@ export function ContextEditor(): React.JSX.Element {
           data-testid="context-preview"
         >
           <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-text-inset">
-            {buildFullPreview()}
+            {currentPreview}
           </pre>
         </div>
       )}

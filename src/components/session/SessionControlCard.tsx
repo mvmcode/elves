@@ -48,7 +48,6 @@ export function SessionControlCard(): React.JSX.Element | null {
   const isHistoricalFloor = useSessionStore(
     (s) => (s.activeFloorId ? s.floors[s.activeFloorId]?.isHistorical : false) ?? false,
   );
-  const needsInput = useSessionStore((s) => s.needsInput);
   const { stopSession } = useTeamSession();
 
   const isActive = activeSession?.status === "active";
@@ -92,7 +91,7 @@ export function SessionControlCard(): React.JSX.Element | null {
 
   const leadElf = elves[0];
   const statusText = isCompleted
-    ? needsInput ? "Waiting for reply..." : "Done!"
+    ? "Done!"
     : isCancelled
       ? "Cancelled"
       : isInteractiveMode
@@ -147,11 +146,16 @@ export function SessionControlCard(): React.JSX.Element | null {
           </span>
         )}
 
-        {/* Stall warning */}
+        {/* Stall warning — clickable to open terminal */}
         {isStalled && (
-          <span className="text-warning" title="Claude may be waiting for input" data-testid="stall-warning">
+          <button
+            onClick={() => useUiStore.getState().openTerminalPanel()}
+            className="cursor-pointer border-none bg-transparent p-0 text-warning"
+            title="Claude may be waiting for input — click to open terminal"
+            data-testid="stall-warning"
+          >
             &#9888;
-          </span>
+          </button>
         )}
 
         {/* Elapsed time */}

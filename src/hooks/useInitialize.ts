@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useAppStore } from "@/stores/app";
 import { useProjectStore } from "@/stores/project";
 import { useSettingsStore } from "@/stores/settings";
-import { detectRuntimes, listProjects, decayMemories, discoverClaude } from "@/lib/tauri";
+import { detectRuntimes, listProjects, decayMemories, discoverClaude, seedTemplates } from "@/lib/tauri";
 
 /**
  * Runs once on app mount to detect runtimes, discover the user's Claude Code
@@ -36,6 +36,11 @@ export function useInitialize(): void {
         /* Run memory relevance decay on startup — fades old unused memories */
         decayMemories().catch((error: unknown) => {
           console.error("Memory decay failed:", error);
+        });
+
+        /* Seed built-in templates on startup — idempotent, skips existing ones */
+        seedTemplates().catch((error: unknown) => {
+          console.error("Template seeding failed:", error);
         });
       } catch (error) {
         console.error("Initialization failed:", error);

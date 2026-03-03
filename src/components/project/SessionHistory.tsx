@@ -4,12 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSessionHistory } from "@/hooks/useSessionHistory";
 import { useUiStore } from "@/stores/ui";
 import { useSessionStore } from "@/stores/session";
+import { useComparisonStore } from "@/stores/comparison";
 import type { ActiveSession } from "@/stores/session";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ShareButton } from "@/components/project/ShareButton";
 import { getEmptyState } from "@/lib/funny-copy";
 import { listSessionEvents } from "@/lib/tauri";
 import type { SessionEvent } from "@/lib/tauri";
+import { EVENT_TYPE_COLOR, summarizeEventPayload } from "@/lib/event-summary";
 import type { ElfEvent } from "@/types/elf";
 import type { Session, SessionStatus } from "@/types/session";
 
@@ -34,50 +36,6 @@ const RUNTIME_BADGE: Record<string, string> = {
   "claude-code": "CC",
   codex: "CX",
 };
-
-/** Event type to display color mapping. */
-const EVENT_TYPE_COLOR: Record<string, string> = {
-  thinking: "#4D96FF",
-  tool_use: "#FF8B3D",
-  tool_call: "#FF8B3D",
-  tool_result: "#6BCB77",
-  output: "#FFD93D",
-  result: "#FFD93D",
-  error: "#FF6B6B",
-  spawn: "#E0C3FC",
-  task_update: "#B8E6D0",
-};
-
-/** Summarize an event payload JSON string for display. */
-function summarizeEventPayload(eventType: string, payloadStr: string): string {
-  try {
-    const payload = JSON.parse(payloadStr) as Record<string, unknown>;
-    switch (eventType) {
-      case "thinking":
-        return typeof payload.text === "string" ? payload.text.slice(0, 150) : "Thinking...";
-      case "tool_use":
-      case "tool_call": {
-        const tool = (payload.tool ?? payload.name ?? "unknown") as string;
-        return `${tool}(...)`;
-      }
-      case "tool_result": {
-        const output = (payload.output ?? payload.result ?? "") as string;
-        return typeof output === "string" ? output.slice(0, 150) : JSON.stringify(output).slice(0, 150);
-      }
-      case "output":
-      case "result":
-        return typeof payload.text === "string" ? payload.text.slice(0, 150) :
-               typeof payload.result === "string" ? (payload.result as string).slice(0, 150) :
-               JSON.stringify(payload).slice(0, 150);
-      case "error":
-        return typeof payload.message === "string" ? payload.message : JSON.stringify(payload).slice(0, 150);
-      default:
-        return JSON.stringify(payload).slice(0, 150);
-    }
-  } catch {
-    return payloadStr.slice(0, 150);
-  }
-}
 
 /** Formats a duration in milliseconds to a compact human-readable string. */
 function formatDuration(startedAt: number, endedAt: number | null): string {
@@ -169,6 +127,7 @@ export function SessionHistory(): React.JSX.Element {
   const setHighlightedSessionId = useUiStore((state) => state.setHighlightedSessionId);
   const setActiveView = useUiStore((state) => state.setActiveView);
   const openHistoricalFloor = useSessionStore((state) => state.openHistoricalFloor);
+  const setComparisonLeft = useComparisonStore((state) => state.setLeft);
   const highlightRef = useRef<HTMLDivElement>(null);
 
   /** Auto-expand and scroll to the highlighted session (navigated from completion card). */
@@ -183,6 +142,20 @@ export function SessionHistory(): React.JSX.Element {
       });
     }
   }, [highlightedSessionId, isLoading, sessions, setHighlightedSessionId]);
+
+  /** Load session events and set it as the left comparison session, then navigate to comparison view. */
+  const handleCompare = useCallback(
+    async (session: Session): Promise<void> => {
+      try {
+        const events = await listSessionEvents(session.id);
+        setComparisonLeft({ session, events });
+        setActiveView("comparison");
+      } catch (error) {
+        console.error("Failed to load session events for comparison:", error);
+      }
+    },
+    [setComparisonLeft, setActiveView],
+  );
 
   /** Open a historical session as a new floor tab. */
   const handleOpenAsFloor = useCallback(
@@ -348,6 +321,16 @@ export function SessionHistory(): React.JSX.Element {
                       data-testid="open-floor-button"
                     >
                       Open as Floor
+                    </button>
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleCompare(session);
+                      }}
+                      className="cursor-pointer border-token-normal border-border bg-accent/20 rounded-token-sm px-3 py-1 font-display text-xs text-label shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                      data-testid="compare-session-button"
+                    >
+                      Compare
                     </button>
                   </div>
                 </div>

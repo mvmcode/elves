@@ -2,9 +2,10 @@
 
 import { create } from "zustand";
 import type { GitBranchInfo, GitCommit, GitFileChange } from "@/types/git";
+import type { GitState, WorktreeInfo } from "@/types/git-state";
 import * as tauri from "@/lib/tauri";
 
-interface GitState {
+interface GitStoreState {
   /** Current branch information. */
   readonly branch: GitBranchInfo | null;
   /** Recent commit history. */
@@ -19,6 +20,10 @@ interface GitState {
   readonly loading: boolean;
   /** Last error from a git operation. */
   readonly error: string | null;
+  /** Worktree list for the project. */
+  readonly worktrees: readonly WorktreeInfo[];
+  /** Full aggregate git state (refreshed via single call). */
+  readonly gitState: GitState | null;
 
   refreshBranch: (projectPath: string) => Promise<void>;
   refreshLog: (projectPath: string, maxCount?: number) => Promise<void>;
@@ -34,6 +39,10 @@ interface GitState {
   switchBranch: (projectPath: string, branchName: string) => Promise<void>;
   clearDiff: () => void;
   clearError: () => void;
+  refreshGitState: (projectPath: string) => Promise<void>;
+  resetGitState: () => void;
+  createWorktree: (projectPath: string, branchName: string, baseRef?: string) => Promise<string>;
+  removeWorktree: (projectPath: string, worktreePath: string) => Promise<void>;
 }
 
 /** Parse `git status --porcelain` output into staged and unstaged file change lists. */
@@ -69,7 +78,7 @@ function parseStatusMap(statusMap: Record<string, string>): {
   return { staged, unstaged };
 }
 
-export const useGitStore = create<GitState>((set) => ({
+export const useGitStore = create<GitStoreState>((set) => ({
   branch: null,
   commits: [],
   stagedFiles: [],
@@ -77,6 +86,8 @@ export const useGitStore = create<GitState>((set) => ({
   diffText: "",
   loading: false,
   error: null,
+  worktrees: [],
+  gitState: null,
 
   refreshBranch: async (projectPath: string): Promise<void> => {
     try {
@@ -215,4 +226,63 @@ export const useGitStore = create<GitState>((set) => ({
 
   clearDiff: () => set({ diffText: "" }),
   clearError: () => set({ error: null }),
+
+  refreshGitState: async (projectPath: string): Promise<void> => {
+    set({ loading: true });
+    try {
+      const gitState = await tauri.getGitState(projectPath);
+      const branch: GitBranchInfo = {
+        current: gitState.currentBranch,
+        local: gitState.branches.filter((b) => !b.isRemote).map((b) => b.name),
+        remote: gitState.branches.filter((b) => b.isRemote).map((b) => b.name),
+      };
+      set({
+        gitState,
+        branch,
+        worktrees: gitState.worktrees,
+        error: null,
+        loading: false,
+      });
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  resetGitState: (): void => {
+    set({
+      branch: null,
+      commits: [],
+      stagedFiles: [],
+      unstagedFiles: [],
+      diffText: "",
+      worktrees: [],
+      gitState: null,
+      loading: false,
+      error: null,
+    });
+  },
+
+  createWorktree: async (projectPath: string, branchName: string, baseRef?: string): Promise<string> => {
+    try {
+      const worktreePath = await tauri.gitWorktreeAdd(projectPath, branchName, baseRef);
+      // Refresh worktree list after creation
+      const worktrees = await tauri.gitWorktreeList(projectPath);
+      set({ worktrees, error: null });
+      return worktreePath;
+    } catch (e) {
+      set({ error: String(e) });
+      throw e;
+    }
+  },
+
+  removeWorktree: async (projectPath: string, worktreePath: string): Promise<void> => {
+    try {
+      await tauri.gitWorktreeRemove(projectPath, worktreePath);
+      // Refresh worktree list after removal
+      const worktrees = await tauri.gitWorktreeList(projectPath);
+      set({ worktrees, error: null });
+    } catch (e) {
+      set({ error: String(e) });
+    }
+  },
 }));

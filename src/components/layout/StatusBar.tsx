@@ -28,6 +28,8 @@ export function StatusBar(): React.JSX.Element {
   const elves = useSessionStore((s) => s.elves);
   const stagedFiles = useGitStore((s) => s.stagedFiles);
   const unstagedFiles = useGitStore((s) => s.unstagedFiles);
+  const gitState = useGitStore((s) => s.gitState);
+  const worktrees = useGitStore((s) => s.worktrees);
   const refreshBranch = useGitStore((s) => s.refreshBranch);
   const activeProject = useProjectStore((s) => {
     const id = s.activeProjectId;
@@ -37,12 +39,12 @@ export function StatusBar(): React.JSX.Element {
 
   const totalChanges = stagedFiles.length + unstagedFiles.length;
 
-  /** Load branch info when a project is active. */
+  /** Load branch info when a project is active — skip if gitState already populated. */
   useEffect(() => {
-    if (activeProject?.path) {
+    if (activeProject?.path && !gitState) {
       void refreshBranch(activeProject.path);
     }
-  }, [activeProject?.path, refreshBranch]);
+  }, [activeProject?.path, gitState, refreshBranch]);
 
   const isActive = activeSession?.status === "active";
   const isCompleted = activeSession?.status === "completed";
@@ -129,9 +131,38 @@ export function StatusBar(): React.JSX.Element {
         />
       </button>
 
-      {/* Branch display + change count */}
+      {/* Branch display + git indicators */}
       <div className="flex items-center gap-2">
         <BranchSwitcher />
+
+        {/* Dirty indicator — yellow dot when working tree has uncommitted changes */}
+        {gitState?.isDirty && (
+          <span
+            className="text-[10px] text-elf-gold"
+            title="Uncommitted changes"
+            data-testid="git-dirty-indicator"
+          >
+            ●
+          </span>
+        )}
+
+        {/* Ahead/behind counts relative to upstream */}
+        {gitState?.aheadBehind != null && (
+          <span className="flex items-center gap-1 font-mono text-[10px] font-bold">
+            {gitState.aheadBehind.ahead > 0 && (
+              <span className="text-success" title={`${gitState.aheadBehind.ahead} commit${gitState.aheadBehind.ahead !== 1 ? "s" : ""} ahead`} data-testid="git-ahead-count">
+                ↑{gitState.aheadBehind.ahead}
+              </span>
+            )}
+            {gitState.aheadBehind.behind > 0 && (
+              <span className="text-info" title={`${gitState.aheadBehind.behind} commit${gitState.aheadBehind.behind !== 1 ? "s" : ""} behind`} data-testid="git-behind-count">
+                ↓{gitState.aheadBehind.behind}
+              </span>
+            )}
+          </span>
+        )}
+
+        {/* Change count badge */}
         {totalChanges > 0 && (
           <button
             onClick={() => setActiveView("git")}
@@ -140,6 +171,35 @@ export function StatusBar(): React.JSX.Element {
             data-testid="git-changes-badge"
           >
             {totalChanges}
+          </button>
+        )}
+
+        {/* Worktree count badge — only shown when multiple worktrees exist */}
+        {worktrees.length > 1 && (
+          <button
+            onClick={() => setActiveView("git")}
+            className="flex cursor-pointer items-center gap-1 border-[2px] border-border/20 bg-info/10 px-1.5 py-0 font-mono text-[10px] font-bold text-info transition-all duration-100 hover:border-border/40 hover:bg-info/20"
+            title={`${worktrees.length} worktrees`}
+            data-testid="git-worktree-count"
+          >
+            {/* Tree icon */}
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M17 18a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2" />
+              <rect width="18" height="18" x="3" y="4" rx="2" />
+              <circle cx="12" cy="10" r="2" />
+              <line x1="8" y1="2" x2="8" y2="4" />
+              <line x1="16" y1="2" x2="16" y2="4" />
+            </svg>
+            {worktrees.length}
           </button>
         )}
       </div>

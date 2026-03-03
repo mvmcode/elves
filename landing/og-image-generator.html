@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ELVES OG Image Generator</title>
+  <!--
+    OG Image Generator for ELVES
+    ============================
+    1. Open this file in a browser
+    2. Click "Save as PNG"
+    3. Commit the generated og-image.png to landing/
+    4. The og:image meta tags in index.html reference this file
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Inter:wght@600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      background: #1A1A2E;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Inter', sans-serif;
+      color: #FFFDF7;
+    }
+    canvas {
+      border: 3px solid #000;
+      box-shadow: 8px 8px 0px 0px #FFD93D;
+    }
+    .save-btn {
+      margin-top: 24px;
+      background: #FFD93D;
+      color: #000;
+      border: 3px solid #000;
+      box-shadow: 4px 4px 0px 0px #000;
+      padding: 14px 32px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .save-btn:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0px 0px #000;
+    }
+    .save-btn:active {
+      transform: translate(4px, 4px);
+      box-shadow: 0px 0px 0px 0px #000;
+    }
+    .instructions {
+      margin-top: 16px;
+      font-size: 14px;
+      color: #888;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" width="1200" height="630"></canvas>
+  <button class="save-btn" onclick="saveImage()">Save as PNG</button>
+  <p class="instructions">Click to download og-image.png, then commit it to landing/</p>
+
+  <script>
+    function drawOgImage() {
+      var canvas = document.getElementById('canvas');
+      var ctx = canvas.getContext('2d');
+      var W = 1200;
+      var H = 630;
+
+      /* Background */
+      ctx.fillStyle = '#1A1A2E';
+      ctx.fillRect(0, 0, W, H);
+
+      /* Neo-brutalist border */
+      ctx.strokeStyle = '#FFD93D';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(24, 24, W - 48, H - 48);
+
+      /* Inner border */
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(32, 32, W - 64, H - 64);
+
+      /* Hard drop shadow accent rectangles */
+      ctx.fillStyle = '#FF6B6B';
+      ctx.fillRect(60, 60, 120, 8);
+
+      ctx.fillStyle = '#6BCB77';
+      ctx.fillRect(W - 180, 60, 120, 8);
+
+      ctx.fillStyle = '#4D96FF';
+      ctx.fillRect(60, H - 68, 120, 8);
+
+      ctx.fillStyle = '#FF8B3D';
+      ctx.fillRect(W - 180, H - 68, 120, 8);
+
+      /* Elf emojis scattered */
+      ctx.font = '48px serif';
+      ctx.fillText('\u{1F9DD}', 80, 180);
+      ctx.fillText('\u{1F9DD}', W - 140, 200);
+      ctx.fillText('\u2728', 100, H - 140);
+      ctx.fillText('\u{1F36A}', W - 140, H - 120);
+      ctx.fillText('\u{1F528}', 80, H / 2 + 40);
+      ctx.fillText('\u26A1', W - 120, H / 2 - 20);
+
+      /* Title: ELVES */
+      ctx.font = 'bold 140px Space Grotesk, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      /* Text shadow */
+      ctx.fillStyle = '#000';
+      ctx.fillText('ELVES', W / 2 + 6, H / 2 - 50 + 6);
+
+      /* Main text */
+      ctx.fillStyle = '#FFD93D';
+      ctx.fillText('ELVES', W / 2, H / 2 - 50);
+
+      /* Tagline */
+      ctx.font = 'bold 32px Space Grotesk, sans-serif';
+      ctx.fillStyle = '#FFFDF7';
+      ctx.fillText('Summon Your AI Workshop', W / 2, H / 2 + 40);
+
+      /* Subtitle */
+      ctx.font = '600 20px Inter, sans-serif';
+      ctx.fillStyle = '#888';
+      ctx.fillText('Type a task. Watch your elves collaborate. Ship faster.', W / 2, H / 2 + 90);
+
+      /* Badge */
+      var badgeText = 'OPEN SOURCE \u2022 macOS';
+      ctx.font = 'bold 14px Inter, sans-serif';
+      var badgeWidth = ctx.measureText(badgeText).width + 32;
+      ctx.fillStyle = '#000';
+      ctx.strokeStyle = '#FFD93D';
+      ctx.lineWidth = 2;
+      ctx.fillRect(W / 2 - badgeWidth / 2, H / 2 + 120, badgeWidth, 32);
+      ctx.strokeRect(W / 2 - badgeWidth / 2, H / 2 + 120, badgeWidth, 32);
+      ctx.fillStyle = '#FFD93D';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(badgeText, W / 2, H / 2 + 136);
+    }
+
+    function saveImage() {
+      var canvas = document.getElementById('canvas');
+      canvas.toBlob(function(blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'og-image.png';
+        a.click();
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+    }
+
+    /* Render on load, with font fallback delay */
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(drawOgImage);
+    } else {
+      setTimeout(drawOgImage, 500);
+    }
+  </script>
+</body>
+</html>

@@ -62,7 +62,47 @@ shasum -a 256 ELVES_vX.Y.Z_aarch64.dmg
 
 ELVES includes `tauri-plugin-updater` which checks GitHub Releases for new versions. Users on an older version will see an update prompt automatically.
 
-The updater reads from the GitHub Releases API endpoint configured in `tauri.conf.json` under `plugins.updater`.
+The updater reads from the `latest.json` manifest uploaded alongside each release DMG. The release workflow generates this file automatically.
+
+### Updater Signing Setup
+
+The Tauri updater requires signed artifacts to verify integrity. Follow these steps to enable signing:
+
+1. **Generate a signing key pair:**
+
+   ```bash
+   npx tauri signer generate -w ~/.tauri/elves.key
+   ```
+
+   This creates `~/.tauri/elves.key` (private) and `~/.tauri/elves.key.pub` (public).
+
+2. **Add secrets to GitHub repository:**
+
+   Go to **Settings > Secrets and variables > Actions** and add:
+   - `TAURI_SIGNING_PRIVATE_KEY` — contents of `~/.tauri/elves.key`
+   - `TAURI_KEY_PASSWORD` — the password you chose during key generation (leave empty if none)
+
+3. **Paste the public key into tauri.conf.json:**
+
+   ```json
+   "plugins": {
+     "updater": {
+       "endpoints": [
+         "https://github.com/mvmcode/elves/releases/latest/download/latest.json"
+       ],
+       "pubkey": "<contents of ~/.tauri/elves.key.pub>"
+     }
+   }
+   ```
+
+4. **Test locally:**
+
+   Build a release and verify `latest.json` is generated with a valid signature:
+   ```bash
+   cat latest.json | python3 -m json.tool
+   ```
+
+Without the signing key secrets, the release workflow still generates `latest.json` but with an empty signature field. The updater will skip unsigned updates.
 
 ## CI Pipeline
 

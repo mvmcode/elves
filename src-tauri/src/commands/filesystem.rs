@@ -7,6 +7,7 @@ use std::process::Command;
 
 /// A single file or directory entry returned by `list_directory`.
 #[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct FileEntry {
     pub name: String,
     pub path: String,

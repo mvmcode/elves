@@ -2,17 +2,15 @@
  * Handles the transition from non-interactive (--print) mode to interactive
  * PTY terminal when the user needs to provide feedback to a running session. */
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ActivityFeed } from "./ActivityFeed";
 import { SessionTerminal } from "@/components/terminal/SessionTerminal";
 import { useSessionStore } from "@/stores/session";
+import { useStallDetection } from "@/hooks/useStallDetection";
 import { transitionToInteractive } from "@/lib/tauri";
 import type { ElfEvent } from "@/types/elf";
 
 type TabId = "activity" | "terminal";
-
-/** Seconds of silence before showing the stall banner. */
-const STALL_THRESHOLD_SECONDS = 15;
 
 interface SidePanelProps {
   readonly events: readonly ElfEvent[];
@@ -44,11 +42,11 @@ export function SidePanel({
 }: SidePanelProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabId>("activity");
   const [hasTransitioned, setHasTransitioned] = useState(false);
-  const [isStalled, setIsStalled] = useState(false);
   const isInteractiveMode = useSessionStore((s) => s.isInteractiveMode);
   const lastEventAt = useSessionStore((s) => s.lastEventAt);
   const activeSession = useSessionStore((s) => s.activeSession);
   const isSessionActive = activeSession?.status === "active";
+  const isStalled = useStallDetection(lastEventAt, isSessionActive && !isInteractiveMode && activeTab !== "terminal");
 
   /** Kill the print process before mounting the terminal. */
   const handleSwitchToTerminal = useCallback((): void => {
@@ -59,39 +57,7 @@ export function SidePanel({
       });
     }
     setActiveTab("terminal");
-    setIsStalled(false);
   }, [sessionId, isSessionActive, hasTransitioned, isInteractiveMode]);
-
-  /** Detect event stream stall — indicates Claude may be waiting for input. */
-  const stallTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (!isSessionActive || isInteractiveMode || activeTab === "terminal") {
-      setIsStalled(false);
-      if (stallTimerRef.current) {
-        clearInterval(stallTimerRef.current);
-        stallTimerRef.current = null;
-      }
-      return;
-    }
-
-    stallTimerRef.current = setInterval(() => {
-      const now = Date.now();
-      const elapsed = (now - lastEventAt) / 1000;
-      if (elapsed >= STALL_THRESHOLD_SECONDS && lastEventAt > 0) {
-        setIsStalled(true);
-      } else {
-        setIsStalled(false);
-      }
-    }, 3000);
-
-    return () => {
-      if (stallTimerRef.current) {
-        clearInterval(stallTimerRef.current);
-        stallTimerRef.current = null;
-      }
-    };
-  }, [isSessionActive, isInteractiveMode, activeTab, lastEventAt]);
 
   /** Complete the session when the PTY exits during interactive mode. */
   const handlePtyExit = useCallback((): void => {
@@ -103,7 +69,6 @@ export function SidePanel({
   /** Reset transition state when session changes. */
   useEffect(() => {
     setHasTransitioned(false);
-    setIsStalled(false);
     setActiveTab("activity");
   }, [sessionId]);
 

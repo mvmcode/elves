@@ -15,6 +15,8 @@ interface LiveEventTerminalProps {
   readonly projectPath: string;
   readonly taskLabel: string;
   readonly onClose: () => void;
+  /** Whether the event stream appears stalled (Claude may be waiting for input). */
+  readonly isStalled?: boolean;
 }
 
 /** ANSI color codes for terminal rendering. */
@@ -91,6 +93,7 @@ export function LiveEventTerminal({
   claudeSessionId,
   taskLabel,
   onClose,
+  isStalled = false,
 }: LiveEventTerminalProps): React.JSX.Element {
   const terminalRef = useRef<XTerminalHandle>(null);
   const writtenCountRef = useRef(0);
@@ -167,19 +170,22 @@ export function LiveEventTerminal({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* GO INTERACTIVE button — prominent neo-brutalist style */}
           <button
             onClick={handleGoInteractive}
             disabled={isTransitioning || !claudeSessionId}
             className={[
-              "shrink-0 border-[2px] border-border px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-widest shadow-brutal-sm transition-all duration-100",
+              "shrink-0 border-[3px] border-border px-4 py-1.5 font-display text-xs font-bold uppercase tracking-widest transition-all duration-100",
               isTransitioning
-                ? "cursor-wait bg-gray-200 text-gray-400"
-                : "cursor-pointer bg-warning/20 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none",
+                ? "cursor-wait bg-gray-200 text-gray-400 shadow-none"
+                : isStalled
+                  ? "animate-pulse cursor-pointer bg-[#FFD93D] text-black shadow-brutal-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                  : "cursor-pointer bg-[#FFD93D] text-black shadow-brutal-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none",
             ].join(" ")}
             title="Kill the print process and open an interactive terminal (interrupts current work)"
             data-testid="go-interactive-btn"
           >
-            {isTransitioning ? "..." : "\u26A1 INTERACTIVE"}
+            {isTransitioning ? "..." : "\u26A1 GO INTERACTIVE"}
           </button>
           <button
             onClick={onClose}
@@ -190,6 +196,24 @@ export function LiveEventTerminal({
           </button>
         </div>
       </div>
+
+      {/* Stall warning banner — shown above terminal when Claude appears to be waiting */}
+      {isStalled && (
+        <button
+          onClick={handleGoInteractive}
+          disabled={isTransitioning}
+          className="flex w-full cursor-pointer items-center gap-3 border-b-[3px] border-border bg-[#FF8B3D] px-4 py-2.5 text-left transition-all duration-100 hover:brightness-110"
+          data-testid="stall-warning-banner"
+        >
+          <span className="text-lg">&#9888;</span>
+          <span className="flex-1 font-display text-xs font-bold uppercase tracking-wider text-black">
+            Claude appears to be waiting for input
+          </span>
+          <span className="border-[3px] border-black bg-[#FFD93D] px-3 py-1 font-display text-[10px] font-bold uppercase tracking-widest text-black shadow-brutal-sm">
+            {isTransitioning ? "..." : "\u26A1 Go Interactive"}
+          </span>
+        </button>
+      )}
 
       {/* Terminal viewport — read-only event stream */}
       <div className="flex-1 overflow-hidden p-1">

@@ -4,6 +4,43 @@ All notable changes to ELVES are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.1] - 2026-03-02 — Stability & UX Polish
+
+### Fixed
+- **Deduplicate projects by path** — prevents duplicate project entries when opening the same directory multiple times
+- **Plan approval GUI** — approve/reject buttons for agent plan mode completions
+- **Detect plan mode completions** — correctly identifies when an agent is waiting for plan approval
+- **Prevent agent question truncation** — agent follow-up questions are no longer silently cut off
+
+## [1.0.0] - 2026-03-03 — Phase 5+6 Completion & Visual Overhaul
+
+### Added
+- **SkillEditor preview & export** — live markdown preview and JSON export for custom skills
+- **MCP tool listing** — enumerate and display available tools from configured MCP servers
+- **ContextEditor save/diff** — save CLAUDE.md edits with inline diff preview before committing
+- **Enhanced avatar animations** — glow effects per-status (working=yellow, thinking=purple, done=green)
+- **Dark mode themes** — neo-brutalist-dark and modern-dark theme options with full design token support
+- **Codex multi-agent event attribution** — events from Codex team sessions correctly attributed to individual elves
+- **Template seeding + JSON export** — built-in templates auto-seed on first launch, exportable as JSON
+- **Session comparison view** — side-by-side diff of two sessions with event timeline alignment
+- **Auto-interactive mode** — detect when sessions benefit from interactive terminal vs print mode
+- **Project context hook** — `useProjectContext` aggregates git state, file tree, and memory for context injection
+- **Event summary utility** — `event-summary.ts` generates human-readable session summaries
+- **Simple diff engine** — `simple-diff.ts` for lightweight text comparison without external dependencies
+- **Git state types** — `git-state.ts` typed representations of branch, status, and diff data
+
+### Changed
+- **Rich interaction flow** — SessionControlCard redesigned with inline response blocks and follow-up handling
+- **File tree sidebar** — SidePanel shows project file tree with git status indicators
+- **Git awareness** — BranchSwitcher and StatusBar show real-time git state
+- **Comparison store** — Zustand store for managing session comparison state
+
+### Removed
+- `AgentPromptPopup` — replaced by inline interaction in SessionControlCard
+- `FollowUpCard` — merged into SessionControlCard's response flow
+- `InlineResponseBlock` — consolidated into SessionControlCard
+- `prompt-classifier` — classification logic moved into session event handling
+
 ## [0.9.0] - 2026-03-01 — Agent Prompt Popup & PTY Elf Pairing
 
 ### Added

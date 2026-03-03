@@ -21,6 +21,7 @@ import { SettingsView } from "@/components/settings/SettingsView";
 import { SkillEditor } from "@/components/editors/SkillEditor";
 import { McpManager } from "@/components/editors/McpManager";
 import { SessionHistory } from "@/components/project/SessionHistory";
+import { SessionComparison } from "@/components/project/SessionComparison";
 import { GitPanel } from "@/components/git/GitPanel";
 import { FileTreePanel } from "@/components/files/FileTreePanel";
 import { FileViewer } from "@/components/files/FileViewer";
@@ -35,6 +36,8 @@ import { useTeamSession } from "@/hooks/useTeamSession";
 import { useMemoryActions } from "@/hooks/useMemoryActions";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useSessionEvents } from "@/hooks/useSessionEvents";
+import { useProjectContext } from "@/hooks/useProjectContext";
+import { useAutoInteractive } from "@/hooks/useAutoInteractive";
 import { useSounds } from "@/hooks/useSounds";
 import { useResizable } from "@/hooks/useResizable";
 import { onEvent } from "@/lib/tauri";
@@ -76,11 +79,7 @@ export function Shell(): React.JSX.Element {
   const setFileTreeWidth = useUiStore((state) => state.setFileTreeWidth);
   const selectedFilePath = useUiStore((state) => state.selectedFilePath);
   const workshopViewMode = useUiStore((state) => state.workshopViewMode);
-  const needsInput = useSessionStore((state) => state.needsInput);
-  const lastResultText = useSessionStore((state) => state.lastResultText);
-  const activeFloorId = useSessionStore((state) => state.activeFloorId);
-  const setNeedsInputOnFloor = useSessionStore((state) => state.setNeedsInputOnFloor);
-  const { deployWithPlan, stopSession, continueSession } = useTeamSession();
+  const { deployWithPlan, stopSession } = useTeamSession();
   const {
     handleCreateMemory,
     handleEditMemory,
@@ -96,29 +95,24 @@ export function Shell(): React.JSX.Element {
     onCancelTask: () => void stopSession(),
   });
 
-  /* Prompt popup state and handlers */
-  const [isPromptSubmitting, setIsPromptSubmitting] = useState(false);
-
-  const handlePromptSubmit = useCallback((message: string): void => {
-    setIsPromptSubmitting(true);
-    void continueSession(message).finally(() => setIsPromptSubmitting(false));
-  }, [continueSession]);
-
-  const handlePromptDismiss = useCallback((): void => {
-    if (activeFloorId) setNeedsInputOnFloor(activeFloorId, false, null);
-  }, [activeFloorId, setNeedsInputOnFloor]);
-
   /* Subscribe to Tauri backend events (elf:event, session:completed) */
   useSessionEvents();
 
-  /* Auto-switch from workshop to card view when needsInput is true.
-   * Workshop/pixel view has no mechanism to show InlineResponseBlock,
-   * so we force card view to ensure the user sees Claude's question. */
+  /* Auto-open terminal panel when a session transitions to "active". */
+  const prevSessionStatusRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (needsInput && workshopViewMode === "workshop") {
-      useUiStore.getState().setWorkshopViewMode("cards");
+    const currentStatus = activeSession?.status;
+    if (prevSessionStatusRef.current !== "active" && currentStatus === "active") {
+      useUiStore.getState().openTerminalPanel();
     }
-  }, [needsInput, workshopViewMode]);
+    prevSessionStatusRef.current = currentStatus;
+  }, [activeSession?.status]);
+
+  /* Load project-scoped context (git state, etc.) when active project changes */
+  useProjectContext();
+
+  /* Auto-transition to interactive mode on stall if the setting is enabled */
+  useAutoInteractive();
 
   /* Global Space key listener for toggling workshop/card view.
    * Lives here (not in WorkshopCanvas) so it works from both views. */
@@ -249,10 +243,6 @@ export function Shell(): React.JSX.Element {
   const isCompleted =
     activeSession?.status === "completed" && elves.length > 0;
 
-  /** Whether this session was started in plan mode — forces approve/reject buttons. */
-  const isPlanApproval =
-    needsInput && activeSession?.appliedOptions?.permissionMode === "plan";
-
   /** Whether this is a team session with a task graph */
   const hasTaskGraph =
     activeSession?.plan != null &&
@@ -314,6 +304,10 @@ export function Shell(): React.JSX.Element {
           <div className="flex flex-1 flex-col overflow-y-auto">
             <SessionHistory />
           </div>
+        ) : activeView === "comparison" ? (
+          <div className="flex flex-1 overflow-hidden">
+            <SessionComparison />
+          </div>
         ) : activeView === "settings" ? (
           <SettingsView
             onClearAll={handleClearAll}
@@ -336,7 +330,7 @@ export function Shell(): React.JSX.Element {
                 <div className="flex flex-1 flex-col overflow-y-auto">
                   {/* Celebration / needs-input banner on completion */}
                   <AnimatePresence>
-                    {isCompleted && !needsInput && (
+                    {isCompleted && (
                       <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: "auto", opacity: 1 }}
@@ -347,20 +341,6 @@ export function Shell(): React.JSX.Element {
                       >
                         <p className="font-display text-xl text-heading tracking-wide text-white">
                           All Done!
-                        </p>
-                      </motion.div>
-                    )}
-                    {isCompleted && needsInput && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
-                        className="border-b-token-normal border-border bg-info px-6 py-3 text-center"
-                        data-testid="needs-input-banner"
-                      >
-                        <p className="font-display text-xl text-heading tracking-wide text-white">
-                          Claude is asking a question — reply below
                         </p>
                       </motion.div>
                     )}
@@ -386,12 +366,6 @@ export function Shell(): React.JSX.Element {
                       startedAt={activeSession.startedAt}
                       sessionStatus={activeSession.status}
                       isHistorical={isHistoricalFloor}
-                      needsInput={needsInput}
-                      lastResultText={lastResultText}
-                      onSubmitResponse={handlePromptSubmit}
-                      onDismissInput={handlePromptDismiss}
-                      isSubmitting={isPromptSubmitting}
-                      isPlanApproval={isPlanApproval}
                     />
                   )}
 
@@ -443,7 +417,7 @@ export function Shell(): React.JSX.Element {
                         </button>
                       </div>
                       <div className="flex-1 overflow-y-auto">
-                        <ActivityFeed events={events} maxHeight="100%" needsInput={needsInput} />
+                        <ActivityFeed events={events} maxHeight="100%" />
                       </div>
                     </div>
                   </div>

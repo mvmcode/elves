@@ -12,6 +12,7 @@ import type { Template } from "@/types/template";
 import type { ClaudeDiscovery, ClaudeSpawnOptions } from "@/types/claude";
 import type { FileEntry } from "@/types/filesystem";
 import type { GitBranchInfo, GitCommit } from "@/types/git";
+import type { GitState, WorktreeInfo } from "@/types/git-state";
 
 /** Detect available AI runtimes (Claude Code, Codex) on the system */
 export async function detectRuntimes(): Promise<RuntimeInfo> {
@@ -95,18 +96,6 @@ export async function startTeamTask(
 /** Stop a team task. Kills all agent processes for the session. */
 export async function stopTeamTask(sessionId: string): Promise<boolean> {
   return invoke<boolean>("stop_team_task", { sessionId });
-}
-
-/** Continue a completed session with a follow-up message.
- * Resumes the Claude session via `--print --resume` with the new message.
- * The session transitions back to "active" and events stream into the same feed. */
-export async function continueTask(
-  sessionId: string,
-  message: string,
-  spawnOptions?: ClaudeSpawnOptions,
-): Promise<boolean> {
-  const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
-  return invoke<boolean>("continue_task", { sessionId, message, options });
 }
 
 /** Transition a session from non-interactive print mode to interactive terminal.
@@ -290,6 +279,17 @@ export async function deleteMcpServer(id: string): Promise<boolean> {
   return invoke<boolean>("delete_mcp_server", { id });
 }
 
+/** A tool exposed by an MCP server. */
+export interface McpTool {
+  readonly name: string;
+  readonly description: string | null;
+}
+
+/** Spawn an MCP server and query its available tools via JSON-RPC. Times out after 5s. */
+export async function listMcpTools(id: string): Promise<McpTool[]> {
+  return invoke<McpTool[]>("list_mcp_tools", { id });
+}
+
 /* ── Template commands ───────────────────────────────────────── */
 
 /** List all templates (built-in + custom). */
@@ -314,6 +314,11 @@ export async function deleteTemplate(id: string): Promise<boolean> {
 /** Load a template by ID. Returns the template with its plan. */
 export async function loadTemplate(id: string): Promise<Template> {
   return invoke<Template>("load_template", { id });
+}
+
+/** Seed built-in templates into the database if they don't already exist. Returns count seeded. */
+export async function seedTemplates(): Promise<number> {
+  return invoke<number>("seed_templates");
 }
 
 /* ── Export commands ──────────────────────────────────────────── */
@@ -390,6 +395,30 @@ export async function gitPull(projectPath: string): Promise<string> {
 /** Switch to a different local branch. */
 export async function gitSwitchBranch(projectPath: string, branchName: string): Promise<boolean> {
   return invoke<boolean>("git_switch_branch", { projectPath, branchName });
+}
+
+/** List all git worktrees for a project. */
+export async function gitWorktreeList(projectPath: string): Promise<WorktreeInfo[]> {
+  return invoke<WorktreeInfo[]>("git_worktree_list", { projectPath });
+}
+
+/** Create a new worktree with a new branch. Returns the worktree path. */
+export async function gitWorktreeAdd(
+  projectPath: string,
+  branchName: string,
+  baseRef?: string,
+): Promise<string> {
+  return invoke<string>("git_worktree_add", { projectPath, branchName, baseRef: baseRef ?? null });
+}
+
+/** Remove a git worktree. */
+export async function gitWorktreeRemove(projectPath: string, worktreePath: string): Promise<boolean> {
+  return invoke<boolean>("git_worktree_remove", { projectPath, worktreePath });
+}
+
+/** Get aggregate git state in a single call — branch, worktrees, dirty, ahead/behind. */
+export async function getGitState(projectPath: string): Promise<GitState> {
+  return invoke<GitState>("get_git_state", { projectPath });
 }
 
 /* ── Event subscription ──────────────────────────────────────── */

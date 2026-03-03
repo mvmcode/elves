@@ -9,6 +9,7 @@ import { LiveEventTerminal } from "./LiveEventTerminal";
 import { useSessionStore } from "@/stores/session";
 import { useUiStore } from "@/stores/ui";
 import { useProjectStore } from "@/stores/project";
+import { useStallDetection } from "@/hooks/useStallDetection";
 import { generateElf, getStatusMessage } from "@/lib/elf-names";
 import { playSound } from "@/lib/sounds";
 import type { DetectedAgent } from "@/lib/pty-agent-detector";
@@ -42,6 +43,8 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
   const claudeSessionId = activeSession?.claudeSessionId;
   const isSessionActive = activeSession?.status === "active";
   const isSessionCompleted = activeSession?.status === "completed";
+  const lastEventAt = useSessionStore((s) => s.lastEventAt);
+  const isStalled = useStallDetection(lastEventAt, isSessionActive === true && !isInteractiveMode);
   const projectPath = projects.find((p) => p.id === activeProjectId)?.path ?? "";
   const taskLabel = activeSession?.task ?? "";
 
@@ -199,6 +202,7 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
             projectPath={projectPath}
             taskLabel={taskLabel}
             onClose={toggleTerminalPanel}
+            isStalled={isStalled}
           />
         ) : claudeSessionId ? (
           <SessionTerminal

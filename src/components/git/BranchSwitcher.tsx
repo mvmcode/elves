@@ -1,15 +1,21 @@
-/* BranchSwitcher — dropdown popover listing local branches with click-to-switch. */
+/* BranchSwitcher — dropdown popover listing local branches with click-to-switch,
+ * plus a worktree section when multiple worktrees exist. */
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useGitStore } from "@/stores/git";
 import { useProjectStore } from "@/stores/project";
+import type { WorktreeInfo } from "@/types/git-state";
 
-/**
- * Dropdown popover for switching git branches.
- * Renders as a button showing current branch; click opens the branch list.
- */
+/** Truncate a file path to its last two segments for compact display. */
+function truncatePath(fullPath: string): string {
+  const segments = fullPath.replace(/\/$/, "").split("/");
+  if (segments.length <= 2) return fullPath;
+  return `…/${segments.slice(-2).join("/")}`;
+}
+
 export function BranchSwitcher(): React.JSX.Element {
   const branch = useGitStore((s) => s.branch);
+  const worktrees = useGitStore((s) => s.worktrees);
   const switchBranch = useGitStore((s) => s.switchBranch);
   const activeProject = useProjectStore((s) => {
     const id = s.activeProjectId;
@@ -99,6 +105,57 @@ export function BranchSwitcher(): React.JSX.Element {
               <span className="truncate">{name}</span>
             </button>
           ))}
+
+          {/* Worktrees section — only when multiple worktrees exist */}
+          {worktrees.length > 1 && (
+            <>
+              <div className="border-t-[2px] border-border/30 px-3 py-1.5">
+                <span className="font-display text-[10px] font-bold uppercase tracking-wider text-text-light/50">
+                  Worktrees
+                </span>
+              </div>
+              {worktrees.map((wt: WorktreeInfo) => (
+                <div
+                  key={wt.path}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 font-mono text-xs text-text-light/70"
+                  title={wt.path}
+                  data-testid={`worktree-${wt.branch}`}
+                >
+                  {/* Folder icon */}
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="shrink-0"
+                  >
+                    <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+                  </svg>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[11px] font-bold">{wt.branch}</span>
+                    <span className="truncate text-[9px] text-text-light/40">{truncatePath(wt.path)}</span>
+                  </div>
+                  {/* Badges */}
+                  <div className="flex shrink-0 items-center gap-1">
+                    {wt.isMain && (
+                      <span className="border-[1.5px] border-border/30 px-1 py-0 text-[8px] font-bold uppercase text-text-light/50">
+                        main
+                      </span>
+                    )}
+                    {wt.isLocked && (
+                      <span className="border-[1.5px] border-border/30 bg-elf-gold/20 px-1 py-0 text-[8px] font-bold uppercase text-elf-gold">
+                        locked
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
 
           {branch.remote.length > 0 && (
             <>

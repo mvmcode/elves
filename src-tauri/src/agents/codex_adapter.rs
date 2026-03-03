@@ -35,6 +35,65 @@ pub struct NormalizedEvent {
     pub runtime: String,
 }
 
+/// Tracks which phase of a Codex team run is active and maps phases to elf IDs.
+///
+/// Codex team runs execute phases sequentially, announcing transitions with
+/// "Phase N" text in their output. This parser detects those announcements
+/// regex-free and advances the current phase index to attribute events to the
+/// correct elf in the session.
+pub struct CodexTeamParser {
+    /// Elf IDs in phase order — index 0 is phase 1, index 1 is phase 2, etc.
+    pub phase_elf_ids: Vec<String>,
+    /// Zero-indexed current phase. Starts at 0 (phase 1).
+    pub current_phase: usize,
+}
+
+impl CodexTeamParser {
+    /// Create a new parser for a team run with the given elf IDs (one per phase).
+    pub fn new(elf_ids: Vec<String>) -> Self {
+        Self { phase_elf_ids: elf_ids, current_phase: 0 }
+    }
+
+    /// Check a line of Codex output for a "Phase N" transition announcement.
+    ///
+    /// Uses `str::to_lowercase().contains("phase")` — no regex dependency.
+    /// Extracts the integer N that follows "phase" (with optional whitespace),
+    /// converts to a zero-based index, and updates `current_phase` if changed.
+    ///
+    /// Returns `Some(new_phase_index)` when a transition is detected, `None` otherwise.
+    pub fn detect_phase_transition(&mut self, line: &str) -> Option<usize> {
+        let lower = line.to_lowercase();
+        if !lower.contains("phase") {
+            return None;
+        }
+
+        // Find the first occurrence of "phase" and look for digits that follow
+        let phase_pos = lower.find("phase")?;
+        let after_phase = lower[phase_pos + 5..].trim_start(); // skip "phase" (5 chars)
+
+        let digits: String = after_phase.chars().take_while(|c| c.is_ascii_digit()).collect();
+        let phase_number: usize = digits.parse().ok()?;
+
+        if phase_number == 0 {
+            return None; // "Phase 0" is not a valid phase
+        }
+
+        let new_index = phase_number - 1; // 1-indexed → 0-indexed
+        if new_index != self.current_phase {
+            self.current_phase = new_index;
+            Some(new_index)
+        } else {
+            None
+        }
+    }
+
+    /// Return the elf ID for the currently active phase, or `None` if the
+    /// phase index is out of bounds (i.e., more phases than expected elves).
+    pub fn current_elf_id(&self) -> Option<&str> {
+        self.phase_elf_ids.get(self.current_phase).map(|s| s.as_str())
+    }
+}
+
 /// Spawn a Codex CLI process for a single-agent task.
 ///
 /// Runs: `codex --approval-mode full-auto "<task>"`
@@ -511,6 +570,77 @@ mod tests {
         assert!(prompt.contains("Simple task"));
         assert!(prompt.contains("Phase 1 — Worker"));
         assert!(!prompt.contains("Execution Order"));
+    }
+
+    // --- CodexTeamParser tests ---
+
+    #[test]
+    fn team_parser_starts_at_phase_zero() {
+        let parser = CodexTeamParser::new(vec!["elf-1".into(), "elf-2".into()]);
+        assert_eq!(parser.current_phase, 0);
+        assert_eq!(parser.current_elf_id(), Some("elf-1"));
+    }
+
+    #[test]
+    fn team_parser_advances_on_phase_announcement() {
+        let mut parser = CodexTeamParser::new(vec!["elf-1".into(), "elf-2".into(), "elf-3".into()]);
+        let new_phase = parser.detect_phase_transition("Phase 2: Building the solution");
+        assert_eq!(new_phase, Some(1));
+        assert_eq!(parser.current_phase, 1);
+        assert_eq!(parser.current_elf_id(), Some("elf-2"));
+    }
+
+    #[test]
+    fn team_parser_case_insensitive() {
+        let mut parser = CodexTeamParser::new(vec!["a".into(), "b".into()]);
+        assert!(parser.detect_phase_transition("PHASE 2 starting now").is_some());
+        assert_eq!(parser.current_phase, 1);
+    }
+
+    #[test]
+    fn team_parser_returns_none_for_same_phase() {
+        let mut parser = CodexTeamParser::new(vec!["a".into(), "b".into(), "c".into()]);
+        parser.detect_phase_transition("Phase 2: work");
+        // Same phase announcement again — no transition
+        let result = parser.detect_phase_transition("Phase 2: still here");
+        assert_eq!(result, None);
+        assert_eq!(parser.current_phase, 1);
+    }
+
+    #[test]
+    fn team_parser_no_phase_in_line_returns_none() {
+        let mut parser = CodexTeamParser::new(vec!["a".into(), "b".into()]);
+        assert!(parser.detect_phase_transition("Working on task...").is_none());
+        assert_eq!(parser.current_phase, 0);
+    }
+
+    #[test]
+    fn team_parser_phase_zero_ignored() {
+        let mut parser = CodexTeamParser::new(vec!["a".into(), "b".into()]);
+        assert!(parser.detect_phase_transition("Phase 0: invalid").is_none());
+        assert_eq!(parser.current_phase, 0);
+    }
+
+    #[test]
+    fn team_parser_out_of_bounds_phase_returns_none_elf_id() {
+        let mut parser = CodexTeamParser::new(vec!["elf-1".into()]);
+        parser.detect_phase_transition("Phase 5: way too many");
+        assert_eq!(parser.current_phase, 4);
+        assert_eq!(parser.current_elf_id(), None); // only 1 elf, index 4 is out of bounds
+    }
+
+    #[test]
+    fn team_parser_empty_elf_ids_returns_none() {
+        let parser = CodexTeamParser::new(vec![]);
+        assert_eq!(parser.current_elf_id(), None);
+    }
+
+    #[test]
+    fn team_parser_phase_with_leading_whitespace_in_output() {
+        let mut parser = CodexTeamParser::new(vec!["a".into(), "b".into(), "c".into()]);
+        let result = parser.detect_phase_transition("  Phase 3 complete");
+        assert_eq!(result, Some(2));
+        assert_eq!(parser.current_elf_id(), Some("c"));
     }
 
     // --- Round-trip serialization ---

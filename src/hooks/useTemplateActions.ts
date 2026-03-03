@@ -1,12 +1,14 @@
 /* Template actions hook — connects TemplateLibrary to Tauri IPC for template CRUD. */
 
 import { useCallback, useEffect } from "react";
+import { save } from "@tauri-apps/plugin-dialog";
 import { useTemplateStore } from "@/stores/templates";
 import {
   listTemplates,
   saveTemplate as invokeSaveTemplate,
   deleteTemplate as invokeDeleteTemplate,
   loadTemplate as invokeLoadTemplate,
+  writeTextToFile,
 } from "@/lib/tauri";
 import type { Template } from "@/types/template";
 import type { TaskPlan } from "@/types/session";
@@ -21,6 +23,7 @@ export function useTemplateActions(): {
   handleSaveTemplate: (name: string, plan: TaskPlan, description?: string) => Promise<void>;
   handleDeleteTemplate: (template: Template) => void;
   handleLoadTemplate: (templateId: string) => Promise<Template | null>;
+  handleExportTemplate: (template: Template) => Promise<void>;
 } {
   const setTemplates = useTemplateStore((s) => s.setTemplates);
   const addTemplate = useTemplateStore((s) => s.addTemplate);
@@ -87,10 +90,33 @@ export function useTemplateActions(): {
     [],
   );
 
+  /** Export a template as a JSON file via the native save dialog. */
+  const handleExportTemplate = useCallback(async (template: Template): Promise<void> => {
+    const exportData = {
+      version: "1.0",
+      name: template.name,
+      description: template.description,
+      plan: template.plan,
+    };
+    const json = JSON.stringify(exportData, null, 2);
+    const path = await save({
+      defaultPath: `${template.name.toLowerCase().replace(/\s+/g, "-")}.json`,
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+    if (path) {
+      try {
+        await writeTextToFile(path, json);
+      } catch (error) {
+        console.error("Failed to export template:", error);
+      }
+    }
+  }, []);
+
   return {
     loadTemplates,
     handleSaveTemplate,
     handleDeleteTemplate,
     handleLoadTemplate,
+    handleExportTemplate,
   };
 }

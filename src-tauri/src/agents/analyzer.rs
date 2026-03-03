@@ -90,6 +90,11 @@ impl std::error::Error for AnalyzerError {}
 /// Each entry is a pair of (pattern, weight). Higher weight means stronger
 /// signal for team decomposition. A task crosses the team threshold when the
 /// sum of matched weights reaches TEAM_THRESHOLD or when sentence count >= 3.
+///
+/// Note: These are no longer used by analyze_task (which always returns solo).
+/// Kept for build_team_plan which is called when the user explicitly opts in
+/// to team mode via the UI toggle.
+#[allow(dead_code)]
 const TEAM_SIGNALS: &[(&str, u8)] = &[
     // Conjunctions that imply multi-step work
     (" and ", 2),
@@ -119,9 +124,11 @@ const TEAM_SIGNALS: &[(&str, u8)] = &[
 ];
 
 /// Score threshold above which a task is classified as needing a team.
+#[allow(dead_code)]
 const TEAM_THRESHOLD: u8 = 5;
 
 /// Maximum number of agents in an auto-generated team plan.
+#[allow(dead_code)]
 const MAX_TEAM_AGENTS: u8 = 6;
 
 /// Analyze a task description and produce a deployment plan.
@@ -143,18 +150,16 @@ pub fn analyze_task(task: &str, project_context: &str) -> Result<TaskPlan, Analy
     }
 
     let runtime = detect_runtime_from_context(project_context);
-    let complexity_score = score_task_complexity(trimmed);
-
-    if complexity_score >= TEAM_THRESHOLD {
-        Ok(build_team_plan(trimmed, &runtime))
-    } else {
-        Ok(build_solo_plan(trimmed, &runtime))
-    }
+    // Always solo — team mode is user-initiated via the TEAM toggle in the UI.
+    // When the user turns on TEAM mode, the frontend calls start_team_task directly
+    // with a plan the user has reviewed and approved.
+    Ok(build_solo_plan(trimmed, &runtime))
 }
 
 /// Score a task description for complexity using keyword matching and structure analysis.
 ///
 /// Returns a u8 score. Values >= TEAM_THRESHOLD indicate team-level complexity.
+#[allow(dead_code)]
 fn score_task_complexity(task: &str) -> u8 {
     let lower = task.to_lowercase();
     let mut score: u8 = 0;
@@ -202,6 +207,7 @@ fn detect_runtime_from_context(context: &str) -> String {
 ///
 /// Analyzes the task text to identify relevant role types (researcher, implementer,
 /// tester, writer) and creates a dependency graph between them.
+#[allow(dead_code)]
 fn build_team_plan(task: &str, runtime: &str) -> TaskPlan {
     let lower = task.to_lowercase();
     let mut roles: Vec<RoleDef> = Vec::new();
@@ -353,6 +359,7 @@ fn build_team_plan(task: &str, runtime: &str) -> TaskPlan {
 /// Extract a focus description for a role from the task text.
 ///
 /// Returns a condensed phrase relevant to the given role type.
+#[allow(dead_code)]
 fn extract_focus_for_role(lower_task: &str, role_type: &str) -> String {
     match role_type {
         "research" => {
@@ -574,52 +581,29 @@ mod tests {
     }
 
     #[test]
-    fn analyze_complex_task_returns_team() {
+    fn analyze_always_returns_solo() {
+        // analyze_task always returns solo — team mode is user-initiated via the UI toggle
         let plan = analyze_task(
             "Research 5 competitors and write a comparison report",
             "",
         )
         .expect("Should analyze");
-        assert_eq!(plan.complexity, TaskComplexity::Team);
-        assert!(plan.agent_count >= 2, "Team should have at least 2 agents");
-        assert!(plan.agent_count <= MAX_TEAM_AGENTS);
-        assert!(!plan.roles.is_empty());
-        assert!(!plan.task_graph.is_empty());
+        assert_eq!(plan.complexity, TaskComplexity::Solo);
+        assert_eq!(plan.agent_count, 1);
+        assert_eq!(plan.roles.len(), 1);
+        assert_eq!(plan.task_graph.len(), 1);
     }
 
     #[test]
-    fn analyze_complex_task_has_researcher_and_writer() {
-        let plan = analyze_task(
-            "Research 5 competitors and write a comparison report",
-            "",
-        )
-        .expect("Should analyze");
-        let role_names: Vec<&str> = plan.roles.iter().map(|r| r.name.as_str()).collect();
-        assert!(role_names.contains(&"Researcher"), "Should have Researcher role");
-        assert!(role_names.contains(&"Writer"), "Should have Writer role");
-    }
-
-    #[test]
-    fn analyze_team_task_has_dependency_chain() {
+    fn analyze_complex_input_still_returns_solo() {
+        // Even multi-step task descriptions return solo — heuristic auto-team is disabled
         let plan = analyze_task(
             "Research the API, implement the integration, then write tests",
             "",
         )
         .expect("Should analyze");
-        assert_eq!(plan.complexity, TaskComplexity::Team);
-
-        // Later nodes should depend on earlier ones
-        for (i, node) in plan.task_graph.iter().enumerate() {
-            if i == 0 {
-                assert!(node.depends_on.is_empty(), "First node has no dependencies");
-            } else {
-                assert!(
-                    !node.depends_on.is_empty(),
-                    "Node {} should have dependencies",
-                    node.id,
-                );
-            }
-        }
+        assert_eq!(plan.complexity, TaskComplexity::Solo);
+        assert_eq!(plan.agent_count, 1);
     }
 
     #[test]
@@ -644,20 +628,22 @@ mod tests {
     }
 
     #[test]
-    fn analyze_numbered_list_returns_team() {
+    fn analyze_numbered_list_still_returns_solo() {
+        // Even numbered lists return solo — team mode is user-initiated
         let plan = analyze_task(
             "1. Set up the database schema. 2. Build the API endpoints. 3. Write integration tests.",
             "",
         )
         .expect("Should analyze");
-        assert_eq!(plan.complexity, TaskComplexity::Team);
+        assert_eq!(plan.complexity, TaskComplexity::Solo);
     }
 
     #[test]
-    fn analyze_parallel_keyword_returns_team() {
+    fn analyze_parallel_keyword_still_returns_solo() {
+        // Heuristic keywords no longer auto-trigger team mode
         let plan = analyze_task("Run linting and tests in parallel", "")
             .expect("Should analyze");
-        assert_eq!(plan.complexity, TaskComplexity::Team);
+        assert_eq!(plan.complexity, TaskComplexity::Solo);
     }
 
     #[test]

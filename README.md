@@ -88,11 +88,23 @@ Every session records a full event log. Step through past sessions event-by-even
 
 ## Screenshots
 
-> Screenshots and GIFs coming soon. In the meantime, here's what you'll see:
-> - **Elf Theater** — animated elf cards with live status messages
-> - **Multi-Elf Teams** — task graph visualization with dependency arrows
-> - **Memory Explorer** — searchable timeline of project memories
-> - **Session Replay** — step through past sessions event-by-event
+### Elf Theater
+The main workshop view — animated elf cards with unique SVG avatars, per-status glow effects, live thinking bubbles, and personality-driven status messages. Solo sessions auto-switch to a full-height terminal variant.
+
+### Memory Explorer
+Searchable timeline of project memories with FTS5 full-text search. Relevance scores decay over time and boost on access. Pin important memories to keep them permanent.
+
+### Skill Editor
+Visual CRUD for custom slash commands with live markdown preview and JSON export. Import skills directly from `~/.claude/commands/`.
+
+### Dark Mode Themes
+Two dark themes — neo-brutalist-dark (saturated colors, thick borders) and modern-dark (softer palette). Full design token support via Tailwind v4 `@theme`.
+
+### Session Comparison
+Side-by-side diff of two sessions with event timeline alignment and a lightweight text diff engine.
+
+### MCP Tool Listing
+Visual MCP server manager with tool enumeration — see every tool available from connected servers at a glance.
 
 ---
 
@@ -263,19 +275,20 @@ elves/
 │   │   │                        # ThinkingPanel, EventBlock, TerminalOutput
 │   │   ├── terminal/            # XTerminal (xterm.js wrapper), SessionTerminal (PTY lifecycle)
 │   │   ├── editors/             # SkillEditor, McpManager, ContextEditor, TemplateLibrary
-│   │   ├── project/             # SessionHistory, ShareButton, NewProjectDialog
+│   │   ├── project/             # SessionHistory, ShareButton, NewProjectDialog, SessionComparison
 │   │   ├── feed/                # ActivityFeed
 │   │   ├── memory/              # MemoryExplorer, MemoryCard
 │   │   └── settings/            # MemorySettings
 │   ├── stores/                  # Zustand stores (app, project, session, ui, memory, settings,
-│   │                            # skills, mcp, templates)
+│   │                            # skills, mcp, templates, git, comparison)
 │   ├── types/                   # TypeScript types (elf, session, project, memory, runtime,
-│   │                            # skill, mcp, template, claude)
+│   │                            # skill, mcp, template, claude, comparison, git-state, floor)
 │   ├── hooks/                   # useInitialize, useSession, useTeamSession, useSessionEvents,
 │   │                            # useMemoryActions, useSkillActions, useMcpActions,
 │   │                            # useTemplateActions, useKeyboardShortcuts, useSessionHistory,
-│   │                            # useSounds, useResizable
-│   └── lib/                     # elf-names, sounds, funny-copy, Tauri IPC wrappers
+│   │                            # useSounds, useResizable, useAutoInteractive, useProjectContext
+│   └── lib/                     # elf-names, sounds, funny-copy, Tauri IPC wrappers,
+│                                # event-summary, simple-diff
 │
 ├── src-tauri/                   # Rust backend
 │   └── src/
@@ -287,6 +300,10 @@ elves/
 │                                # (projects, sessions, elves, events, memory, skills, mcp, templates)
 │
 ├── assets/logo/                 # ELVES wordmark and logo assets
+├── landing/                     # GitHub Pages landing site
+│   ├── index.html               # Neo-brutalist landing page with app mockup
+│   ├── favicon.svg              # Elf face favicon
+│   └── og-image-generator.html  # Canvas-based OG image generator (1200x630)
 ├── CLAUDE.md                    # Engineering standards
 ├── VISION.md                    # Full product vision
 └── DECISIONS.md                 # Architectural decision log
@@ -316,13 +333,15 @@ elves/
 
 ## Roadmap
 
+All planned phases are complete. Current work focuses on UX polish, stability, and community contributions.
+
 - [x] **Phase 1: Foundation** — Tauri v2 scaffold, design system, SQLite backend, runtime detection
 - [x] **Phase 2: Single Elf Mode** — ElfCard, ActivityFeed, live streaming, session management
 - [x] **Phase 3: Multi-Elf Teams** — Task analyzer, plan preview, team deployment, task graph, thinking panel
 - [x] **Phase 4: Memory & Intelligence** — Persistent memory with FTS5, auto-learning, context injection, memory explorer, settings
-- [x] **Phase 5: Visual Editors & Polish** — Skills editor, MCP manager, context editor, 15 SVG elf avatars, Web Audio sounds, funny copy engine, keyboard shortcuts, shortcut overlay
-- [x] **Phase 6: Codex Full Support** — Codex adapter with JSONL normalization, interop layer, runtime picker, template library (5 built-in), session history
-- [x] **Phase 7: Distribution** — CI/CD, auto-updater, session replay export, Homebrew cask, landing page
+- [x] **Phase 5: Visual Editors & Polish** — Skills editor with preview/export, MCP manager with tool listing, context editor with save/diff, 15 SVG elf avatars with glow effects, Web Audio sounds, keyboard shortcuts
+- [x] **Phase 6: Codex Full Support** — Codex adapter with JSONL normalization, multi-agent event attribution, interop layer, runtime picker, template library with seeding + JSON export, session history and comparison
+- [x] **Phase 7: Distribution** — CI/CD with clippy, auto-updater with signing, session replay export, Homebrew cask, landing page with app mockup, OG image generator, community files
 - [x] **Phase 8: Streaming & Terminal** — Real-time stream-json events, Claude discovery, embedded PTY terminal, session resume, resizable panels, solo terminal mode, native dialogs, TaskBar options
 
 ---
