@@ -26,14 +26,16 @@ src-tauri/src/      → Rust backend (SQLite, process management, adapters)
 ```
 
 Key architecture:
+- **Worktree-first workspaces** — every task is a git worktree under `.claude/worktrees/<slug>` with full lifecycle management
 - **Unified Agent Protocol** — Claude Code and Codex events normalized into `ElfEvent`
-- **Zustand stores** — 9 domain stores (app, project, session, ui, memory, settings, skills, mcp, templates)
+- **Zustand stores** — 12 domain stores (app, project, session, ui, memory, settings, skills, mcp, templates, git, comparison, workspace)
 - **Tauri IPC** — `tauri::command` for request/response, `app.emit()` for streaming
+- **Project-scoped config** — `.elves/config.json` per project for runtime, MCP, and memory settings
 
 ## Testing
 
 ```bash
-# Frontend (418 tests)
+# Frontend (617+ tests)
 npx vitest run
 
 # Backend (40+ tests)

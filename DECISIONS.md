@@ -341,3 +341,31 @@
 **Options:** (1) Leave as-is. (2) Extract drawing into ElfDrawing.ts as pure functions. (3) Create an ElfRenderer class.
 **Decision:** Extract 12 pure functions into ElfDrawing.ts, each receiving position, colors, and state as parameters.
 **Rationale:** Pure functions are the simplest extraction — no class instantiation, no shared state, trivially testable. The ElfVisuals interface provides a clean contract between the state machine (ElfSprite) and the renderer (ElfDrawing). ElfSprite still handles state transitions and animation timing; ElfDrawing only knows how to draw pixels. This brought ElfSprite to 628 lines (still over 300 but the remaining code is the irreducible state machine complexity) and ElfDrawing to 297 lines.
+
+---
+
+## Workspace Redesign — Worktree-First Architecture
+
+## 2026-03-03 — Worktree-First Workspace Model
+**Context:** ELVES needed a way to manage parallel development tasks with proper git isolation. The original model used a single branch with session-based task tracking, but this conflates code state with session state and makes parallel work on the same project difficult.
+**Options:** (1) Session-based tasks with no git awareness, (2) Branch-per-task with checkout switching, (3) Git worktree per task with `.claude/worktrees/<slug>` layout
+**Decision:** Every task becomes a git worktree under `.claude/worktrees/<slug>` with a dedicated branch `worktree-<slug>`. ELVES manages the full lifecycle: create worktree → work in terminal → "Ship It" (push, merge, extract memories, remove worktree, delete branch).
+**Rationale:** Git worktrees provide true filesystem-level isolation — each task gets its own working directory, so switching between tasks doesn't require stashing or committing incomplete work. The `.claude/worktrees/` convention keeps worktrees colocated with the project without polluting the main working directory. Worktree names as slugs ensure filesystem-safe paths. The "Ship It" completion flow is a single atomic action that handles the entire merge-and-cleanup lifecycle, preventing orphaned branches or abandoned worktrees. Trade-off: git worktrees consume more disk space than branches, but for a desktop app with SSD storage this is negligible.
+
+## 2026-03-03 — Project-Scoped Configuration via `.elves/config.json`
+**Context:** Project settings (default runtime, MCP servers, memory toggle) were stored globally in the SQLite database. Different projects may want different runtimes or MCP configurations.
+**Options:** (1) Global config in SQLite, (2) Per-project config in SQLite keyed by project path, (3) Per-project config file in `.elves/config.json`
+**Decision:** Store project-level configuration in `.elves/config.json` at the project root with `ProjectConfig` struct (default_runtime, mcp_servers, memory_enabled).
+**Rationale:** File-based config is portable — it can be committed to the repo (or gitignored), shared with teammates, and read/written without database access. The `.elves/` directory convention is explicit about what ELVES owns. The `init_elves_dir` command creates the directory on demand. The Rust `project::config` module provides typed read/write with serde defaults for forward compatibility.
+
+## 2026-03-03 — Workspace Backend Commands as Thin Git Wrappers
+**Context:** The workspace lifecycle involves git operations (worktree add/remove, branch create/delete, merge, push) that need to be exposed to the frontend.
+**Options:** (1) Shell out to `git` CLI, (2) Use `git2` (libgit2 bindings), (3) Mix of CLI and library
+**Decision:** All workspace commands shell out to `git` CLI via `std::process::Command`, reusing the existing `run_git` helper in `commands/git.rs`.
+**Rationale:** The `git` CLI is universally available on macOS developer machines (Xcode Command Line Tools), handles all edge cases (worktree locking, merge conflicts, push authentication via credential helpers), and produces human-readable error messages. `git2` (libgit2) doesn't support worktrees well and lacks the porcelain features we need (merge strategies, push with credential helpers). The `run_git` helper already handles working directory setup and stderr capture. Trade-off: requires git to be installed, but this is a given for a developer tool.
+
+## 2026-03-03 — Merge Strategy Picker in Ship It Flow
+**Context:** When completing a workspace, the user needs to merge changes back to the base branch.
+**Options:** (1) Always merge commit, (2) Always rebase, (3) User-selectable strategy
+**Decision:** ShipItDialog presents three merge strategies: merge (default), rebase, and squash. The selected strategy is passed to `complete_workspace` which executes the appropriate `git merge`/`git rebase`/`git merge --squash` command.
+**Rationale:** Different teams have different merge policies. Some prefer merge commits for explicit history, others prefer rebase for linear history, others prefer squash for clean single-commit features. Offering all three with merge as default satisfies all workflows. The strategy is a one-time choice per ship, not a persistent setting, because users may vary strategy per task size.
