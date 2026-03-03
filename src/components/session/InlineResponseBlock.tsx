@@ -20,12 +20,22 @@ const BUTTON_PAIRS: readonly [string, string][] = [
   ["Proceed!", "Abort!"],
 ];
 
+/** Button label pairs specifically for plan approval prompts. */
+const PLAN_BUTTON_PAIRS: readonly [string, string][] = [
+  ["Approve!", "Reject!"],
+  ["Ship the plan!", "Rethink it!"],
+  ["LGTM!", "Nah, redo!"],
+  ["Let's build!", "Back to the drawing board!"],
+];
+
 interface InlineResponseBlockProps {
   readonly questionText: string;
   readonly leadElf: Elf | null;
   readonly onSubmit: (message: string) => void;
   readonly onDismiss: () => void;
   readonly isSubmitting: boolean;
+  /** When true, forces yes/no (approve/reject) mode regardless of classifier output. */
+  readonly isPlanApproval?: boolean;
 }
 
 /** Picks a random element from an array. */
@@ -44,15 +54,22 @@ export function InlineResponseBlock({
   onSubmit,
   onDismiss,
   isSubmitting,
+  isPlanApproval = false,
 }: InlineResponseBlockProps): React.JSX.Element {
   const [message, setMessage] = useState("");
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [buttonPair] = useState<[string, string]>(() => randomPick(BUTTON_PAIRS));
+  const [buttonPair] = useState<[string, string]>(() =>
+    isPlanApproval ? randomPick(PLAN_BUTTON_PAIRS) : randomPick(BUTTON_PAIRS),
+  );
 
-  const classification = classifyPromptType(questionText);
+  /* Plan approval always forces yes/no mode — the numbered steps in a plan
+   * are informational, not selectable options. */
+  const classification = isPlanApproval
+    ? { type: "yes_no" as const }
+    : classifyPromptType(questionText);
   const promptType = classification.type;
-  const options = classification.options;
+  const options = "options" in classification ? classification.options : undefined;
 
   const elfName = leadElf?.name ?? "Spark";
   const avatarId = getAvatarId(elfName);
