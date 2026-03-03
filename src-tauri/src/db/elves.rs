@@ -31,6 +31,7 @@ pub struct ElfRow {
 ///
 /// The elf starts with status "spawning", an empty tools_used array, and
 /// `spawned_at` set to the current UTC timestamp.
+#[allow(clippy::too_many_arguments)]
 pub fn create_elf(
     conn: &Connection,
     id: &str,

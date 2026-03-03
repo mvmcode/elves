@@ -173,7 +173,7 @@ fn score_task_complexity(task: &str) -> u8 {
 
     // Sentence count heuristic: 3+ sentences suggest multi-step work
     let sentence_count = task
-        .split(|c: char| c == '.' || c == '!' || c == '?' || c == ';')
+        .split(['.', '!', '?', ';'])
         .filter(|s| s.trim().len() > 3)
         .count();
     if sentence_count >= 3 {
