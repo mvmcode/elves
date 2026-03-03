@@ -8,7 +8,7 @@ cask "elves" do
   url "https://github.com/mvmcode/elves/releases/download/v#{version}/ELVES_#{version}_aarch64.dmg"
   name "ELVES"
   desc "Summon your AI army — visual multi-agent orchestration for Claude Code and Codex"
-  homepage "https://elves.dev"
+  homepage "https://mvmcode.github.io/elves"
 
   depends_on macos: ">= :ventura"
 

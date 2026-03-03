@@ -2,7 +2,7 @@
 
 > *"You don't do the work. You have elves for that."*
 
-**Website:** elves.dev  
+**Website:** mvmcode.github.io/elves
 **Tagline options:**
 - "Summon the elves."
 - "Why do it yourself when you have elves?"
@@ -958,7 +958,7 @@ Step 8: POST-SESSION
     - Shareable HTML replay (static, no app needed)
     - "Share to X" with auto-generated screenshot
 
-7.3 Landing page (elves.dev)
+7.3 Landing page (mvmcode.github.io/elves)
     - Hero: animated elves doing a task
     - Demo video
     - Download button
@@ -1127,7 +1127,7 @@ elves/
 
 ## 13. Name & Branding Notes
 
-- **Domain:** elves.dev (check availability)
+- **Domain:** mvmcode.github.io/elves
 - **GitHub:** github.com/elves-dev/elves (or similar)
 - **App icon:** Yellow blob character with sunglasses, holding a wrench
 - **Color palette:** Yellow (#FFD93D) primary, dark navy (#1A1A2E) background, white text

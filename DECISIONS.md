@@ -239,7 +239,7 @@
 **Rationale:** Industry standard adopted by major projects (React, VS Code, Ruby on Rails). Provides a clear enforcement ladder. Widely recognized by contributors. Adding light ELVES branding ("The Workshop Code") keeps it consistent with the product's personality.
 
 ## 2026-02-26 — Static Landing Page (No Framework)
-**Context:** Need a marketing site at elves.dev
+**Context:** Need a marketing site at mvmcode.github.io/elves
 **Options:** Next.js static export, Astro, plain HTML/CSS, Docusaurus
 **Decision:** Single self-contained HTML file with inline CSS and minimal vanilla JS
 **Rationale:** Zero build step, instant deploy to any static host (GitHub Pages, Vercel, Netlify). No dependency maintenance. Page loads in <1s. The page is simple enough (7 sections, no dynamic content) that a framework adds complexity without value. Neo-brutalist styling is CSS-only — no component library needed.

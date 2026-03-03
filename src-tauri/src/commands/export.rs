@@ -178,7 +178,7 @@ window.__ELVES_EVENTS__ = {events_json};
     </div>
   </footer>
 
-  <div class="branding">Made with ELVES &#127850; &mdash; elves.dev</div>
+  <div class="branding">Made with ELVES &#127850; &mdash; mvmcode.github.io/elves</div>
 </div>
 
 <script>
@@ -994,7 +994,7 @@ mod tests {
         assert!(html.contains("Test task"));
         assert!(html.contains("Cookie"));
         assert!(html.contains("neo-brutalist") || html.contains("var(--gold)"));
-        assert!(html.contains("elves.dev"));
+        assert!(html.contains("mvmcode.github.io/elves"));
     }
 
     #[test]
