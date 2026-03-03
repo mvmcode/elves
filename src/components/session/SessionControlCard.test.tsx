@@ -13,7 +13,6 @@ vi.mock("@/hooks/useTeamSession", () => ({
     stopSession: mockStopSession,
     analyzeAndDeploy: vi.fn(),
     deployWithPlan: vi.fn(),
-    continueSession: vi.fn(),
     isSessionActive: false,
     isSessionCompleted: false,
     isPlanPreview: false,

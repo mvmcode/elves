@@ -19,6 +19,9 @@
   <meta name="twitter:description" content="A visual, personality-driven desktop app for orchestrating AI agent teams. Type a task. Watch your elves collaborate. Ship faster.">
   <meta name="twitter:image" content="https://mvmcode.github.io/elves/og-image.png">
 
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -991,10 +994,80 @@
           <span class="demo-dot green"></span>
           <span class="demo-titlebar-text">ELVES — My Project</span>
         </div>
-        <div class="demo-content">
-          <span class="demo-emoji">🧝‍♂️</span>
-          <p>Demo coming soon — the elves are still rehearsing</p>
-          <p class="demo-sub">GIF / video placeholder</p>
+        <div class="demo-content" style="padding: 0; text-align: left; display: block;">
+          <!-- Task Bar -->
+          <div style="background: #1A1A2E; border-bottom: 2px solid #333; padding: 10px 16px; display: flex; align-items: center; gap: 10px;">
+            <div style="flex: 1; background: #0D0D1A; border: 2px solid #555; padding: 8px 14px; font-family: var(--font-mono); font-size: 13px; color: #888;">
+              <span style="color: #FFD93D;">$</span> Add OAuth login with Google and GitHub providers
+            </div>
+            <div style="background: #FFD93D; color: #000; border: 2px solid #000; box-shadow: 3px 3px 0px 0px #000; padding: 8px 16px; font-family: var(--font-display); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">
+              SUMMON
+            </div>
+          </div>
+          <!-- Elf Theater -->
+          <div style="display: flex; gap: 0;">
+            <!-- Elf Cards -->
+            <div style="flex: 1; padding: 16px; display: flex; gap: 12px;">
+              <!-- Spark — working -->
+              <div style="flex: 1; background: #1e1e36; border: 2px solid #FFD93D; box-shadow: 4px 4px 0px 0px #FFD93D; padding: 14px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                  <div style="width: 36px; height: 36px; background: #FFD93D; border: 2px solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">🧝</div>
+                  <div>
+                    <div style="font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #FFD93D;">Spark</div>
+                    <div style="font-family: var(--font-mono); font-size: 10px; color: #6BCB77;">WORKING</div>
+                  </div>
+                </div>
+                <div style="font-family: var(--font-body); font-size: 11px; color: #BBB; line-height: 1.5;">
+                  "Spark is typing furiously with nimble elf fingers..."
+                </div>
+                <div style="margin-top: 10px; height: 4px; background: #333; overflow: hidden;">
+                  <div style="width: 65%; height: 100%; background: #FFD93D;"></div>
+                </div>
+              </div>
+              <!-- Tinker — thinking -->
+              <div style="flex: 1; background: #1e1e36; border: 2px solid #A855F7; box-shadow: 4px 4px 0px 0px #A855F7; padding: 14px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                  <div style="width: 36px; height: 36px; background: #A855F7; border: 2px solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">🧝</div>
+                  <div>
+                    <div style="font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #A855F7;">Tinker</div>
+                    <div style="font-family: var(--font-mono); font-size: 10px; color: #A855F7;">THINKING</div>
+                  </div>
+                </div>
+                <div style="font-family: var(--font-body); font-size: 11px; color: #BBB; line-height: 1.5;">
+                  "Tinker is staring at the ceiling thinking really hard..."
+                </div>
+                <div style="margin-top: 10px; height: 4px; background: #333; overflow: hidden;">
+                  <div style="width: 30%; height: 100%; background: #A855F7;"></div>
+                </div>
+              </div>
+              <!-- Jingle — done -->
+              <div style="flex: 1; background: #1e1e36; border: 2px solid #6BCB77; box-shadow: 4px 4px 0px 0px #6BCB77; padding: 14px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                  <div style="width: 36px; height: 36px; background: #6BCB77; border: 2px solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">🧝</div>
+                  <div>
+                    <div style="font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #6BCB77;">Jingle</div>
+                    <div style="font-family: var(--font-mono); font-size: 10px; color: #6BCB77;">DONE</div>
+                  </div>
+                </div>
+                <div style="font-family: var(--font-body); font-size: 11px; color: #BBB; line-height: 1.5;">
+                  "Jingle finished and is demanding a cookie as payment."
+                </div>
+                <div style="margin-top: 10px; height: 4px; background: #333; overflow: hidden;">
+                  <div style="width: 100%; height: 100%; background: #6BCB77;"></div>
+                </div>
+              </div>
+            </div>
+            <!-- Activity Feed -->
+            <div style="width: 200px; border-left: 2px solid #333; padding: 12px; font-family: var(--font-mono); font-size: 10px; color: #888; overflow: hidden;">
+              <div style="font-family: var(--font-display); font-weight: 700; font-size: 11px; color: #FFD93D; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px;">Activity</div>
+              <div style="margin-bottom: 8px;"><span style="color: #6BCB77;">Jingle</span> wrote auth/google.ts</div>
+              <div style="margin-bottom: 8px;"><span style="color: #FFD93D;">Spark</span> editing auth/github.ts</div>
+              <div style="margin-bottom: 8px;"><span style="color: #A855F7;">Tinker</span> planning OAuth flow</div>
+              <div style="margin-bottom: 8px;"><span style="color: #6BCB77;">Jingle</span> tests passing (4/4)</div>
+              <div style="margin-bottom: 8px;"><span style="color: #FFD93D;">Spark</span> reading docs...</div>
+              <div style="margin-bottom: 8px;"><span style="color: #A855F7;">Tinker</span> created plan.md</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1020,7 +1093,7 @@
 
       <div class="reveal">
         <div class="brew-block">
-          <span class="brew-prefix">$ </span>brew install --cask elves
+          <span class="brew-prefix">$ </span>brew install --no-quarantine --cask mvmcode/tap/elves
           <button class="brew-copy" onclick="copyBrew()">Copy</button>
         </div>
       </div>
@@ -1093,7 +1166,7 @@
 
     /* Copy brew command */
     function copyBrew() {
-      var text = 'brew install --cask elves';
+      var text = 'brew install --no-quarantine --cask mvmcode/tap/elves';
       if (navigator.clipboard) {
         navigator.clipboard.writeText(text).then(function () {
           var btn = document.querySelector('.brew-copy');

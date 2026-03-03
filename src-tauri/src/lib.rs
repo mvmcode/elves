@@ -129,7 +129,6 @@ pub fn run() {
             commands::tasks::start_team_task,
             commands::tasks::stop_team_task,
             commands::tasks::transition_to_interactive,
-            commands::tasks::continue_task,
             commands::memory::list_memories,
             commands::memory::create_memory,
             commands::memory::update_memory,
@@ -153,6 +152,7 @@ pub fn run() {
             commands::mcp::toggle_mcp_server,
             commands::mcp::health_check_mcp,
             commands::mcp::delete_mcp_server,
+            commands::mcp::list_mcp_tools,
             commands::templates::list_templates,
             commands::templates::save_template,
             commands::templates::delete_template,
@@ -176,6 +176,10 @@ pub fn run() {
             commands::git::git_push,
             commands::git::git_pull,
             commands::git::git_switch_branch,
+            commands::git::git_worktree_list,
+            commands::git::git_worktree_add,
+            commands::git::git_worktree_remove,
+            commands::git::get_git_state,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");

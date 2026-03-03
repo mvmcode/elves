@@ -1,5 +1,6 @@
 /* ElfAvatar — neo-brutalist SVG elf avatar with status-driven CSS animations. */
 
+import { motion } from "framer-motion";
 import type { ElfStatus } from "@/types/elf";
 
 /** Avatar IDs matching the 15 elf names in order. */
@@ -39,7 +40,7 @@ const SIZE_MAP: Record<AvatarSize, number> = {
 
 /** Maps elf status to a CSS animation class name. */
 const STATUS_ANIMATION: Record<ElfStatus, string> = {
-  spawning: "elf-anim-idle",
+  spawning: "elf-anim-spawn",
   working: "elf-anim-working",
   thinking: "elf-anim-thinking",
   waiting: "elf-anim-idle",
@@ -48,6 +49,19 @@ const STATUS_ANIMATION: Record<ElfStatus, string> = {
   error: "elf-anim-error",
   sleeping: "elf-anim-sleeping",
 };
+
+/**
+ * Maps statuses that need a drop-shadow glow to their CSS class.
+ * Glow classes are applied alongside the animation class on the same wrapper div.
+ */
+const STATUS_GLOW: Partial<Record<ElfStatus, string>> = {
+  thinking: "elf-glow-thinking",
+  error: "elf-glow-error",
+  done: "elf-glow-done",
+};
+
+/** Spring config for status transition entrance — snappy overshoot feel. */
+const ENTRANCE_SPRING = { type: "spring" as const, stiffness: 500, damping: 30 };
 
 /**
  * Renders the unique accessory for each avatar on top of the base elf shape.
@@ -208,10 +222,20 @@ export function ElfAvatar({
 }: ElfAvatarProps): React.JSX.Element {
   const pixelSize = SIZE_MAP[size];
   const animationClass = STATUS_ANIMATION[status];
+  const glowClass = STATUS_GLOW[status];
+  const wrapperClass = glowClass
+    ? `${animationClass} ${glowClass}`
+    : animationClass;
 
   return (
+    <motion.div
+      key={status}
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={ENTRANCE_SPRING}
+    >
     <div
-      className={animationClass}
+      className={wrapperClass}
       style={{ width: pixelSize, height: pixelSize, display: "inline-flex" }}
       data-testid="elf-avatar"
       data-avatar-id={avatarId}
@@ -240,6 +264,7 @@ export function ElfAvatar({
         {renderAccessory(avatarId)}
       </svg>
     </div>
+    </motion.div>
   );
 }
 

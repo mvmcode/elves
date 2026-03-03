@@ -27,8 +27,6 @@ interface ElfEventPayload {
 /** Payload shape for `session:completed` Tauri events emitted when the Claude process exits. */
 interface SessionCompletedPayload {
   readonly sessionId: string;
-  readonly needsInput?: boolean;
-  readonly lastResult?: string;
 }
 
 /** Payload shape for `session:cancelled` Tauri events emitted when the user stops a task. */
@@ -420,18 +418,6 @@ export function useSessionEvents(): void {
           funnyStatus: `${leadName} declares victory!`,
         });
 
-        /* Set needsInput flag if Claude asked a question — BEFORE ending session
-         * so the flag is available when the UI checks for the FollowUpCard. */
-        if (data.needsInput) {
-          store.setNeedsInputOnFloor(floorId, true, data.lastResult ?? null);
-        }
-
-        /* Plan mode fallback — plan mode sessions always need user approval, even if
-         * detect_question_in_result() didn't catch the plan text as a question. */
-        if (!data.needsInput && floor.session?.appliedOptions?.permissionMode === "plan") {
-          store.setNeedsInputOnFloor(floorId, true, data.lastResult ?? null);
-        }
-
         /* Extract memories if auto-learn is enabled */
         const autoLearn = useSettingsStore.getState().autoLearn;
         if (autoLearn) {
@@ -445,47 +431,15 @@ export function useSessionEvents(): void {
         /* Toast for cross-floor events — only when this session is on a non-active floor */
         if (store.activeFloorId !== floorId) {
           const floorLabel = floor.label || "another floor";
-          if (data.needsInput) {
-            useToastStore.getState().addToast({
-              message: `Claude is asking a question on "${floorLabel}"`,
-              variant: "warning",
-              duration: 8000,
-              action: {
-                label: "GO TO FLOOR",
-                onClick: () => useSessionStore.getState().switchFloor(floorId),
-              },
-            });
-          } else {
-            useToastStore.getState().addToast({
-              message: `Session completed on "${floorLabel}"`,
-              variant: "success",
-              duration: 5000,
-              action: {
-                label: "VIEW",
-                onClick: () => useSessionStore.getState().switchFloor(floorId),
-              },
-            });
-          }
-        }
-      }),
-    );
-
-    /* Listen for session continuation (follow-up message sent, new process spawned) */
-    interface SessionContinuedPayload {
-      readonly sessionId: string;
-    }
-    cleanups.push(
-      subscribeSafe<SessionContinuedPayload>("session:continued", (data) => {
-        const store = useSessionStore.getState();
-        const floorId = store.getFloorBySessionId(data.sessionId);
-        if (!floorId) return;
-
-        store.reactivateSessionOnFloor(floorId);
-
-        const floor = store.floors[floorId];
-        const leadElf = floor?.elves[0];
-        if (leadElf) {
-          store.updateElfStatusOnFloor(floorId, leadElf.id, "working");
+          useToastStore.getState().addToast({
+            message: `Session completed on "${floorLabel}"`,
+            variant: "success",
+            duration: 5000,
+            action: {
+              label: "VIEW",
+              onClick: () => useSessionStore.getState().switchFloor(floorId),
+            },
+          });
         }
       }),
     );

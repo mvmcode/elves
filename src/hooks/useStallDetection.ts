@@ -11,12 +11,14 @@ const CHECK_INTERVAL_MS = 3000;
 
 /**
  * Returns true when the event stream has been silent for more than
- * STALL_THRESHOLD_SECONDS while a session is active.
+ * the configured threshold while a session is active.
  *
  * @param lastEventAt - Timestamp of the last received event (ms since epoch)
  * @param isActive - Whether the session is currently active (running)
+ * @param thresholdSeconds - Seconds of silence before reporting a stall (default: STALL_THRESHOLD_SECONDS)
  */
-export function useStallDetection(lastEventAt: number, isActive: boolean): boolean {
+export function useStallDetection(lastEventAt: number, isActive: boolean, thresholdSeconds?: number): boolean {
+  const threshold = thresholdSeconds ?? STALL_THRESHOLD_SECONDS;
   const [isStalled, setIsStalled] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -33,7 +35,7 @@ export function useStallDetection(lastEventAt: number, isActive: boolean): boole
     timerRef.current = setInterval(() => {
       const now = Date.now();
       const elapsed = (now - lastEventAt) / 1000;
-      if (elapsed >= STALL_THRESHOLD_SECONDS && lastEventAt > 0) {
+      if (elapsed >= threshold && lastEventAt > 0) {
         setIsStalled(true);
       } else {
         setIsStalled(false);
@@ -46,7 +48,7 @@ export function useStallDetection(lastEventAt: number, isActive: boolean): boole
         timerRef.current = null;
       }
     };
-  }, [isActive, lastEventAt]);
+  }, [isActive, lastEventAt, threshold]);
 
   return isStalled;
 }

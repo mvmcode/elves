@@ -23,7 +23,7 @@ export function TemplateLibrary({
 }: TemplateLibraryProps): React.JSX.Element {
   const templates = useTemplateStore((s) => s.templates);
   const isLoading = useTemplateStore((s) => s.isLoading);
-  const { handleDeleteTemplate, handleLoadTemplate } = useTemplateActions();
+  const { handleDeleteTemplate, handleLoadTemplate, handleExportTemplate } = useTemplateActions();
 
   const handleSelect = (template: Template): void => {
     void (async () => {
@@ -116,6 +116,13 @@ export function TemplateLibrary({
                 onClick={() => handleSelect(template)}
               >
                 Use Template
+              </Button>
+              <Button
+                variant="secondary"
+                className="py-2 text-xs"
+                onClick={() => void handleExportTemplate(template)}
+              >
+                Export
               </Button>
               {!template.builtIn && (
                 <Button

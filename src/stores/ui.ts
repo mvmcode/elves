@@ -5,7 +5,7 @@ import type { WorkshopViewMode } from "@/types/workshop";
 
 /** Top-level views the shell can render in the main content area.
  * Note: "files" was removed — it is now a persistent side panel, not a view. */
-export type AppView = "session" | "memory" | "skills" | "mcp" | "history" | "settings" | "git";
+export type AppView = "session" | "memory" | "skills" | "mcp" | "history" | "settings" | "git" | "comparison";
 
 /** Panel width constraints for resizable layout. */
 const SIDEBAR_MIN = 200;
@@ -63,6 +63,8 @@ interface UiState {
   toggleActivityFeed: () => void;
   setHighlightedSessionId: (id: string | null) => void;
   toggleTerminalPanel: () => void;
+  /** One-shot open — sets isTerminalPanelOpen to true only if currently false. */
+  openTerminalPanel: () => void;
   setTerminalPanelHeight: (height: number) => void;
   setWorkshopViewMode: (mode: WorkshopViewMode) => void;
   toggleWorkshopViewMode: () => void;
@@ -100,6 +102,7 @@ export const useUiStore = create<UiState>((set) => ({
   toggleActivityFeed: () => set((state) => ({ isActivityFeedVisible: !state.isActivityFeedVisible })),
   setHighlightedSessionId: (id: string | null) => set({ highlightedSessionId: id }),
   toggleTerminalPanel: () => set((state) => ({ isTerminalPanelOpen: !state.isTerminalPanelOpen })),
+  openTerminalPanel: () => set((state) => state.isTerminalPanelOpen ? state : { isTerminalPanelOpen: true }),
   setTerminalPanelHeight: (height: number) => set({ terminalPanelHeight: clamp(height, 150, 800) }),
   setWorkshopViewMode: (mode: WorkshopViewMode) => set({ workshopViewMode: mode }),
   toggleWorkshopViewMode: () => set((state) => ({

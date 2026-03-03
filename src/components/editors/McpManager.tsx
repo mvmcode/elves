@@ -5,6 +5,7 @@ import { useMcpStore } from "@/stores/mcp";
 import { useMcpActions } from "@/hooks/useMcpActions";
 import { useAppStore } from "@/stores/app";
 import { getRuntimeControlConfig } from "@/lib/runtime-controls";
+import { listMcpTools, type McpTool } from "@/lib/tauri";
 import { Button } from "@/components/shared/Button";
 import { Badge } from "@/components/shared/Badge";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -35,6 +36,9 @@ export function McpManager(): React.JSX.Element {
   const [addArgs, setAddArgs] = useState("");
   const [addEnv, setAddEnv] = useState("");
   const [healthStatus, setHealthStatus] = useState<Record<string, boolean | null>>({});
+  const [toolsData, setToolsData] = useState<Record<string, McpTool[]>>({});
+  const [toolsExpanded, setToolsExpanded] = useState<Record<string, boolean>>({});
+  const [toolsLoading, setToolsLoading] = useState<Record<string, boolean>>({});
 
   const handleSubmitAdd = useCallback((): void => {
     if (!addName.trim() || !addCommand.trim()) return;
@@ -61,6 +65,30 @@ export function McpManager(): React.JSX.Element {
     },
     [handleHealthCheck],
   );
+
+  const handleShowTools = useCallback((server: McpServer): void => {
+    if (toolsData[server.id] !== undefined) {
+      // Already loaded — just toggle visibility
+      setToolsExpanded((prev) => ({ ...prev, [server.id]: !prev[server.id] }));
+      return;
+    }
+    // Fetch tools for the first time
+    setToolsLoading((prev) => ({ ...prev, [server.id]: true }));
+    void listMcpTools(server.id)
+      .then((tools) => {
+        setToolsData((prev) => ({ ...prev, [server.id]: tools }));
+        setToolsExpanded((prev) => ({ ...prev, [server.id]: true }));
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        setToolsData((prev) => ({ ...prev, [server.id]: [] }));
+        setToolsExpanded((prev) => ({ ...prev, [server.id]: true }));
+        console.error(`Failed to list tools for ${server.name}:`, message);
+      })
+      .finally(() => {
+        setToolsLoading((prev) => ({ ...prev, [server.id]: false }));
+      });
+  }, [toolsData]);
 
   const handleImport = useCallback((): void => {
     void handleImportFromClaude();
@@ -232,6 +260,19 @@ export function McpManager(): React.JSX.Element {
                   </Button>
 
                   <Button
+                    variant="secondary"
+                    className="px-2 py-1 text-xs"
+                    onClick={() => handleShowTools(server)}
+                    data-testid="mcp-show-tools"
+                  >
+                    {toolsLoading[server.id]
+                      ? "…"
+                      : toolsExpanded[server.id]
+                        ? "Hide Tools"
+                        : "Show Tools"}
+                  </Button>
+
+                  <Button
                     variant="danger"
                     className="ml-auto px-2 py-1 text-xs"
                     onClick={() => handleDeleteServer(server.id)}
@@ -239,6 +280,30 @@ export function McpManager(): React.JSX.Element {
                     ×
                   </Button>
                 </div>
+
+                {/* Expandable tools list */}
+                {(() => {
+                  const serverTools = toolsData[server.id];
+                  if (!toolsExpanded[server.id] || serverTools === undefined) return null;
+                  return (
+                    <div className="mt-3 border-t border-border pt-3" data-testid="mcp-tools-list">
+                      {serverTools.length === 0 ? (
+                        <p className="font-body text-xs text-text-light/50">No tools reported.</p>
+                      ) : (
+                        <ul className="flex flex-col gap-1">
+                          {serverTools.map((tool) => (
+                            <li key={tool.name} className="flex flex-col">
+                              <span className="font-mono text-xs font-bold text-heading">{tool.name}</span>
+                              {tool.description && (
+                                <span className="font-body text-xs text-text-light/60">{tool.description}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

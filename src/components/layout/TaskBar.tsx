@@ -30,7 +30,7 @@ export function TaskBar(): React.JSX.Element {
   const isFocused = useUiStore((s) => s.isTaskBarFocused);
   const setFocused = useUiStore((s) => s.setTaskBarFocused);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
-  const { analyzeAndDeploy, continueSession, stopSession, isSessionActive, isSessionCompleted, isPlanPreview } = useTeamSession();
+  const { analyzeAndDeploy, stopSession, isSessionActive, isSessionCompleted, isPlanPreview } = useTeamSession();
   const claudeDiscovery = useAppStore((s) => s.claudeDiscovery);
   const isOptionsExpanded = useAppStore((s) => s.isOptionsExpanded);
   const setOptionsExpanded = useAppStore((s) => s.setOptionsExpanded);
@@ -42,12 +42,10 @@ export function TaskBar(): React.JSX.Element {
   const isHistoricalFloor = useSessionStore(
     (s) => (s.activeFloorId ? s.floors[s.activeFloorId]?.isHistorical : false) ?? false,
   );
-  const needsInput = useSessionStore((s) => s.needsInput);
   const attachedFileCount = useAppStore((s) => s.attachedFiles.length);
   const { isDragOver, dragHandlers } = useFileDragDrop();
 
   const canDeploy = taskText.trim().length > 0 && activeProjectId !== null && !isSessionActive && !isPlanPreview;
-  const canFollowUp = taskText.trim().length > 0 && isSessionCompleted;
   const defaultRuntime = useAppStore((s) => s.defaultRuntime);
   const hasOptions = defaultRuntime === "codex" || (claudeDiscovery !== null && claudeDiscovery.claudeDirExists);
 
@@ -58,21 +56,13 @@ export function TaskBar(): React.JSX.Element {
   const hasActiveSelections = displayAgent != null || displayModel != null || displayPermission != null || displayTeamMode;
 
   const handleDeploy = useCallback(async (): Promise<void> => {
-    if (canFollowUp) {
-      const message = taskText.trim();
-      setTaskText("");
-      inputRef.current?.blur();
-      setFocused(false);
-      await continueSession(message);
-      return;
-    }
     if (!canDeploy) return;
     const task = taskText.trim();
     setTaskText("");
     inputRef.current?.blur();
     setFocused(false);
     await analyzeAndDeploy(task);
-  }, [canDeploy, canFollowUp, taskText, setFocused, analyzeAndDeploy, continueSession]);
+  }, [canDeploy, taskText, setFocused, analyzeAndDeploy]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -91,12 +81,12 @@ export function TaskBar(): React.JSX.Element {
 
   const handleInputKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === "Enter" && (canDeploy || canFollowUp)) {
+      if (event.key === "Enter" && canDeploy) {
         event.preventDefault();
         void handleDeploy();
       }
     },
-    [canDeploy, canFollowUp, handleDeploy],
+    [canDeploy, handleDeploy],
   );
 
   useEffect(() => {
@@ -145,11 +135,9 @@ export function TaskBar(): React.JSX.Element {
                     ? "Ask a follow-up or continue this session... (Cmd+K)"
                     : isSessionActive
                       ? "Elves are working... (Cmd+K)"
-                      : isSessionCompleted && needsInput
-                        ? "Claude asked a question \u2014 type your reply... (Cmd+K)"
-                        : isSessionCompleted
-                          ? "Reply to continue the conversation... (Cmd+K)"
-                          : "What do you want the elves to do? (Cmd+K)"
+                      : isSessionCompleted
+                        ? "Session complete. Start a new task... (Cmd+K)"
+                        : "What do you want the elves to do? (Cmd+K)"
             }
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
@@ -163,27 +151,13 @@ export function TaskBar(): React.JSX.Element {
               Stop
             </button>
           ) : isSessionCompleted ? (
-            <div className="flex shrink-0 gap-1.5">
-              <button
-                onClick={() => void handleDeploy()}
-                disabled={!canFollowUp}
-                className={[
-                  "border-[2px] border-border px-3 py-1.5 font-display text-[10px] font-bold uppercase tracking-wider shadow-brutal-sm transition-all duration-100",
-                  canFollowUp
-                    ? "cursor-pointer bg-info text-white hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
-                    : "cursor-not-allowed bg-gray-300 text-gray-500",
-                ].join(" ")}
-              >
-                Send
-              </button>
-              <button
-                onClick={() => useSessionStore.getState().clearSession()}
-                className="cursor-pointer border-[2px] border-border bg-white px-2 py-1.5 font-display text-[10px] font-bold uppercase tracking-wider shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
-                title="End conversation and start fresh"
-              >
-                New
-              </button>
-            </div>
+            <button
+              onClick={() => useSessionStore.getState().clearSession()}
+              className="shrink-0 cursor-pointer border-[2px] border-border bg-white px-3 py-1.5 font-display text-[10px] font-bold uppercase tracking-wider shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+              title="Clear session and start fresh"
+            >
+              New
+            </button>
           ) : (
             <DeployButton onClick={() => void handleDeploy()} disabled={!canDeploy} />
           )}

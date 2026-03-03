@@ -7,8 +7,6 @@ import { getColor } from "@/lib/elf-names";
 interface ActivityFeedProps {
   readonly events: readonly ElfEvent[];
   readonly maxHeight?: string;
-  /** When true, shows an "Input pending..." indicator at the bottom of the feed. */
-  readonly needsInput?: boolean;
 }
 
 /** Event filter categories for the filter bar. */
@@ -94,7 +92,6 @@ function eventEmoji(type: ElfEventType): string {
 export function ActivityFeed({
   events,
   maxHeight = "100%",
-  needsInput = false,
 }: ActivityFeedProps): React.JSX.Element {
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
   const [expandedEventIds, setExpandedEventIds] = useState<ReadonlySet<string>>(new Set());
@@ -252,18 +249,6 @@ export function ActivityFeed({
           })
         )}
 
-        {/* Input pending indicator */}
-        {needsInput && (
-          <div
-            className="flex items-center gap-2 border-t-[2px] border-elf-gold/40 bg-elf-gold/10 px-3 py-2"
-            data-testid="input-pending-indicator"
-          >
-            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-elf-gold" />
-            <span className="font-mono text-xs font-bold text-elf-gold">
-              Input pending...
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );

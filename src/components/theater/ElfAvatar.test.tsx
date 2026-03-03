@@ -39,7 +39,7 @@ describe("ElfAvatar", () => {
 
   it("applies the correct animation class for each status", () => {
     const expectedClasses: Record<ElfStatus, string> = {
-      spawning: "elf-anim-idle",
+      spawning: "elf-anim-spawn",
       working: "elf-anim-working",
       thinking: "elf-anim-thinking",
       waiting: "elf-anim-idle",

@@ -16,9 +16,19 @@ const THEMES: readonly ThemeOption[] = [
     description: "Bold borders, hard shadows, sharp corners. The original elf aesthetic.",
   },
   {
+    id: "neo-brutalist-dark",
+    name: "Neo-Brutalist Dark",
+    description: "Navy canvas, gold borders, hard shadows. Brutalism after sundown.",
+  },
+  {
     id: "modern",
     name: "Modern",
     description: "Clean lines, subtle shadows, rounded corners. Notion/Linear inspired.",
+  },
+  {
+    id: "modern-dark",
+    name: "Modern Dark",
+    description: "Zinc-900 surface, indigo accent, soft glow. Dark mode done right.",
   },
 ] as const;
 
@@ -246,6 +256,229 @@ function ModernPreview(): React.JSX.Element {
 }
 
 /**
+ * Mini-mockup that visually represents the neo-brutalist-dark theme.
+ * Navy background, gold borders, hard shadows — brutalism after sundown.
+ */
+function NeoBrutalistDarkPreview(): React.JSX.Element {
+  return (
+    <div
+      className="flex flex-col gap-2 p-3"
+      style={{ background: "#1A1A2E" }}
+    >
+      {/* Mini header bar */}
+      <div
+        className="flex items-center gap-2"
+        style={{
+          background: "#FFD93D",
+          border: "2px solid #FFD93D",
+          boxShadow: "3px 3px 0px 0px rgba(255,217,61,0.3)",
+          padding: "6px 10px",
+        }}
+      >
+        <div
+          style={{
+            width: 8,
+            height: 8,
+            background: "#000",
+            borderRadius: 0,
+          }}
+        />
+        <div
+          style={{
+            height: 6,
+            flex: 1,
+            background: "#000",
+            opacity: 0.7,
+          }}
+        />
+      </div>
+
+      {/* Mini content card */}
+      <div
+        style={{
+          background: "#16213E",
+          border: "2px solid #FFD93D",
+          boxShadow: "4px 4px 0px 0px rgba(255,217,61,0.3)",
+          padding: "8px",
+        }}
+      >
+        <div
+          style={{
+            height: 5,
+            width: "60%",
+            background: "#FFFDF7",
+            marginBottom: 6,
+          }}
+        />
+        <div
+          style={{
+            height: 4,
+            width: "80%",
+            background: "#FFFDF7",
+            opacity: 0.3,
+            marginBottom: 4,
+          }}
+        />
+        <div
+          style={{
+            height: 4,
+            width: "50%",
+            background: "#FFFDF7",
+            opacity: 0.3,
+          }}
+        />
+      </div>
+
+      {/* Mini button row */}
+      <div className="flex gap-2">
+        <div
+          style={{
+            background: "#FFD93D",
+            border: "2px solid #FFD93D",
+            boxShadow: "2px 2px 0px 0px rgba(255,217,61,0.3)",
+            padding: "3px 10px",
+            fontSize: 8,
+            fontWeight: 700,
+            color: "#000",
+            letterSpacing: "0.05em",
+          }}
+        >
+          DEPLOY
+        </div>
+        <div
+          style={{
+            background: "#16213E",
+            border: "2px solid #FFD93D",
+            boxShadow: "2px 2px 0px 0px rgba(255,217,61,0.3)",
+            padding: "3px 10px",
+            fontSize: 8,
+            fontWeight: 700,
+            color: "#FFFDF7",
+          }}
+        >
+          CANCEL
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Mini-mockup that visually represents the modern-dark theme.
+ * Zinc-900 surface, indigo accent, soft shadows, rounded corners.
+ */
+function ModernDarkPreview(): React.JSX.Element {
+  return (
+    <div
+      className="flex flex-col gap-2 p-3"
+      style={{ background: "#18181B" }}
+    >
+      {/* Mini header bar */}
+      <div
+        className="flex items-center gap-2"
+        style={{
+          background: "#818CF8",
+          border: "1px solid #6366F1",
+          borderRadius: 8,
+          boxShadow: "0 2px 4px rgba(0,0,0,0.4)",
+          padding: "6px 10px",
+        }}
+      >
+        <div
+          style={{
+            width: 8,
+            height: 8,
+            background: "#FFFFFF",
+            borderRadius: "50%",
+          }}
+        />
+        <div
+          style={{
+            height: 6,
+            flex: 1,
+            background: "#FFFFFF",
+            opacity: 0.7,
+            borderRadius: 3,
+          }}
+        />
+      </div>
+
+      {/* Mini content card */}
+      <div
+        style={{
+          background: "#27272A",
+          border: "1px solid #3F3F46",
+          borderRadius: 8,
+          boxShadow: "0 4px 6px rgba(0,0,0,0.5)",
+          padding: "8px",
+        }}
+      >
+        <div
+          style={{
+            height: 5,
+            width: "60%",
+            background: "#FAFAFA",
+            borderRadius: 2,
+            marginBottom: 6,
+          }}
+        />
+        <div
+          style={{
+            height: 4,
+            width: "80%",
+            background: "#FAFAFA",
+            opacity: 0.25,
+            borderRadius: 2,
+            marginBottom: 4,
+          }}
+        />
+        <div
+          style={{
+            height: 4,
+            width: "50%",
+            background: "#FAFAFA",
+            opacity: 0.25,
+            borderRadius: 2,
+          }}
+        />
+      </div>
+
+      {/* Mini button row */}
+      <div className="flex gap-2">
+        <div
+          style={{
+            background: "#818CF8",
+            border: "1px solid #6366F1",
+            borderRadius: 6,
+            boxShadow: "0 1px 2px rgba(0,0,0,0.3)",
+            padding: "3px 10px",
+            fontSize: 8,
+            fontWeight: 500,
+            color: "#FFFFFF",
+          }}
+        >
+          Deploy
+        </div>
+        <div
+          style={{
+            background: "#27272A",
+            border: "1px solid #3F3F46",
+            borderRadius: 6,
+            boxShadow: "0 1px 2px rgba(0,0,0,0.3)",
+            padding: "3px 10px",
+            fontSize: 8,
+            fontWeight: 500,
+            color: "#FAFAFA",
+          }}
+        >
+          Cancel
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Theme picker for the settings view. Shows visual preview cards for each
  * available theme. Clicking a card instantly applies the theme.
  */
@@ -297,6 +530,10 @@ export default function ThemePicker(): React.JSX.Element {
               <div className="overflow-hidden rounded-t-md border-b-token-normal border-border">
                 {option.id === "neo-brutalist" ? (
                   <NeoBrutalistPreview />
+                ) : option.id === "neo-brutalist-dark" ? (
+                  <NeoBrutalistDarkPreview />
+                ) : option.id === "modern-dark" ? (
+                  <ModernDarkPreview />
                 ) : (
                   <ModernPreview />
                 )}

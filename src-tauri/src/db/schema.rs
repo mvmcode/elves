@@ -235,10 +235,57 @@ fn migrate_v3(conn: &Connection) -> Result<(), DbError> {
 ///
 /// Cleans up any existing duplicates first by keeping only the most recently updated
 /// row for each path, then adds the unique index to prevent future duplicates.
+/// Temporarily disables FK checks so child rows (sessions, memory, skills) don't
+/// block the delete, and reassigns orphaned children to the surviving project row.
 fn migrate_v4(conn: &Connection) -> Result<(), DbError> {
     conn.execute_batch(
         "
-        -- Remove duplicate projects keeping only the newest (by updated_at) for each path
+        -- Disable FK enforcement for the duration of this migration.
+        -- Child rows reference project IDs that may be deleted; we reassign them below.
+        PRAGMA foreign_keys=OFF;
+
+        -- Reassign child rows from duplicate projects to the surviving (newest) project.
+        -- For each duplicate path, the keeper is the row with the latest updated_at.
+        UPDATE sessions SET project_id = (
+            SELECT keeper.id FROM projects AS keeper
+            WHERE keeper.path = (SELECT path FROM projects WHERE id = sessions.project_id)
+            ORDER BY keeper.updated_at DESC LIMIT 1
+        ) WHERE project_id IN (
+            SELECT id FROM projects WHERE id NOT IN (
+                SELECT id FROM (
+                    SELECT id, ROW_NUMBER() OVER (PARTITION BY path ORDER BY updated_at DESC) AS rn
+                    FROM projects
+                ) WHERE rn = 1
+            )
+        );
+
+        UPDATE memory SET project_id = (
+            SELECT keeper.id FROM projects AS keeper
+            WHERE keeper.path = (SELECT path FROM projects WHERE id = memory.project_id)
+            ORDER BY keeper.updated_at DESC LIMIT 1
+        ) WHERE project_id IS NOT NULL AND project_id IN (
+            SELECT id FROM projects WHERE id NOT IN (
+                SELECT id FROM (
+                    SELECT id, ROW_NUMBER() OVER (PARTITION BY path ORDER BY updated_at DESC) AS rn
+                    FROM projects
+                ) WHERE rn = 1
+            )
+        );
+
+        UPDATE skills SET project_id = (
+            SELECT keeper.id FROM projects AS keeper
+            WHERE keeper.path = (SELECT path FROM projects WHERE id = skills.project_id)
+            ORDER BY keeper.updated_at DESC LIMIT 1
+        ) WHERE project_id IS NOT NULL AND project_id IN (
+            SELECT id FROM projects WHERE id NOT IN (
+                SELECT id FROM (
+                    SELECT id, ROW_NUMBER() OVER (PARTITION BY path ORDER BY updated_at DESC) AS rn
+                    FROM projects
+                ) WHERE rn = 1
+            )
+        );
+
+        -- Now safe to remove duplicate projects — no child rows reference them
         DELETE FROM projects WHERE id NOT IN (
             SELECT id FROM (
                 SELECT id, ROW_NUMBER() OVER (PARTITION BY path ORDER BY updated_at DESC) AS rn
@@ -248,6 +295,9 @@ fn migrate_v4(conn: &Connection) -> Result<(), DbError> {
 
         -- Add unique index to prevent future duplicates
         CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_path_unique ON projects(path);
+
+        -- Re-enable FK enforcement
+        PRAGMA foreign_keys=ON;
 
         -- Record this migration
         INSERT INTO schema_version (version) VALUES (4);

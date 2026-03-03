@@ -136,7 +136,7 @@ pub async fn start_task(
         let sid = session_id.clone();
         if is_codex {
             std::thread::spawn(move || {
-                stream_codex_output(stdout, &app_handle, &sid);
+                stream_codex_output(stdout, &app_handle, &sid, None);
             });
         } else {
             std::thread::spawn(move || {
@@ -367,7 +367,7 @@ pub async fn start_team_task(
         let sid = session_id.clone();
         if is_codex {
             std::thread::spawn(move || {
-                stream_codex_output(stdout, &app_handle, &sid);
+                stream_codex_output(stdout, &app_handle, &sid, Some(elf_ids));
             });
         } else {
             std::thread::spawn(move || {
@@ -432,89 +432,6 @@ pub async fn stop_team_task(
     Ok(any_killed)
 }
 
-/// Continue a completed session with a follow-up message.
-///
-/// Resumes the Claude Code session via `--print --resume <claudeSessionId> "<message>"`.
-/// The new process streams events into the same session, and the session transitions
-/// back to "active" status. This enables multi-turn conversations where Claude asks
-/// a question and the user replies.
-///
-/// Returns true if the continue process was spawned successfully.
-#[tauri::command]
-pub async fn continue_task(
-    app: AppHandle,
-    db: State<'_, DbState>,
-    process_mgr: State<'_, ProcessManager>,
-    session_id: String,
-    message: String,
-    options: Option<String>,
-) -> Result<bool, String> {
-    // 1. Look up the Claude session ID from the database
-    let (claude_session_id, working_dir) = {
-        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
-        let session = db::sessions::get_session(&conn, &session_id)
-            .map_err(|e| format!("Database error: {e}"))?
-            .ok_or("Session not found")?;
-        let claude_sid = session.claude_session_id
-            .ok_or("No Claude session ID — cannot resume")?;
-        let project = db::projects::get_project(&conn, &session.project_id)
-            .map_err(|e| format!("Database error: {e}"))?
-            .ok_or("Project not found")?;
-        (claude_sid, project.path.clone())
-    };
-
-    // 2. Parse spawn options
-    let spawn_options: ClaudeSpawnOptions = match options {
-        Some(ref json) => serde_json::from_str(json).unwrap_or_default(),
-        None => ClaudeSpawnOptions::default(),
-    };
-
-    // 3. Spawn the resume process
-    let mut child = claude_adapter::spawn_claude_resume(
-        &claude_session_id,
-        &message,
-        &working_dir,
-        &spawn_options,
-    ).map_err(|e| format!("Failed to resume claude: {e}"))?;
-
-    // 4. Update session status back to active
-    {
-        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
-        let _ = db::sessions::update_session_status(&conn, &session_id, "active", None);
-    }
-
-    // 5. Take stdout/stderr and register
-    let stdout = child.stdout.take();
-    let stderr = child.stderr.take();
-    process_mgr.register(&session_id, child);
-
-    if let Some(stderr) = stderr {
-        let sid_err = session_id.clone();
-        std::thread::spawn(move || {
-            drain_stderr(stderr, &sid_err);
-        });
-    }
-
-    if let Some(stdout) = stdout {
-        let app_handle = app.clone();
-        let sid = session_id.clone();
-        std::thread::spawn(move || {
-            stream_claude_output(stdout, &app_handle, &sid);
-        });
-    }
-
-    // 6. Emit event so frontend knows the session is active again
-    let _ = app.emit(
-        "session:continued",
-        serde_json::json!({
-            "sessionId": &session_id,
-        }),
-    );
-
-    log::info!("[session {session_id}] Continued with follow-up message");
-    Ok(true)
-}
-
 /// Transition a session from non-interactive `--print` mode to interactive terminal.
 ///
 /// Marks the session as interactive (so the stdout reader suppresses the false
@@ -567,41 +484,6 @@ fn drain_stderr(stderr: std::process::ChildStderr, session_id: &str) {
     }
 }
 
-/// Detect whether the result text contains a question or prompt for user input.
-///
-/// Checks for trailing question marks and common conversational prompt phrases.
-/// Used to determine if the frontend should show a follow-up input card.
-fn detect_question_in_result(text: &str) -> bool {
-    let trimmed = text.trim();
-    if trimmed.is_empty() {
-        return false;
-    }
-    let ends_with_question = trimmed.ends_with('?');
-    let lower = trimmed.to_lowercase();
-    let has_prompt_phrase = [
-        "would you like",
-        "shall i",
-        "do you want",
-        "please confirm",
-        "let me know",
-        "what should i",
-        "which option",
-        "should i",
-        "can i",
-        "could you",
-        "any preference",
-        "approve",
-        "here's my plan",
-        "here is my plan",
-        "proceed with",
-        "ready to implement",
-        "look good",
-    ]
-    .iter()
-    .any(|phrase| lower.contains(phrase));
-    ends_with_question || has_prompt_phrase
-}
-
 /// Read Claude's stdout line-by-line, parse events, and emit them to the frontend.
 ///
 /// Runs in a background thread. For each parsed line:
@@ -626,7 +508,6 @@ fn stream_claude_output(
     let db_state = app.state::<DbState>();
     let reader = std::io::BufReader::new(stdout);
     let mut last_result_payload: Option<serde_json::Value> = None;
-    let mut last_assistant_text: Option<String> = None;
     let mut event_count: u32 = 0;
 
     for line in reader.lines() {
@@ -705,25 +586,6 @@ fn stream_claude_output(
                     // 3. Track the last result event for usage extraction
                     if event.event_type == "result" {
                         last_result_payload = Some(event.payload.clone());
-                    }
-
-                    // 4. Track the last assistant text for question detection fallback.
-                    // The result event may not always contain the text; the preceding
-                    // assistant event is a reliable source for the final message.
-                    if event.event_type == "assistant" {
-                        if let Some(message) = event.payload.get("message") {
-                            if let Some(content) = message.get("content").and_then(|c| c.as_array()) {
-                                for block in content {
-                                    if block.get("type").and_then(|t| t.as_str()) == Some("text") {
-                                        if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
-                                            if !text.trim().is_empty() {
-                                                last_assistant_text = Some(text.to_string());
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -806,31 +668,10 @@ fn stream_claude_output(
         );
     }
 
-    // Extract the final text — try the result event first, fall back to last assistant text.
-    // Claude's stream-json result event sometimes omits the text field, but the preceding
-    // assistant event always contains the actual message content.
-    let extracted_text: Option<String> = last_result_payload.as_ref()
-        .and_then(|r| {
-            r.get("result").and_then(|v| v.as_str())
-                .or_else(|| r.get("text").and_then(|v| v.as_str()))
-                .or_else(|| r.get("content").and_then(|v| v.as_str()))
-        })
-        .map(|s| s.to_string())
-        .or(last_assistant_text);
-
-    // Detect if the final text contains a question that needs user input
-    let needs_input = extracted_text.as_deref()
-        .map(|text| detect_question_in_result(text))
-        .unwrap_or(false);
-
-    let last_result_text = extracted_text;
-
     let _ = app.emit(
         "session:completed",
         serde_json::json!({
             "sessionId": session_id,
-            "needsInput": needs_input,
-            "lastResult": last_result_text,
         }),
     );
 }
@@ -840,14 +681,20 @@ fn stream_claude_output(
 /// Runs in a background thread. For each parsed line:
 /// 1. Parses the JSONL output into a CodexEvent via `parse_codex_output`
 /// 2. Normalizes into the unified ElfEvent format via `normalize_codex_event`
-/// 3. Emits `elf:event` to the frontend for real-time display
-/// 4. Persists the event to SQLite for history and replay
+/// 3. Detects "Phase N" transitions (when `elf_ids` is Some) to attribute events to the correct elf
+/// 4. Emits `elf:event` to the frontend for real-time display (with elfId when in team mode)
+/// 5. Persists the event to SQLite for history and replay
+///
+/// Pass `elf_ids = None` for solo Codex runs, `Some(elf_ids)` for team runs.
+/// When `Some`, a `CodexTeamParser` tracks phase transitions and tags each event
+/// with the elf ID for the active phase.
 ///
 /// When stdout closes (process finished), marks the session as completed.
 fn stream_codex_output(
     stdout: std::process::ChildStdout,
     app: &AppHandle,
     session_id: &str,
+    elf_ids: Option<Vec<String>>,
 ) {
     use std::io::BufRead;
 
@@ -857,6 +704,9 @@ fn stream_codex_output(
     let db_state = app.state::<DbState>();
     let reader = std::io::BufReader::new(stdout);
     let mut event_count: u32 = 0;
+
+    // Create a phase parser for team runs, None for solo runs
+    let mut team_parser = elf_ids.map(codex_adapter::CodexTeamParser::new);
 
     for line in reader.lines() {
         match line {
@@ -873,11 +723,18 @@ fn stream_codex_output(
                         );
                     }
 
-                    // 1. Emit to frontend for real-time display
+                    // Detect phase transitions and resolve the current elf ID for attribution
+                    let elf_id: Option<String> = team_parser.as_mut().map(|parser| {
+                        parser.detect_phase_transition(&line);
+                        parser.current_elf_id().map(|id| id.to_string())
+                    }).flatten();
+
+                    // 1. Emit to frontend for real-time display (with elfId when in team mode)
                     let _ = app.emit(
                         "elf:event",
                         serde_json::json!({
                             "sessionId": session_id,
+                            "elfId": elf_id.as_deref(),
                             "eventType": &normalized.event_type,
                             "payload": &normalized.payload,
                             "timestamp": normalized.timestamp,
@@ -885,13 +742,13 @@ fn stream_codex_output(
                         }),
                     );
 
-                    // 2. Persist to SQLite for history and replay
+                    // 2. Persist to SQLite for history and replay (with elf attribution)
                     if let Ok(conn) = db_state.0.lock() {
                         let payload_str = serde_json::to_string(&normalized.payload).unwrap_or_default();
                         if let Err(e) = db::events::insert_event(
                             &conn,
                             session_id,
-                            None,
+                            elf_id.as_deref(),
                             &normalized.event_type,
                             &payload_str,
                             None,
@@ -929,53 +786,3 @@ fn stream_codex_output(
     );
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn detects_trailing_question_mark() {
-        assert!(detect_question_in_result("Would you like me to proceed?"));
-        assert!(detect_question_in_result("What file should I modify?"));
-    }
-
-    #[test]
-    fn detects_prompt_phrases() {
-        assert!(detect_question_in_result("I can fix this. Would you like me to do it now."));
-        assert!(detect_question_in_result("Shall I proceed with the refactor."));
-        assert!(detect_question_in_result("Please confirm the changes are correct."));
-        assert!(detect_question_in_result("Let me know if this approach works for you."));
-        assert!(detect_question_in_result("Should I also update the tests."));
-        assert!(detect_question_in_result("Do you want me to apply the fix."));
-    }
-
-    #[test]
-    fn rejects_non_question_text() {
-        assert!(!detect_question_in_result("Done! All tests pass."));
-        assert!(!detect_question_in_result("I've updated the file successfully."));
-        assert!(!detect_question_in_result("The function now handles edge cases."));
-    }
-
-    #[test]
-    fn handles_empty_and_whitespace() {
-        assert!(!detect_question_in_result(""));
-        assert!(!detect_question_in_result("   "));
-        assert!(!detect_question_in_result("\n\n"));
-    }
-
-    #[test]
-    fn case_insensitive_phrase_match() {
-        assert!(detect_question_in_result("WOULD YOU LIKE me to continue"));
-        assert!(detect_question_in_result("SHALL I proceed"));
-        assert!(detect_question_in_result("Any Preference on the approach"));
-    }
-
-    #[test]
-    fn detects_plan_mode_phrases() {
-        assert!(detect_question_in_result("Here's my plan for this task. Ready to implement."));
-        assert!(detect_question_in_result("Here is my plan:\n1. Refactor module\n2. Add tests"));
-        assert!(detect_question_in_result("Does this look good to you."));
-        assert!(detect_question_in_result("I'd like to proceed with option A."));
-        assert!(detect_question_in_result("Please approve the changes above."));
-    }
-}

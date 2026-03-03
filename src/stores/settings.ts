@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type ThemeName = "neo-brutalist" | "modern";
+export type ThemeName = "neo-brutalist" | "neo-brutalist-dark" | "modern" | "modern-dark";
 type DecayRate = "slow" | "normal" | "fast";
 
 interface SettingsState {
@@ -32,6 +32,10 @@ interface SettingsState {
   readonly defaultBudgetCap: number | null;
   /** Custom system prompt appended to every agent invocation */
   readonly customSystemPrompt: string;
+  /** Whether to auto-transition to interactive mode when a stall is detected */
+  readonly autoInteractiveOnStall: boolean;
+  /** Seconds of silence before reporting a stall */
+  readonly stallThresholdSeconds: number;
 
   /** Set the active theme and apply it to the document */
   setTheme: (theme: ThemeName) => void;
@@ -57,6 +61,10 @@ interface SettingsState {
   setDefaultBudgetCap: (cap: number | null) => void;
   /** Set the custom system prompt */
   setCustomSystemPrompt: (prompt: string) => void;
+  /** Toggle auto-interactive-on-stall */
+  setAutoInteractiveOnStall: (enabled: boolean) => void;
+  /** Set the stall threshold in seconds */
+  setStallThresholdSeconds: (seconds: number) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -75,6 +83,8 @@ export const useSettingsStore = create<SettingsState>()(
       defaultEffort: null,
       defaultBudgetCap: null,
       customSystemPrompt: "",
+      autoInteractiveOnStall: false,
+      stallThresholdSeconds: 15,
 
       setTheme: (theme: ThemeName) => {
         document.documentElement.setAttribute("data-theme", theme);
@@ -91,6 +101,8 @@ export const useSettingsStore = create<SettingsState>()(
       setDefaultEffort: (defaultEffort: string | null) => set({ defaultEffort }),
       setDefaultBudgetCap: (defaultBudgetCap: number | null) => set({ defaultBudgetCap }),
       setCustomSystemPrompt: (customSystemPrompt: string) => set({ customSystemPrompt }),
+      setAutoInteractiveOnStall: (autoInteractiveOnStall: boolean) => set({ autoInteractiveOnStall }),
+      setStallThresholdSeconds: (stallThresholdSeconds: number) => set({ stallThresholdSeconds: Math.max(5, stallThresholdSeconds) }),
     }),
     {
       name: "elves-settings",

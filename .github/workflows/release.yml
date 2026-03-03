@@ -87,6 +87,41 @@ jobs:
           path: ${{ env.DMG_NAME }}
           retention-days: 1
 
+      - name: Generate updater manifest (latest.json)
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          DMG_URL="https://github.com/mvmcode/elves/releases/download/${RELEASE_TAG}/${DMG_NAME}"
+          SIGNATURE=""
+
+          # Sign the DMG tarball if the signing key is available
+          if [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            # Create a gzip tarball of the DMG for signing
+            gzip -c "$DMG_NAME" > "${DMG_NAME}.tar.gz"
+            SIGNATURE=$(echo -n "" | npx tauri signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" "${DMG_NAME}.tar.gz" 2>/dev/null || echo "")
+            rm -f "${DMG_NAME}.tar.gz"
+          fi
+
+          cat > latest.json <<EOF
+          {
+            "version": "${VERSION}",
+            "notes": "See the CHANGELOG for details: https://github.com/mvmcode/elves/blob/main/CHANGELOG.md",
+            "pub_date": "${PUB_DATE}",
+            "platforms": {
+              "darwin-aarch64": {
+                "url": "${DMG_URL}",
+                "signature": "${SIGNATURE}"
+              }
+            }
+          }
+          EOF
+
+          echo "Generated latest.json for ${VERSION}"
+          cat latest.json
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD || '' }}
+
       - name: Create GitHub Release
         run: |
           gh release create "$RELEASE_TAG" \
@@ -109,7 +144,8 @@ jobs:
              - Or run: `xattr -cr /Applications/ELVES.app`
           NOTES
           )" \
-            "$DMG_NAME"
+            "$DMG_NAME" \
+            latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
