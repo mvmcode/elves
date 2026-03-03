@@ -3,6 +3,7 @@
 pub mod agents;
 pub mod export;
 pub mod filesystem;
+pub mod git;
 pub mod mcp;
 pub mod memory;
 pub mod projects;

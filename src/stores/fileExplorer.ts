@@ -12,6 +12,8 @@ interface FileExplorerState {
   readonly gitStatusMap: Readonly<Record<string, string>>;
   /** Loading state for individual directories */
   readonly loadingDirs: ReadonlySet<string>;
+  /** Current search/filter query for the file tree. */
+  readonly searchQuery: string;
 
   toggleDir: (path: string) => void;
   setDirEntries: (path: string, entries: readonly FileEntry[]) => void;
@@ -19,6 +21,7 @@ interface FileExplorerState {
   setDirLoading: (path: string, loading: boolean) => void;
   collapseAll: () => void;
   invalidateCache: () => void;
+  setSearchQuery: (query: string) => void;
 }
 
 export const useFileExplorerStore = create<FileExplorerState>((set) => ({
@@ -26,6 +29,7 @@ export const useFileExplorerStore = create<FileExplorerState>((set) => ({
   dirCache: new Map<string, readonly FileEntry[]>(),
   gitStatusMap: {},
   loadingDirs: new Set<string>(),
+  searchQuery: "",
 
   toggleDir: (path: string) =>
     set((state) => {
@@ -64,4 +68,6 @@ export const useFileExplorerStore = create<FileExplorerState>((set) => ({
 
   invalidateCache: () =>
     set({ dirCache: new Map<string, readonly FileEntry[]>(), expandedDirs: new Set<string>() }),
+
+  setSearchQuery: (query: string) => set({ searchQuery: query }),
 }));

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { MarkdownLite } from "@/lib/markdown-lite";
 
 interface ThinkingPanelProps {
   readonly thoughts: readonly string[];
@@ -105,17 +106,17 @@ export function ThinkingPanel({
                   Waiting for thinking events...
                 </p>
               ) : (
-                <pre
-                  className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-text-dark"
+                <div
+                  className="font-mono text-sm leading-relaxed text-text-dark"
                   data-testid="thinking-text"
                 >
-                  {displayedText}
+                  <MarkdownLite text={displayedText} />
                   {isStreaming && (
                     <span className="inline-block animate-pulse text-accent" data-testid="cursor">
                       |
                     </span>
                   )}
-                </pre>
+                </div>
               )}
             </div>
           </motion.div>

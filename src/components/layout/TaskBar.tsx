@@ -10,6 +10,7 @@ import { useAppStore } from "@/stores/app";
 import { useSessionStore } from "@/stores/session";
 import { useTeamSession } from "@/hooks/useTeamSession";
 import { TaskBarPickers } from "@/components/layout/TaskBarPickers";
+import { AttachButton, AttachedFileChips, useFileDragDrop } from "@/components/layout/FileAttachment";
 
 /** Suggestion chips shown when viewing a historical floor. */
 const HISTORICAL_SUGGESTIONS: readonly string[] = [
@@ -42,6 +43,8 @@ export function TaskBar(): React.JSX.Element {
     (s) => (s.activeFloorId ? s.floors[s.activeFloorId]?.isHistorical : false) ?? false,
   );
   const needsInput = useSessionStore((s) => s.needsInput);
+  const attachedFileCount = useAppStore((s) => s.attachedFiles.length);
+  const { isDragOver, dragHandlers } = useFileDragDrop();
 
   const canDeploy = taskText.trim().length > 0 && activeProjectId !== null && !isSessionActive && !isPlanPreview;
   const canFollowUp = taskText.trim().length > 0 && isSessionCompleted;
@@ -104,16 +107,29 @@ export function TaskBar(): React.JSX.Element {
   return (
     <div
       className={[
-        "shrink-0 border-b-[2px] border-border/30 px-4 py-2 transition-colors duration-100",
+        "relative shrink-0 border-b-[2px] border-border/30 px-4 py-2 transition-colors duration-100",
         isFocused ? "bg-accent-light" : "bg-surface-elevated",
       ].join(" ")}
+      {...dragHandlers}
     >
+      {/* Drag-over overlay */}
+      {isDragOver && (
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center border-[3px] border-dashed border-border bg-accent/20">
+          <span className="font-display text-sm font-bold uppercase tracking-wider">
+            Drop files to attach
+          </span>
+        </div>
+      )}
+
       {/* Centered command palette container */}
       <div className="mx-auto max-w-[720px]">
         {/* Main input row */}
         <div className="flex items-center gap-2">
           {/* Search/elf icon prefix */}
           <span className="shrink-0 text-sm text-text-light/30">{"\u2692"}</span>
+
+          {/* Attach file button */}
+          {!isSessionActive && <AttachButton />}
 
           <Input
             ref={inputRef}
@@ -172,6 +188,9 @@ export function TaskBar(): React.JSX.Element {
             <DeployButton onClick={() => void handleDeploy()} disabled={!canDeploy} />
           )}
         </div>
+
+        {/* Attached file chips — shown when files are attached */}
+        {attachedFileCount > 0 && <AttachedFileChips />}
 
         {/* Suggestion chips — shown for historical floors */}
         {isHistoricalFloor && (

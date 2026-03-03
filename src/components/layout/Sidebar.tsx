@@ -51,6 +51,17 @@ function IconMcp(): React.JSX.Element {
   );
 }
 
+function IconGit(): React.JSX.Element {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="6" y1="3" x2="6" y2="15" />
+      <circle cx="18" cy="6" r="3" />
+      <circle cx="6" cy="18" r="3" />
+      <path d="M18 9a9 9 0 01-9 9" />
+    </svg>
+  );
+}
+
 function IconHistory(): React.JSX.Element {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -87,15 +98,24 @@ function IconExpand(): React.JSX.Element {
   );
 }
 
-/** Navigation items with SVG icon components. */
-const NAV_ITEMS: readonly { view: AppView; label: string; Icon: () => React.JSX.Element }[] = [
-  { view: "session", label: "Workshop", Icon: IconWorkshop },
-  { view: "files", label: "Files", Icon: IconFiles },
-  { view: "memory", label: "Memory", Icon: IconMemory },
-  { view: "skills", label: "Skills", Icon: IconSkills },
-  { view: "mcp", label: "MCP Servers", Icon: IconMcp },
-  { view: "history", label: "History", Icon: IconHistory },
-  { view: "settings", label: "Settings", Icon: IconSettings },
+/** Navigation items — most switch the active view, "files" toggles the file tree panel. */
+interface NavItem {
+  readonly id: string;
+  readonly label: string;
+  readonly Icon: () => React.JSX.Element;
+  readonly view?: AppView;
+  readonly isPanel?: boolean;
+}
+
+const NAV_ITEMS: readonly NavItem[] = [
+  { id: "session", view: "session", label: "Workshop", Icon: IconWorkshop },
+  { id: "files", label: "Files", Icon: IconFiles, isPanel: true },
+  { id: "memory", view: "memory", label: "Memory", Icon: IconMemory },
+  { id: "skills", view: "skills", label: "Skills", Icon: IconSkills },
+  { id: "mcp", view: "mcp", label: "MCP Servers", Icon: IconMcp },
+  { id: "git", view: "git", label: "Git", Icon: IconGit },
+  { id: "history", view: "history", label: "History", Icon: IconHistory },
+  { id: "settings", view: "settings", label: "Settings", Icon: IconSettings },
 ];
 
 /**
@@ -108,16 +128,22 @@ export function Sidebar(): React.JSX.Element {
   const setNewProjectDialogOpen = useUiStore((s) => s.setNewProjectDialogOpen);
   const isCollapsed = useUiStore((s) => s.isSidebarCollapsed);
   const toggleCollapsed = useUiStore((s) => s.toggleSidebarCollapsed);
+  const isFileTreeVisible = useUiStore((s) => s.isFileTreeVisible);
+  const toggleFileTree = useUiStore((s) => s.toggleFileTree);
   const projects = useProjectStore((s) => s.projects);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const setActiveProject = useProjectStore((s) => s.setActiveProject);
   const removeProject = useProjectStore((s) => s.removeProject);
 
   const handleNavClick = useCallback(
-    (view: AppView): void => {
-      setActiveView(activeView === view && view !== "session" ? "session" : view);
+    (item: NavItem): void => {
+      if (item.isPanel) {
+        toggleFileTree();
+      } else if (item.view) {
+        setActiveView(activeView === item.view && item.view !== "session" ? "session" : item.view);
+      }
     },
-    [activeView, setActiveView],
+    [activeView, setActiveView, toggleFileTree],
   );
 
   return (
@@ -212,11 +238,11 @@ export function Sidebar(): React.JSX.Element {
         isCollapsed ? "items-center" : "px-2",
       ].join(" ")}>
         {NAV_ITEMS.map((item) => {
-          const isActive = activeView === item.view;
+          const isActive = item.isPanel ? isFileTreeVisible : activeView === item.view;
           return (
             <button
-              key={item.view}
-              onClick={() => handleNavClick(item.view)}
+              key={item.id}
+              onClick={() => handleNavClick(item)}
               className={[
                 "group relative flex cursor-pointer items-center border-none transition-all duration-100",
                 isCollapsed
@@ -227,7 +253,7 @@ export function Sidebar(): React.JSX.Element {
                   : "text-text-light/40 hover:text-text-light/70",
               ].join(" ")}
               title={isCollapsed ? item.label : undefined}
-              data-testid={`nav-${item.view}`}
+              data-testid={`nav-${item.id}`}
             >
               {/* Active indicator — left accent bar */}
               {isActive && (

@@ -1,9 +1,10 @@
-/* ElfTheater — responsive workshop grid with solo terminal mode, global progress bar, lead badge, and inter-elf chat bubbles. */
+/* ElfTheater — responsive workshop grid with solo terminal mode, global progress bar, lead badge, inter-elf chat bubbles, and inline response block. */
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ElfCard } from "./ElfCard";
 import { Badge } from "@/components/shared/Badge";
+import { InlineResponseBlock } from "@/components/session/InlineResponseBlock";
 import type { Elf, ElfEvent } from "@/types/elf";
 
 interface ElfTheaterProps {
@@ -16,6 +17,16 @@ interface ElfTheaterProps {
   readonly sessionStatus?: string;
   /** Whether this is a historical/read-only floor. Shows static resting message. */
   readonly isHistorical?: boolean;
+  /** Whether the agent is waiting for user input. */
+  readonly needsInput?: boolean;
+  /** The question text from the agent (used for inline response block). */
+  readonly lastResultText?: string | null;
+  /** Callback when the user submits a response to the agent's question. */
+  readonly onSubmitResponse?: (message: string) => void;
+  /** Callback to dismiss the inline response block without answering. */
+  readonly onDismissInput?: () => void;
+  /** Whether a response is currently being submitted. */
+  readonly isSubmitting?: boolean;
 }
 
 /** A chat bubble message extracted from chat-type events. */
@@ -76,6 +87,11 @@ export function ElfTheater({
   startedAt,
   sessionStatus,
   isHistorical = false,
+  needsInput = false,
+  lastResultText,
+  onSubmitResponse,
+  onDismissInput,
+  isSubmitting = false,
 }: ElfTheaterProps): React.JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -207,6 +223,19 @@ export function ElfTheater({
             />
           </div>
         </div>
+
+        {/* Inline response block — shown when agent asks a question */}
+        <AnimatePresence>
+          {needsInput && onSubmitResponse && onDismissInput && (
+            <InlineResponseBlock
+              questionText={lastResultText ?? "Claude is waiting for your input."}
+              leadElf={elves[0] ?? null}
+              onSubmit={onSubmitResponse}
+              onDismiss={onDismissInput}
+              isSubmitting={isSubmitting}
+            />
+          )}
+        </AnimatePresence>
       </div>
     );
   }
@@ -303,6 +332,19 @@ export function ElfTheater({
           </div>
         ))}
       </div>
+
+      {/* Inline response block — shown when agent asks a question */}
+      <AnimatePresence>
+        {needsInput && onSubmitResponse && onDismissInput && (
+          <InlineResponseBlock
+            questionText={lastResultText ?? "Claude is waiting for your input."}
+            leadElf={elves[0] ?? null}
+            onSubmit={onSubmitResponse}
+            onDismiss={onDismissInput}
+            isSubmitting={isSubmitting}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

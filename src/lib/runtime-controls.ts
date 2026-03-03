@@ -17,9 +17,11 @@ export interface ApprovalModeOption extends RuntimeOption {
 export interface RuntimeControlConfig {
   readonly models: readonly RuntimeOption[];
   readonly approvalModes: readonly ApprovalModeOption[];
+  readonly effortLevels: readonly RuntimeOption[];
   readonly supportsCustomAgents: boolean;
   readonly supportsSkills: boolean;
   readonly supportsMcp: boolean;
+  readonly supportsThinking: boolean;
   readonly contextFileName: string | null;
 }
 
@@ -38,9 +40,15 @@ export const RUNTIME_CONTROLS: Record<Runtime, RuntimeControlConfig> = {
       { id: "bypassPermissions", label: "YOLO", description: "Skip all permission checks" },
       { id: "dontAsk", label: "Don't Ask", description: "Never prompt for approval" },
     ],
+    effortLevels: [
+      { id: "low", label: "Low" },
+      { id: "medium", label: "Medium" },
+      { id: "high", label: "High" },
+    ],
     supportsCustomAgents: true,
     supportsSkills: true,
     supportsMcp: true,
+    supportsThinking: true,
     contextFileName: "CLAUDE.md",
   },
   codex: {
@@ -54,9 +62,11 @@ export const RUNTIME_CONTROLS: Record<Runtime, RuntimeControlConfig> = {
       { id: "auto-edit", label: "Auto Edit", description: "Apply file edits automatically" },
       { id: "full-auto", label: "Full Auto", description: "Execute everything automatically" },
     ],
+    effortLevels: [],
     supportsCustomAgents: false,
     supportsSkills: false,
     supportsMcp: false,
+    supportsThinking: false,
     contextFileName: "AGENTS.md",
   },
 };

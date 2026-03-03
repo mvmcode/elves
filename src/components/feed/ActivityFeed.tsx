@@ -7,6 +7,8 @@ import { getColor } from "@/lib/elf-names";
 interface ActivityFeedProps {
   readonly events: readonly ElfEvent[];
   readonly maxHeight?: string;
+  /** When true, shows an "Input pending..." indicator at the bottom of the feed. */
+  readonly needsInput?: boolean;
 }
 
 /** Event filter categories for the filter bar. */
@@ -19,6 +21,11 @@ const FILTER_EVENT_TYPES: Record<FilterKey, readonly ElfEventType[] | null> = {
   chat: ["chat", "output"],
   errors: ["error"],
 };
+
+/** Truncates text to a max length, appending "…" when clipped. */
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
 
 /** Formats a unix timestamp to HH:MM:SS. */
 function formatTimestamp(timestamp: number): string {
@@ -33,19 +40,19 @@ function describeEvent(event: ElfEvent): string {
     case "spawn":
       return `spawned${payload.role ? ` as ${String(payload.role)}` : ""}`;
     case "thinking":
-      return String(payload.text ?? "thinking...").slice(0, 120);
+      return truncate(String(payload.text ?? "thinking..."), 120);
     case "tool_call": {
       const tool = String(payload.tool ?? "tool");
       const input = payload.input as Record<string, unknown> | undefined;
       const detail = input?.file_path ?? input?.command ?? input?.pattern ?? input?.query ?? input?.url ?? "";
-      return detail ? `${tool} ${String(detail).slice(0, 80)}` : tool;
+      return detail ? `${tool} ${truncate(String(detail), 80)}` : tool;
     }
     case "tool_result":
-      return String(payload.result ?? "").slice(0, 120) || "done";
+      return truncate(String(payload.result ?? ""), 120) || "done";
     case "output": {
       const text = String(payload.text ?? "");
-      if (payload.isFinal) return `Result: ${text.slice(0, 120)}`;
-      return text.slice(0, 120) || "output";
+      if (payload.isFinal) return `Result: ${truncate(text, 120)}`;
+      return truncate(text, 120) || "output";
     }
     case "error":
       return String(payload.message ?? "error occurred");
@@ -87,6 +94,7 @@ function eventEmoji(type: ElfEventType): string {
 export function ActivityFeed({
   events,
   maxHeight = "100%",
+  needsInput = false,
 }: ActivityFeedProps): React.JSX.Element {
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
   const [expandedEventIds, setExpandedEventIds] = useState<ReadonlySet<string>>(new Set());
@@ -242,6 +250,19 @@ export function ActivityFeed({
               </div>
             );
           })
+        )}
+
+        {/* Input pending indicator */}
+        {needsInput && (
+          <div
+            className="flex items-center gap-2 border-t-[2px] border-elf-gold/40 bg-elf-gold/10 px-3 py-2"
+            data-testid="input-pending-indicator"
+          >
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-elf-gold" />
+            <span className="font-mono text-xs font-bold text-elf-gold">
+              Input pending...
+            </span>
+          </div>
         )}
       </div>
     </div>
