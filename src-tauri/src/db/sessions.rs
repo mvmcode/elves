@@ -213,10 +213,11 @@ mod tests {
     /// Insert a project so foreign key constraints are satisfied.
     fn seed_project(conn: &Connection, id: &str) {
         let now = chrono::Utc::now().timestamp();
+        let path = format!("/tmp/test-{id}");
         conn.execute(
             "INSERT INTO projects (id, name, path, default_runtime, created_at, updated_at)
-             VALUES (?1, 'Test Project', '/tmp/test', 'claude-code', ?2, ?3)",
-            params![id, now, now],
+             VALUES (?1, 'Test Project', ?4, 'claude-code', ?2, ?3)",
+            params![id, now, now, path],
         )
         .expect("Should seed project");
     }

@@ -5,7 +5,7 @@ use rusqlite::Connection;
 use super::DbError;
 
 /// Current schema version. Increment this when adding new migrations.
-const CURRENT_VERSION: i32 = 3;
+const CURRENT_VERSION: i32 = 4;
 
 /// Run all pending migrations up to CURRENT_VERSION.
 /// Uses a schema_version table to track which migrations have been applied.
@@ -34,6 +34,9 @@ pub fn run_migrations(conn: &Connection) -> Result<(), DbError> {
     }
     if current < 3 {
         migrate_v3(conn)?;
+    }
+    if current < 4 {
+        migrate_v4(conn)?;
     }
 
     Ok(())
@@ -222,6 +225,36 @@ fn migrate_v3(conn: &Connection) -> Result<(), DbError> {
     )
     .map_err(|e| DbError::Migration {
         version: 3,
+        message: e.to_string(),
+    })?;
+
+    Ok(())
+}
+
+/// Migration v4: Add unique index on projects.path to prevent duplicate project entries.
+///
+/// Cleans up any existing duplicates first by keeping only the most recently updated
+/// row for each path, then adds the unique index to prevent future duplicates.
+fn migrate_v4(conn: &Connection) -> Result<(), DbError> {
+    conn.execute_batch(
+        "
+        -- Remove duplicate projects keeping only the newest (by updated_at) for each path
+        DELETE FROM projects WHERE id NOT IN (
+            SELECT id FROM (
+                SELECT id, ROW_NUMBER() OVER (PARTITION BY path ORDER BY updated_at DESC) AS rn
+                FROM projects
+            ) WHERE rn = 1
+        );
+
+        -- Add unique index to prevent future duplicates
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_path_unique ON projects(path);
+
+        -- Record this migration
+        INSERT INTO schema_version (version) VALUES (4);
+        ",
+    )
+    .map_err(|e| DbError::Migration {
+        version: 4,
         message: e.to_string(),
     })?;
 
