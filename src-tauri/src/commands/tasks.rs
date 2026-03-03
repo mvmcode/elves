@@ -590,6 +590,12 @@ fn detect_question_in_result(text: &str) -> bool {
         "can i",
         "could you",
         "any preference",
+        "approve",
+        "here's my plan",
+        "here is my plan",
+        "proceed with",
+        "ready to implement",
+        "look good",
     ]
     .iter()
     .any(|phrase| lower.contains(phrase));
@@ -639,6 +645,23 @@ fn stream_claude_output(
 
                     // Capture Claude Code's session ID from system events for resume support
                     if event.event_type == "system" {
+                        if let Some(claude_sid) = event.payload.get("session_id").and_then(|v| v.as_str()) {
+                            if let Ok(conn) = db_state.0.lock() {
+                                let _ = db::sessions::update_claude_session_id(&conn, session_id, claude_sid);
+                            }
+                            let _ = app.emit(
+                                "session:claude_id",
+                                serde_json::json!({
+                                    "sessionId": session_id,
+                                    "claudeSessionId": claude_sid,
+                                }),
+                            );
+                        }
+                    }
+
+                    // Also capture session_id from result events as fallback —
+                    // result events reliably include it even if the system event was missed
+                    if event.event_type == "result" {
                         if let Some(claude_sid) = event.payload.get("session_id").and_then(|v| v.as_str()) {
                             if let Ok(conn) = db_state.0.lock() {
                                 let _ = db::sessions::update_claude_session_id(&conn, session_id, claude_sid);
@@ -945,5 +968,14 @@ mod tests {
         assert!(detect_question_in_result("WOULD YOU LIKE me to continue"));
         assert!(detect_question_in_result("SHALL I proceed"));
         assert!(detect_question_in_result("Any Preference on the approach"));
+    }
+
+    #[test]
+    fn detects_plan_mode_phrases() {
+        assert!(detect_question_in_result("Here's my plan for this task. Ready to implement."));
+        assert!(detect_question_in_result("Here is my plan:\n1. Refactor module\n2. Add tests"));
+        assert!(detect_question_in_result("Does this look good to you."));
+        assert!(detect_question_in_result("I'd like to proceed with option A."));
+        assert!(detect_question_in_result("Please approve the changes above."));
     }
 }
