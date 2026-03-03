@@ -800,10 +800,7 @@ fn stream_claude_output(
         .map(|text| detect_question_in_result(text))
         .unwrap_or(false);
 
-    let last_result_text = extracted_text
-        .map(|text| {
-            if text.len() > 500 { format!("{}...", &text[..497]) } else { text }
-        });
+    let last_result_text = extracted_text;
 
     let _ = app.emit(
         "session:completed",

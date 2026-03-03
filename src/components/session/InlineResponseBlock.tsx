@@ -147,11 +147,15 @@ export function InlineResponseBlock({
 
       {/* Question body */}
       <div className="px-4 pt-3">
-        <div className="max-h-36 overflow-y-auto border-[2px] border-dashed border-purple-300/40 bg-purple-50/10 px-3 py-2">
-          <MarkdownLite
-            text={questionText}
-            className="font-body text-sm text-text-light/90 [&_pre]:text-[11px] [&_code]:text-[11px] [&_p]:leading-relaxed"
-          />
+        <div className="relative">
+          <div className="max-h-64 overflow-y-auto border-[2px] border-dashed border-purple-300/40 bg-purple-50/10 px-3 py-2">
+            <MarkdownLite
+              text={questionText}
+              className="font-body text-sm text-text-light/90 [&_pre]:text-[11px] [&_code]:text-[11px] [&_p]:leading-relaxed"
+            />
+          </div>
+          {/* Scroll fade hint — visible when content overflows */}
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white/80 to-transparent" />
         </div>
       </div>
 
