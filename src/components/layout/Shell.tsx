@@ -111,6 +111,15 @@ export function Shell(): React.JSX.Element {
   /* Subscribe to Tauri backend events (elf:event, session:completed) */
   useSessionEvents();
 
+  /* Auto-switch from workshop to card view when needsInput is true.
+   * Workshop/pixel view has no mechanism to show InlineResponseBlock,
+   * so we force card view to ensure the user sees Claude's question. */
+  useEffect(() => {
+    if (needsInput && workshopViewMode === "workshop") {
+      useUiStore.getState().setWorkshopViewMode("cards");
+    }
+  }, [needsInput, workshopViewMode]);
+
   /* Global Space key listener for toggling workshop/card view.
    * Lives here (not in WorkshopCanvas) so it works from both views. */
   useEffect(() => {
@@ -240,6 +249,10 @@ export function Shell(): React.JSX.Element {
   const isCompleted =
     activeSession?.status === "completed" && elves.length > 0;
 
+  /** Whether this session was started in plan mode — forces approve/reject buttons. */
+  const isPlanApproval =
+    needsInput && activeSession?.appliedOptions?.permissionMode === "plan";
+
   /** Whether this is a team session with a task graph */
   const hasTaskGraph =
     activeSession?.plan != null &&
@@ -321,9 +334,9 @@ export function Shell(): React.JSX.Element {
               <div className="relative flex flex-1 overflow-hidden">
                 {/* Center — elf workshop + task graph + thinking panel */}
                 <div className="flex flex-1 flex-col overflow-y-auto">
-                  {/* Celebration banner on completion */}
+                  {/* Celebration / needs-input banner on completion */}
                   <AnimatePresence>
-                    {isCompleted && (
+                    {isCompleted && !needsInput && (
                       <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: "auto", opacity: 1 }}
@@ -334,6 +347,20 @@ export function Shell(): React.JSX.Element {
                       >
                         <p className="font-display text-xl text-heading tracking-wide text-white">
                           All Done!
+                        </p>
+                      </motion.div>
+                    )}
+                    {isCompleted && needsInput && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="border-b-token-normal border-border bg-info px-6 py-3 text-center"
+                        data-testid="needs-input-banner"
+                      >
+                        <p className="font-display text-xl text-heading tracking-wide text-white">
+                          Claude is asking a question — reply below
                         </p>
                       </motion.div>
                     )}
@@ -364,6 +391,7 @@ export function Shell(): React.JSX.Element {
                       onSubmitResponse={handlePromptSubmit}
                       onDismissInput={handlePromptDismiss}
                       isSubmitting={isPromptSubmitting}
+                      isPlanApproval={isPlanApproval}
                     />
                   )}
 

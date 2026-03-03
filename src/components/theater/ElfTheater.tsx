@@ -27,6 +27,8 @@ interface ElfTheaterProps {
   readonly onDismissInput?: () => void;
   /** Whether a response is currently being submitted. */
   readonly isSubmitting?: boolean;
+  /** Whether this is a plan-mode approval prompt (forces yes/no buttons). */
+  readonly isPlanApproval?: boolean;
 }
 
 /** A chat bubble message extracted from chat-type events. */
@@ -92,6 +94,7 @@ export function ElfTheater({
   onSubmitResponse,
   onDismissInput,
   isSubmitting = false,
+  isPlanApproval = false,
 }: ElfTheaterProps): React.JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -233,6 +236,7 @@ export function ElfTheater({
               onSubmit={onSubmitResponse}
               onDismiss={onDismissInput}
               isSubmitting={isSubmitting}
+              isPlanApproval={isPlanApproval}
             />
           )}
         </AnimatePresence>
@@ -342,6 +346,7 @@ export function ElfTheater({
             onSubmit={onSubmitResponse}
             onDismiss={onDismissInput}
             isSubmitting={isSubmitting}
+            isPlanApproval={isPlanApproval}
           />
         )}
       </AnimatePresence>

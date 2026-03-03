@@ -208,6 +208,10 @@ function subscribeSafe<T>(
  */
 export function useSessionEvents(): void {
   const mounted = useRef(true);
+  /** Maps Agent tool_use IDs to the elf ID created for that sub-agent. */
+  const agentToolUseMap = useRef<Map<string, string>>(new Map());
+  /** Stack of active sub-agent elf IDs — top of stack is the currently active sub-agent. */
+  const activeAgentStack = useRef<string[]>([]);
 
   useEffect(() => {
     mounted.current = true;
@@ -223,8 +227,16 @@ export function useSessionEvents(): void {
         const floor = store.floors[floorId];
         if (!floor) return;
 
-        /* Determine the elf to attribute this event to */
-        const targetElf = floor.elves[0];
+        /* Determine the elf to attribute this event to.
+         * If a sub-agent is active (on the stack), route events to that elf.
+         * Otherwise default to the lead elf. */
+        const stack = activeAgentStack.current;
+        let targetElf = floor.elves[0];
+        if (stack.length > 0) {
+          const activeElfId = stack[stack.length - 1];
+          const activeElf = floor.elves.find((e) => e.id === activeElfId);
+          if (activeElf) targetElf = activeElf;
+        }
         if (!targetElf) return;
 
         /* Parse the raw Claude event into one or more typed ElfEvents */
@@ -241,11 +253,8 @@ export function useSessionEvents(): void {
             funnyStatus: getStatusMessage(targetElf.name, targetElf.status),
           });
 
-          /* Detect Agent tool calls — create a new elf for each spawned sub-agent.
-           * The lead elf (elves[0]) is already the leader; new agents get their own elf. */
+          /* Detect Agent tool calls — create a new elf for each spawned sub-agent. */
           if (entry.type === "tool_call" && entry.payload.tool === "Agent") {
-            const usedNames = floor.elves.map((e) => e.name);
-            const personality = generateElf(usedNames);
             const agentDesc = String(entry.payload.input && typeof entry.payload.input === "object"
               ? (entry.payload.input as Record<string, unknown>).description ?? ""
               : "");
@@ -253,45 +262,70 @@ export function useSessionEvents(): void {
               ? (entry.payload.input as Record<string, unknown>).subagent_type ?? "Agent"
               : "Agent");
             const roleName = agentType === "Agent" ? "Worker" : agentType;
-            const elfId = `elf-agent-${data.sessionId}-${data.timestamp}-${Math.random().toString(36).slice(2, 6)}`;
+            const toolUseId = String(entry.payload.toolUseId ?? "");
 
-            store.addElfToFloor(floorId, {
-              id: elfId,
-              sessionId: data.sessionId,
-              name: personality.name,
-              role: roleName,
-              avatar: personality.avatar,
-              color: personality.color,
-              quirk: personality.quirk,
-              runtime: targetElf.runtime,
-              status: "spawning",
-              spawnedAt: Date.now(),
-              finishedAt: null,
-              parentElfId: targetElf.id,
-              toolsUsed: [],
-            });
+            /* Fix 6: Check for existing role-matched elf before creating a duplicate */
+            const existingElf = floor.elves.find(
+              (e) => e.role === roleName && e.status === "spawning" && e.id !== targetElf.id,
+            );
 
-            store.addEventToFloor(floorId, {
-              id: `event-agent-spawn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              timestamp: Date.now(),
-              elfId,
-              elfName: personality.name,
-              runtime: targetElf.runtime,
-              type: "spawn",
-              payload: { role: roleName, description: agentDesc },
-              funnyStatus: getStatusMessage(personality.name, "spawning"),
-            });
+            let elfId: string;
+            if (existingElf) {
+              elfId = existingElf.id;
+              store.updateElfStatusOnFloor(floorId, elfId, "working");
+            } else {
+              const usedNames = floor.elves.map((e) => e.name);
+              const personality = generateElf(usedNames);
+              elfId = `elf-agent-${data.sessionId}-${data.timestamp}-${Math.random().toString(36).slice(2, 6)}`;
 
-            playSound("spawn");
+              store.addElfToFloor(floorId, {
+                id: elfId,
+                sessionId: data.sessionId,
+                name: personality.name,
+                role: roleName,
+                avatar: personality.avatar,
+                color: personality.color,
+                quirk: personality.quirk,
+                runtime: targetElf.runtime,
+                status: "spawning",
+                spawnedAt: Date.now(),
+                finishedAt: null,
+                parentElfId: targetElf.id,
+                toolsUsed: [],
+              });
 
-            /* Transition to working after brief delay */
-            setTimeout(() => {
-              const currentStore = useSessionStore.getState();
-              const currentFloor = currentStore.floors[floorId];
-              if (currentFloor?.elves.some((e) => e.id === elfId)) {
-                currentStore.updateElfStatusOnFloor(floorId, elfId, "working");
-              }
-            }, 1500);
+              store.addEventToFloor(floorId, {
+                id: `event-agent-spawn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                timestamp: Date.now(),
+                elfId,
+                elfName: personality.name,
+                runtime: targetElf.runtime,
+                type: "spawn",
+                payload: { role: roleName, description: agentDesc },
+                funnyStatus: getStatusMessage(personality.name, "spawning"),
+              });
+
+              playSound("spawn");
+              /* No blind setTimeout — elf transitions to "working" when it receives
+               * its first real event via the status update below. */
+            }
+
+            /* Record mapping and push to active agent stack */
+            if (toolUseId) {
+              agentToolUseMap.current.set(toolUseId, elfId);
+              activeAgentStack.current.push(elfId);
+            }
+          }
+
+          /* Detect Agent tool_result — sub-agent completed, pop from stack */
+          if (entry.type === "tool_result" && entry.payload.toolUseId) {
+            const mappedElfId = agentToolUseMap.current.get(String(entry.payload.toolUseId));
+            if (mappedElfId) {
+              const idx = activeAgentStack.current.indexOf(mappedElfId);
+              if (idx !== -1) activeAgentStack.current.splice(idx, 1);
+              store.updateElfStatusOnFloor(floorId, mappedElfId, "done");
+              agentToolUseMap.current.delete(String(entry.payload.toolUseId));
+            }
           }
         }
 
@@ -389,6 +423,12 @@ export function useSessionEvents(): void {
         /* Set needsInput flag if Claude asked a question — BEFORE ending session
          * so the flag is available when the UI checks for the FollowUpCard. */
         if (data.needsInput) {
+          store.setNeedsInputOnFloor(floorId, true, data.lastResult ?? null);
+        }
+
+        /* Plan mode fallback — plan mode sessions always need user approval, even if
+         * detect_question_in_result() didn't catch the plan text as a question. */
+        if (!data.needsInput && floor.session?.appliedOptions?.permissionMode === "plan") {
           store.setNeedsInputOnFloor(floorId, true, data.lastResult ?? null);
         }
 

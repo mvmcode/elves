@@ -19,12 +19,27 @@ pub struct ProjectRow {
 }
 
 /// Insert a new project into the database. Returns the created project row.
+///
+/// If a project with the same path already exists, returns the existing row
+/// (with an updated `updated_at` timestamp) instead of creating a duplicate.
 pub fn create_project(
     conn: &Connection,
     id: &str,
     name: &str,
     path: &str,
 ) -> Result<ProjectRow, DbError> {
+    // De-duplicate by path — return existing project if one already points to this directory
+    if let Some(existing) = get_project_by_path(conn, path)? {
+        let now = chrono::Utc::now().timestamp();
+        conn.execute(
+            "UPDATE projects SET updated_at = ?1 WHERE id = ?2",
+            params![now, existing.id],
+        )?;
+        return get_project(conn, &existing.id)?.ok_or_else(|| {
+            DbError::Sqlite(rusqlite::Error::QueryReturnedNoRows)
+        });
+    }
+
     let now = chrono::Utc::now().timestamp();
     conn.execute(
         "INSERT INTO projects (id, name, path, default_runtime, created_at, updated_at)
@@ -35,6 +50,30 @@ pub fn create_project(
     get_project(conn, id)?.ok_or_else(|| {
         DbError::Sqlite(rusqlite::Error::QueryReturnedNoRows)
     })
+}
+
+/// Retrieve a single project by its directory path. Used for dedup on create.
+pub fn get_project_by_path(conn: &Connection, path: &str) -> Result<Option<ProjectRow>, DbError> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, path, default_runtime, created_at, updated_at, settings
+         FROM projects WHERE path = ?1",
+    )?;
+
+    let result = stmt
+        .query_row(params![path], |row| {
+            Ok(ProjectRow {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                path: row.get(2)?,
+                default_runtime: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+                settings: row.get(6)?,
+            })
+        })
+        .optional()?;
+
+    Ok(result)
 }
 
 /// Retrieve a single project by ID.
@@ -178,6 +217,38 @@ mod tests {
         let conn = test_conn();
         let result = get_project(&conn, "nope").expect("Should query");
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn create_project_deduplicates_by_path() {
+        let conn = test_conn();
+        let first = create_project(&conn, "dup-1", "First Name", "/tmp/same-path")
+            .expect("Should create project");
+        assert_eq!(first.id, "dup-1");
+
+        let second = create_project(&conn, "dup-2", "Second Name", "/tmp/same-path")
+            .expect("Should return existing project");
+        // Returns the existing project, not a new one
+        assert_eq!(second.id, "dup-1");
+        assert_eq!(second.name, "First Name");
+
+        let all = list_projects(&conn).expect("Should list");
+        assert_eq!(all.len(), 1, "Should have exactly one project, not two");
+    }
+
+    #[test]
+    fn get_project_by_path_returns_match() {
+        let conn = test_conn();
+        create_project(&conn, "path-1", "By Path", "/tmp/find-me").unwrap();
+
+        let found = get_project_by_path(&conn, "/tmp/find-me")
+            .expect("Should query")
+            .expect("Should find project");
+        assert_eq!(found.id, "path-1");
+
+        let not_found = get_project_by_path(&conn, "/tmp/not-here")
+            .expect("Should query");
+        assert!(not_found.is_none());
     }
 
     #[test]
