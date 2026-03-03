@@ -55,7 +55,7 @@ export function FloorBar(): React.JSX.Element {
 
   return (
     <div
-      className="flex h-9 shrink-0 items-end gap-0 overflow-x-auto border-b-[2px] border-border bg-[#f5f3ee]"
+      className="flex h-9 shrink-0 items-end gap-0 overflow-x-auto border-b-[2px] border-border bg-surface"
       data-testid="floor-bar"
     >
       {floors.map((floor) => {
@@ -70,8 +70,8 @@ export function FloorBar(): React.JSX.Element {
             className={[
               "group flex h-full shrink-0 cursor-pointer items-center gap-1.5 border-r-[1px] border-border/30 px-3 font-display text-[11px] font-bold tracking-wide transition-colors duration-75",
               isActive
-                ? "border-b-[2px] border-b-elf-gold bg-white text-text-light"
-                : "bg-transparent text-text-light/50 hover:bg-white/60 hover:text-text-light",
+                ? "border-b-[2px] border-b-elf-gold bg-surface-elevated text-text-light"
+                : "bg-transparent text-text-light/50 hover:bg-surface-elevated/60 hover:text-text-light",
             ].join(" ")}
             data-testid="floor-tab"
             data-floor-id={floor.id}

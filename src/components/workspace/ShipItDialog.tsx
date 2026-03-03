@@ -9,6 +9,8 @@ interface ShipItDialogProps {
   readonly workspace: WorkspaceInfo;
   readonly onClose: () => void;
   readonly onConfirm: (strategy: MergeStrategy, extractMemory: boolean) => void;
+  /** For multi-repo: list of repo names that will be affected. */
+  readonly repos?: readonly string[];
 }
 
 /** Describes what each merge strategy does for the user. */
@@ -28,6 +30,7 @@ export function ShipItDialog({
   workspace,
   onClose,
   onConfirm,
+  repos,
 }: ShipItDialogProps): React.JSX.Element {
   const [strategy, setStrategy] = useState<MergeStrategy>("squash");
   const [extractMemory, setExtractMemory] = useState(true);
@@ -119,6 +122,9 @@ export function ShipItDialog({
           </p>
           <ul className="flex flex-col gap-1 font-mono text-xs text-text-muted">
             <li>1. Push branch to remote</li>
+            {repos && repos.length > 1 && (
+              <li>Across {repos.length} repos: {repos.join(", ")}</li>
+            )}
             <li>2. {strategy === "merge" ? "Merge" : strategy === "rebase" ? "Rebase" : "Squash merge"} into target branch</li>
             {extractMemory && <li>3. Extract session memories</li>}
             <li>{extractMemory ? "4" : "3"}. Clean up worktree and branch</li>

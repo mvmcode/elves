@@ -59,3 +59,32 @@ export interface ShippedWorkspace {
   readonly mergedAt: number;
   readonly memoriesExtracted: number;
 }
+
+/** Information about a single git repository discovered in the project directory. */
+export interface GitRepoInfo {
+  readonly path: string;
+  readonly name: string;
+  readonly currentBranch: string;
+  readonly isDirty: boolean;
+}
+
+/** Describes the git topology of a project directory. */
+export interface ProjectTopology {
+  readonly kind: "single_repo" | "multi_repo" | "no_git";
+  readonly repos: readonly GitRepoInfo[];
+}
+
+/** A workspace entry scoped to a specific repo within a multi-repo project. */
+export interface RepoWorkspaceEntry {
+  readonly repoPath: string;
+  readonly repoName: string;
+  readonly workspace: WorkspaceInfo;
+}
+
+/** A workspace spanning multiple repositories, grouped by slug. */
+export interface MultiRepoWorkspace {
+  readonly slug: string;
+  readonly repos: readonly RepoWorkspaceEntry[];
+  readonly status: string;
+  readonly totalFilesChanged: number;
+}

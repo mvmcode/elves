@@ -13,7 +13,7 @@ import type { ClaudeDiscovery, ClaudeSpawnOptions } from "@/types/claude";
 import type { FileEntry } from "@/types/filesystem";
 import type { GitBranchInfo, GitCommit } from "@/types/git";
 import type { GitState, WorktreeInfo } from "@/types/git-state";
-import type { WorkspaceInfo, WorkspaceDiff, ProjectConfig } from "@/types/workspace";
+import type { WorkspaceInfo, WorkspaceDiff, ProjectConfig, ProjectTopology, MultiRepoWorkspace } from "@/types/workspace";
 
 /** Detect available AI runtimes (Claude Code, Codex) on the system */
 export async function detectRuntimes(): Promise<RuntimeInfo> {
@@ -500,6 +500,76 @@ export async function readProjectConfig(projectPath: string): Promise<ProjectCon
 /** Write project-scoped config to .elves/config.json. */
 export async function writeProjectConfig(projectPath: string, config: ProjectConfig): Promise<boolean> {
   return invoke<boolean>("write_project_config", { projectPath, config: JSON.stringify(config) });
+}
+
+/* ── Multi-repo workspace commands ───────────────────────────── */
+
+/** Discover the git topology of a project directory. */
+export async function discoverGitRepos(
+  projectPath: string,
+  maxDepth?: number,
+): Promise<ProjectTopology> {
+  return invoke<ProjectTopology>("discover_git_repos", { projectPath, maxDepth: maxDepth ?? null });
+}
+
+/** Create a workspace across multiple repositories. */
+export async function createMultiRepoWorkspace(
+  projectPath: string,
+  slug: string,
+  repoPaths: string[],
+  baseBranch?: string,
+): Promise<MultiRepoWorkspace> {
+  return invoke<MultiRepoWorkspace>("create_multi_repo_workspace", {
+    projectPath, slug, repoPaths, baseBranch: baseBranch ?? null,
+  });
+}
+
+/** List all workspaces grouped by slug across multiple repos. */
+export async function listMultiRepoWorkspaces(
+  projectPath: string,
+  repoPaths: string[],
+): Promise<MultiRepoWorkspace[]> {
+  return invoke<MultiRepoWorkspace[]>("list_multi_repo_workspaces", { projectPath, repoPaths });
+}
+
+/** Get aggregate diff across multiple repos for a workspace slug. */
+export async function getMultiRepoWorkspaceDiff(
+  projectPath: string,
+  slug: string,
+  repoPaths: string[],
+): Promise<WorkspaceDiff> {
+  return invoke<WorkspaceDiff>("get_multi_repo_workspace_diff", { projectPath, slug, repoPaths });
+}
+
+/** Complete (Ship It) a workspace across multiple repos. */
+export async function completeMultiRepoWorkspace(
+  projectPath: string,
+  slug: string,
+  repoPaths: string[],
+  strategy: string,
+  extractMemory: boolean,
+): Promise<boolean> {
+  return invoke<boolean>("complete_multi_repo_workspace", {
+    projectPath, slug, repoPaths, strategy, extractMemory,
+  });
+}
+
+/** Remove a workspace from all repos. */
+export async function removeMultiRepoWorkspace(
+  projectPath: string,
+  slug: string,
+  repoPaths: string[],
+): Promise<boolean> {
+  return invoke<boolean>("remove_multi_repo_workspace", { projectPath, slug, repoPaths });
+}
+
+/** Push workspace branch in all repos. */
+export async function pushMultiRepoWorkspace(
+  projectPath: string,
+  slug: string,
+  repoPaths: string[],
+): Promise<boolean> {
+  return invoke<boolean>("push_multi_repo_workspace", { projectPath, slug, repoPaths });
 }
 
 /** Create a new git branch. */

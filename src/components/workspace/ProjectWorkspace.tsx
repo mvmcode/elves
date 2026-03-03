@@ -5,6 +5,7 @@ import { useWorkspaceStore } from "@/stores/workspace";
 import { useProjectStore } from "@/stores/project";
 import { useGitStore } from "@/stores/git";
 import { WorkspaceCard } from "./WorkspaceCard";
+import { MultiRepoWorkspaceCard } from "./MultiRepoWorkspaceCard";
 import { NewWorkspaceDialog } from "./NewWorkspaceDialog";
 import { ShipItDialog } from "./ShipItDialog";
 import { DiffViewer } from "./DiffViewer";
@@ -32,6 +33,10 @@ export function ProjectWorkspace(): React.JSX.Element {
   const setError = useWorkspaceStore((state) => state.setError);
   const removeWorkspaceFromStore = useWorkspaceStore((state) => state.removeWorkspace);
   const addShipped = useWorkspaceStore((state) => state.addShipped);
+  const topology = useWorkspaceStore((state) => state.topology);
+  const setTopology = useWorkspaceStore((state) => state.setTopology);
+  const multiRepoWorkspaces = useWorkspaceStore((state) => state.multiRepoWorkspaces);
+  const setMultiRepoWorkspaces = useWorkspaceStore((state) => state.setMultiRepoWorkspaces);
 
   const gitState = useGitStore((state) => state.gitState);
 
@@ -39,30 +44,33 @@ export function ProjectWorkspace(): React.JSX.Element {
   const [shipItWorkspace, setShipItWorkspace] = useState<WorkspaceInfo | null>(null);
   const [viewingDiffSlug, setViewingDiffSlug] = useState<string | null>(null);
 
-  /** Load workspaces when the project changes. */
+  /** Discover project topology on mount. */
+  useEffect(() => {
+    if (!activeProject?.path) return;
+    tauri.discoverGitRepos(activeProject.path)
+      .then((topo) => setTopology(topo))
+      .catch(() => setTopology(null));
+  }, [activeProject?.path, setTopology]);
+
+  /** Load workspaces when the project or topology changes. */
   useEffect(() => {
     if (!activeProject?.path) return;
     setLoading(true);
-    tauri
-      .listWorkspaces(activeProject.path)
-      .then((result) => {
-        setWorkspaces(result);
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        setError(String(err));
-        setLoading(false);
-      });
-  }, [activeProject?.path, setWorkspaces, setLoading, setError]);
-
-  /** Create a new workspace. */
-  const handleCreateWorkspace = useCallback(
-    (slug: string, baseBranch?: string, _runtime?: string): void => {
-      if (!activeProject?.path) return;
-      setLoading(true);
+    if (topology?.kind === "multi_repo") {
+      const repoPaths = topology.repos.map((r) => r.path);
       tauri
-        .createWorkspace(activeProject.path, slug, baseBranch)
-        .then(() => tauri.listWorkspaces(activeProject.path))
+        .listMultiRepoWorkspaces(activeProject.path, repoPaths)
+        .then((result) => {
+          setMultiRepoWorkspaces(result);
+          setLoading(false);
+        })
+        .catch((err: unknown) => {
+          setError(String(err));
+          setLoading(false);
+        });
+    } else {
+      tauri
+        .listWorkspaces(activeProject.path)
         .then((result) => {
           setWorkspaces(result);
           setLoading(false);
@@ -71,8 +79,46 @@ export function ProjectWorkspace(): React.JSX.Element {
           setError(String(err));
           setLoading(false);
         });
+    }
+  }, [activeProject?.path, topology, setWorkspaces, setMultiRepoWorkspaces, setLoading, setError]);
+
+  /** Helper to get repo paths from topology. */
+  const getRepoPaths = useCallback((): string[] => {
+    return topology?.repos.map((r) => r.path) ?? [];
+  }, [topology]);
+
+  /** Create a new workspace. */
+  const handleCreateWorkspace = useCallback(
+    (slug: string, baseBranch?: string, _runtime?: string, selectedRepoPaths?: string[]): void => {
+      if (!activeProject?.path) return;
+      setLoading(true);
+      if (topology?.kind === "multi_repo" && selectedRepoPaths && selectedRepoPaths.length > 0) {
+        tauri
+          .createMultiRepoWorkspace(activeProject.path, slug, selectedRepoPaths, baseBranch)
+          .then(() => tauri.listMultiRepoWorkspaces(activeProject.path, getRepoPaths()))
+          .then((result) => {
+            setMultiRepoWorkspaces(result);
+            setLoading(false);
+          })
+          .catch((err: unknown) => {
+            setError(String(err));
+            setLoading(false);
+          });
+      } else {
+        tauri
+          .createWorkspace(activeProject.path, slug, baseBranch)
+          .then(() => tauri.listWorkspaces(activeProject.path))
+          .then((result) => {
+            setWorkspaces(result);
+            setLoading(false);
+          })
+          .catch((err: unknown) => {
+            setError(String(err));
+            setLoading(false);
+          });
+      }
     },
-    [activeProject?.path, setWorkspaces, setLoading, setError],
+    [activeProject?.path, topology, getRepoPaths, setWorkspaces, setMultiRepoWorkspaces, setLoading, setError],
   );
 
   /** Focus on a workspace — for now, sets it as active. */
@@ -163,6 +209,93 @@ export function ProjectWorkspace(): React.JSX.Element {
     [activeProject?.path, removeWorkspaceFromStore, setLoading, setError],
   );
 
+  /** Load and display diff for a multi-repo workspace. */
+  const handleMultiRepoDiff = useCallback(
+    (slug: string): void => {
+      if (!activeProject?.path) return;
+      if (viewingDiffSlug === slug) {
+        setViewingDiffSlug(null);
+        return;
+      }
+      setViewingDiffSlug(slug);
+      tauri
+        .getMultiRepoWorkspaceDiff(activeProject.path, slug, getRepoPaths())
+        .then((diff) => setDiff(slug, diff))
+        .catch((err: unknown) => setError(String(err)));
+    },
+    [activeProject?.path, viewingDiffSlug, getRepoPaths, setDiff, setError],
+  );
+
+  /** Open Ship It dialog for a multi-repo workspace. */
+  const handleMultiRepoShipItOpen = useCallback(
+    (slug: string): void => {
+      const mrWorkspace = multiRepoWorkspaces.find((w) => w.slug === slug);
+      const firstRepo = mrWorkspace?.repos[0];
+      if (firstRepo) {
+        setShipItWorkspace(firstRepo.workspace);
+      }
+    },
+    [multiRepoWorkspaces],
+  );
+
+  /** Execute the multi-repo ship-it flow. */
+  const handleMultiRepoShipItConfirm = useCallback(
+    (strategy: MergeStrategy, extractMemory: boolean): void => {
+      if (!activeProject?.path || !shipItWorkspace) return;
+      setLoading(true);
+      tauri
+        .completeMultiRepoWorkspace(activeProject.path, shipItWorkspace.slug, getRepoPaths(), strategy, extractMemory)
+        .then(() => {
+          addShipped({
+            slug: shipItWorkspace.slug,
+            branch: shipItWorkspace.branch,
+            elfName: shipItWorkspace.elfName ?? "Unknown",
+            mergedAt: Date.now(),
+            memoriesExtracted: extractMemory ? 1 : 0,
+          });
+          return tauri.listMultiRepoWorkspaces(activeProject.path, getRepoPaths());
+        })
+        .then((result) => {
+          setMultiRepoWorkspaces(result);
+          setShipItWorkspace(null);
+          setLoading(false);
+        })
+        .catch((err: unknown) => {
+          setError(String(err));
+          setLoading(false);
+        });
+    },
+    [activeProject?.path, shipItWorkspace, getRepoPaths, addShipped, setMultiRepoWorkspaces, setLoading, setError],
+  );
+
+  /** Remove a multi-repo workspace from all repos. */
+  const handleMultiRepoRemove = useCallback(
+    (slug: string): void => {
+      if (!activeProject?.path) return;
+      setLoading(true);
+      tauri
+        .removeMultiRepoWorkspace(activeProject.path, slug, getRepoPaths())
+        .then(() => tauri.listMultiRepoWorkspaces(activeProject.path, getRepoPaths()))
+        .then((result) => {
+          setMultiRepoWorkspaces(result);
+          setLoading(false);
+        })
+        .catch((err: unknown) => {
+          setError(String(err));
+          setLoading(false);
+        });
+    },
+    [activeProject?.path, getRepoPaths, setMultiRepoWorkspaces, setLoading, setError],
+  );
+
+  /** Focus on a multi-repo workspace. */
+  const handleMultiRepoFocus = useCallback(
+    (slug: string): void => {
+      useWorkspaceStore.getState().setActiveWorkspace(slug);
+    },
+    [],
+  );
+
   /** Refresh git state. */
   const handleRefreshGit = useCallback((): void => {
     if (!activeProject?.path) return;
@@ -190,7 +323,14 @@ export function ProjectWorkspace(): React.JSX.Element {
     <div className="flex flex-1 flex-col overflow-y-auto p-6" data-testid="project-workspace">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="font-display text-2xl font-bold tracking-tight">Workspaces</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="font-display text-2xl font-bold tracking-tight">Workspaces</h2>
+          {topology?.kind === "multi_repo" && (
+            <span className="border-[2px] border-border bg-accent-blue px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-white">
+              Multi-repo: {topology.repos.length} repos
+            </span>
+          )}
+        </div>
         <div className="flex gap-2">
           <button
             onClick={handleRefreshGit}
@@ -228,38 +368,88 @@ export function ProjectWorkspace(): React.JSX.Element {
         </div>
       )}
 
-      {/* Workspace grid */}
-      {workspaces.length > 0 ? (
-        <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {workspaces.map((workspace) => (
-            <div key={workspace.slug} className="flex flex-col gap-2">
-              <WorkspaceCard
-                workspace={workspace}
-                onFocus={handleFocus}
-                onResume={handleResume}
-                onDiff={handleDiff}
-                onShipIt={handleShipItOpen}
-                onRemove={handleRemove}
-              />
-              {viewingDiffSlug === workspace.slug && (
-                <DiffViewer
-                  diff={diffs[workspace.slug] ?? null}
-                  workspaceSlug={workspace.slug}
-                />
-              )}
-            </div>
-          ))}
+      {/* No-git message */}
+      {topology?.kind === "no_git" && (
+        <div className="mb-8 border-[2px] border-border/30 bg-surface-elevated p-8 text-center">
+          <p className="font-display text-lg font-bold text-text-muted">
+            This project directory has no git repositories.
+          </p>
+          <p className="mt-1 font-body text-sm text-text-muted">
+            Initialize a git repository to use workspaces.
+          </p>
         </div>
-      ) : (
-        !isLoading && (
-          <div className="mb-8 border-[2px] border-border/30 bg-white p-8 text-center">
-            <p className="font-display text-lg font-bold text-text-muted">
-              No workspaces yet.
-            </p>
-            <p className="mt-1 font-body text-sm text-text-muted">
-              Create one to start working. Each workspace is a git worktree with its own elf.
-            </p>
+      )}
+
+      {/* Multi-repo workspace grid */}
+      {topology?.kind === "multi_repo" && (
+        multiRepoWorkspaces.length > 0 ? (
+          <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {multiRepoWorkspaces.map((mrWorkspace) => (
+              <div key={mrWorkspace.slug} className="flex flex-col gap-2">
+                <MultiRepoWorkspaceCard
+                  workspace={mrWorkspace}
+                  onFocus={handleMultiRepoFocus}
+                  onDiff={handleMultiRepoDiff}
+                  onShipIt={handleMultiRepoShipItOpen}
+                  onRemove={handleMultiRepoRemove}
+                />
+                {viewingDiffSlug === mrWorkspace.slug && (
+                  <DiffViewer
+                    diff={diffs[mrWorkspace.slug] ?? null}
+                    workspaceSlug={mrWorkspace.slug}
+                  />
+                )}
+              </div>
+            ))}
           </div>
+        ) : (
+          !isLoading && (
+            <div className="mb-8 border-[2px] border-border/30 bg-surface-elevated p-8 text-center">
+              <p className="font-display text-lg font-bold text-text-muted">
+                No workspaces yet.
+              </p>
+              <p className="mt-1 font-body text-sm text-text-muted">
+                Create one to start working across {topology.repos.length} repositories.
+              </p>
+            </div>
+          )
+        )
+      )}
+
+      {/* Single-repo workspace grid (existing flow) */}
+      {(topology?.kind === "single_repo" || !topology) && (
+        workspaces.length > 0 ? (
+          <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {workspaces.map((workspace) => (
+              <div key={workspace.slug} className="flex flex-col gap-2">
+                <WorkspaceCard
+                  workspace={workspace}
+                  onFocus={handleFocus}
+                  onResume={handleResume}
+                  onDiff={handleDiff}
+                  onShipIt={handleShipItOpen}
+                  onRemove={handleRemove}
+                />
+                {viewingDiffSlug === workspace.slug && (
+                  <DiffViewer
+                    diff={diffs[workspace.slug] ?? null}
+                    workspaceSlug={workspace.slug}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          !isLoading && (
+            <div className="mb-8 border-[2px] border-border/30 bg-surface-elevated p-8 text-center">
+              <p className="font-display text-lg font-bold text-text-muted">
+                No workspaces yet.
+              </p>
+              <p className="mt-1 font-body text-sm text-text-muted">
+                Create one to start working. Each workspace is a git worktree with its own elf.
+              </p>
+            </div>
+          )
         )
       )}
 
@@ -272,6 +462,8 @@ export function ProjectWorkspace(): React.JSX.Element {
         onClose={() => setNewDialogOpen(false)}
         onSubmit={handleCreateWorkspace}
         branches={localBranches}
+        repos={topology?.kind === "multi_repo" ? topology.repos : undefined}
+        topologyKind={topology?.kind}
       />
 
       {/* Ship It confirmation dialog */}
@@ -280,7 +472,8 @@ export function ProjectWorkspace(): React.JSX.Element {
           isOpen={!!shipItWorkspace}
           workspace={shipItWorkspace}
           onClose={() => setShipItWorkspace(null)}
-          onConfirm={handleShipItConfirm}
+          onConfirm={topology?.kind === "multi_repo" ? handleMultiRepoShipItConfirm : handleShipItConfirm}
+          repos={topology?.kind === "multi_repo" ? topology.repos.map((r) => r.name) : undefined}
         />
       )}
     </div>

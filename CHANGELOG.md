@@ -4,7 +4,7 @@ All notable changes to ELVES are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.2.0] - 2026-03-03 — Worktree-First Workspace Model
+## [1.0.2] - 2026-03-03 — Worktree-First Workspace Model
 
 ### Added
 - **Workspace view** — new primary view for managing git worktree-based workspaces

@@ -95,7 +95,7 @@ export function StatusBar(): React.JSX.Element {
 
   return (
     <footer
-      className="no-select flex h-7 shrink-0 items-center justify-between border-t-[2px] border-border bg-[#F0EDE6] px-2 text-[11px] text-text-light/70"
+      className="no-select flex h-7 shrink-0 items-center justify-between border-t-[2px] border-border bg-surface px-2 text-[11px] text-text-light/70"
       data-testid="status-bar"
     >
       {/* Left: Runtime toggle */}

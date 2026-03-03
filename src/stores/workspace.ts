@@ -1,7 +1,7 @@
 /* Workspace store — manages worktree-based workspaces for the active project. */
 
 import { create } from "zustand";
-import type { WorkspaceInfo, WorkspaceDiff, ShippedWorkspace } from "@/types/workspace";
+import type { WorkspaceInfo, WorkspaceDiff, ShippedWorkspace, ProjectTopology, MultiRepoWorkspace } from "@/types/workspace";
 
 interface WorkspaceState {
   /** All workspaces for the current project. */
@@ -16,6 +16,10 @@ interface WorkspaceState {
   readonly isLoading: boolean;
   /** Error message from last operation, if any. */
   readonly error: string | null;
+  /** Discovered project topology. */
+  readonly topology: ProjectTopology | null;
+  /** Multi-repo workspaces (only populated when topology is multi_repo). */
+  readonly multiRepoWorkspaces: readonly MultiRepoWorkspace[];
 
   setWorkspaces: (workspaces: WorkspaceInfo[]) => void;
   setActiveWorkspace: (slug: string | null) => void;
@@ -23,6 +27,8 @@ interface WorkspaceState {
   addShipped: (shipped: ShippedWorkspace) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  setTopology: (topology: ProjectTopology | null) => void;
+  setMultiRepoWorkspaces: (workspaces: MultiRepoWorkspace[]) => void;
   /** Update a single workspace's status in the list. */
   updateWorkspaceStatus: (slug: string, status: WorkspaceInfo["status"]) => void;
   /** Remove a workspace from the list (after deletion/completion). */
@@ -36,6 +42,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   recentlyShipped: [],
   isLoading: false,
   error: null,
+  topology: null,
+  multiRepoWorkspaces: [],
 
   setWorkspaces: (workspaces: WorkspaceInfo[]) => set({ workspaces, error: null }),
   setActiveWorkspace: (slug: string | null) => set({ activeWorkspaceSlug: slug }),
@@ -43,6 +51,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     set((state) => ({ diffs: { ...state.diffs, [slug]: diff } })),
   addShipped: (shipped: ShippedWorkspace) =>
     set((state) => ({ recentlyShipped: [shipped, ...state.recentlyShipped].slice(0, 10) })),
+  setTopology: (topology: ProjectTopology | null) => set({ topology }),
+  setMultiRepoWorkspaces: (workspaces: MultiRepoWorkspace[]) => set({ multiRepoWorkspaces: workspaces }),
   setLoading: (loading: boolean) => set({ isLoading: loading }),
   setError: (error: string | null) => set({ error }),
   updateWorkspaceStatus: (slug: string, status: WorkspaceInfo["status"]) =>

@@ -195,6 +195,13 @@ pub fn run() {
             commands::workspace::init_elves_dir,
             commands::workspace::read_project_config,
             commands::workspace::write_project_config,
+            commands::workspace::discover_git_repos,
+            commands::workspace::create_multi_repo_workspace,
+            commands::workspace::list_multi_repo_workspaces,
+            commands::workspace::get_multi_repo_workspace_diff,
+            commands::workspace::complete_multi_repo_workspace,
+            commands::workspace::remove_multi_repo_workspace,
+            commands::workspace::push_multi_repo_workspace,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");

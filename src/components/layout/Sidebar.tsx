@@ -161,7 +161,7 @@ export function Sidebar(): React.JSX.Element {
   return (
     <aside
       className={[
-        "no-select flex h-full shrink-0 flex-col border-r-[3px] border-border bg-[#F0EDE6] transition-[width] duration-150",
+        "no-select flex h-full shrink-0 flex-col border-r-[3px] border-border bg-surface transition-[width] duration-150",
         isCollapsed ? "w-[52px]" : "w-[180px]",
       ].join(" ")}
       data-testid="icon-sidebar"
@@ -204,7 +204,7 @@ export function Sidebar(): React.JSX.Element {
                   "flex h-7 w-7 cursor-pointer items-center justify-center rounded-sm border-[2px] font-display text-[10px] font-black uppercase transition-all duration-100",
                   isActive
                     ? "border-border bg-elf-gold text-text-light shadow-brutal-xs"
-                    : "border-transparent bg-transparent text-text-light/60 hover:border-border/40 hover:bg-white hover:text-text-light",
+                    : "border-transparent bg-transparent text-text-light/60 hover:border-border/40 hover:bg-surface-elevated hover:text-text-light",
                 ].join(" ")}
                 title={project.name}
               >
@@ -217,7 +217,7 @@ export function Sidebar(): React.JSX.Element {
                   "group flex w-full cursor-pointer items-center rounded-sm border-[2px] transition-all duration-100",
                   isActive
                     ? "border-border bg-elf-gold text-text-light shadow-brutal-xs"
-                    : "border-transparent bg-transparent text-text-light/60 hover:border-border/40 hover:bg-white hover:text-text-light",
+                    : "border-transparent bg-transparent text-text-light/60 hover:border-border/40 hover:bg-surface-elevated hover:text-text-light",
                 ].join(" ")}
               >
                 <button
@@ -287,7 +287,7 @@ export function Sidebar(): React.JSX.Element {
 
               {/* Tooltip — only in collapsed mode */}
               {isCollapsed && (
-                <span className="pointer-events-none absolute left-[52px] z-50 hidden whitespace-nowrap border-[2px] border-border bg-white px-2 py-1 font-display text-[10px] font-bold uppercase tracking-wider text-text-light shadow-brutal-sm group-hover:block">
+                <span className="pointer-events-none absolute left-[52px] z-50 hidden whitespace-nowrap border-[2px] border-border bg-surface-elevated px-2 py-1 font-display text-[10px] font-bold uppercase tracking-wider text-text-light shadow-brutal-sm group-hover:block">
                   {item.label}
                 </span>
               )}
@@ -305,7 +305,7 @@ export function Sidebar(): React.JSX.Element {
         <button
           onClick={() => setNewProjectDialogOpen(true)}
           className={[
-            "flex cursor-pointer items-center gap-2 border-[2px] border-border/40 bg-white font-display text-text-light/50 transition-all duration-100 hover:border-border hover:bg-elf-gold hover:text-text-light hover:shadow-brutal-xs",
+            "flex cursor-pointer items-center gap-2 border-[2px] border-border/40 bg-surface-elevated font-display text-text-light/50 transition-all duration-100 hover:border-border hover:bg-elf-gold hover:text-text-light hover:shadow-brutal-xs",
             isCollapsed
               ? "h-8 w-8 justify-center text-base font-bold"
               : "w-full rounded-sm px-2 py-1.5 text-xs font-bold uppercase tracking-wider",
