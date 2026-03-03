@@ -724,10 +724,10 @@ fn stream_codex_output(
                     }
 
                     // Detect phase transitions and resolve the current elf ID for attribution
-                    let elf_id: Option<String> = team_parser.as_mut().map(|parser| {
+                    let elf_id: Option<String> = team_parser.as_mut().and_then(|parser| {
                         parser.detect_phase_transition(&line);
                         parser.current_elf_id().map(|id| id.to_string())
-                    }).flatten();
+                    });
 
                     // 1. Emit to frontend for real-time display (with elfId when in team mode)
                     let _ = app.emit(

@@ -13,6 +13,7 @@ import type { ClaudeDiscovery, ClaudeSpawnOptions } from "@/types/claude";
 import type { FileEntry } from "@/types/filesystem";
 import type { GitBranchInfo, GitCommit } from "@/types/git";
 import type { GitState, WorktreeInfo } from "@/types/git-state";
+import type { WorkspaceInfo, WorkspaceDiff, ProjectConfig } from "@/types/workspace";
 
 /** Detect available AI runtimes (Claude Code, Codex) on the system */
 export async function detectRuntimes(): Promise<RuntimeInfo> {
@@ -419,6 +420,101 @@ export async function gitWorktreeRemove(projectPath: string, worktreePath: strin
 /** Get aggregate git state in a single call — branch, worktrees, dirty, ahead/behind. */
 export async function getGitState(projectPath: string): Promise<GitState> {
   return invoke<GitState>("get_git_state", { projectPath });
+}
+
+/* ── Workspace commands ──────────────────────────────────────── */
+
+/** Initialize the .elves/ directory for a project. */
+export async function initElvesDir(projectPath: string): Promise<boolean> {
+  return invoke<boolean>("init_elves_dir", { projectPath });
+}
+
+/** Create a new workspace (worktree + branch). */
+export async function createWorkspace(
+  projectPath: string,
+  slug: string,
+  baseBranch?: string,
+): Promise<WorkspaceInfo> {
+  return invoke<WorkspaceInfo>("create_workspace", { projectPath, slug, baseBranch: baseBranch ?? null });
+}
+
+/** List all workspaces for a project. */
+export async function listWorkspaces(projectPath: string): Promise<WorkspaceInfo[]> {
+  return invoke<WorkspaceInfo[]>("list_workspaces", { projectPath });
+}
+
+/** Get diff summary for a workspace vs base branch. */
+export async function getWorkspaceDiff(projectPath: string, slug: string): Promise<WorkspaceDiff> {
+  return invoke<WorkspaceDiff>("get_workspace_diff", { projectPath, slug });
+}
+
+/** Push a workspace branch to remote. */
+export async function pushWorkspace(projectPath: string, slug: string): Promise<string> {
+  return invoke<string>("push_workspace", { projectPath, slug });
+}
+
+/** Create a PR from a workspace branch. Returns PR URL. */
+export async function createPrFromWorkspace(
+  projectPath: string,
+  slug: string,
+  title: string,
+  body: string,
+): Promise<string> {
+  return invoke<string>("create_pr_from_workspace", { projectPath, slug, title, body });
+}
+
+/** Merge a workspace branch into a target branch. */
+export async function mergeWorkspace(
+  projectPath: string,
+  slug: string,
+  targetBranch: string,
+  strategy: string,
+): Promise<boolean> {
+  return invoke<boolean>("merge_workspace", { projectPath, slug, targetBranch, strategy });
+}
+
+/** Remove a workspace (worktree + branch). */
+export async function removeWorkspace(
+  projectPath: string,
+  slug: string,
+  force?: boolean,
+): Promise<boolean> {
+  return invoke<boolean>("remove_workspace", { projectPath, slug, force: force ?? false });
+}
+
+/** Complete a workspace — push, merge, cleanup. The full "Ship It" flow. */
+export async function completeWorkspace(
+  projectPath: string,
+  slug: string,
+  strategy: string,
+  extractMemory: boolean,
+): Promise<boolean> {
+  return invoke<boolean>("complete_workspace", { projectPath, slug, strategy, extractMemory });
+}
+
+/** Read project-scoped config from .elves/config.json. */
+export async function readProjectConfig(projectPath: string): Promise<ProjectConfig> {
+  return invoke<ProjectConfig>("read_project_config", { projectPath });
+}
+
+/** Write project-scoped config to .elves/config.json. */
+export async function writeProjectConfig(projectPath: string, config: ProjectConfig): Promise<boolean> {
+  return invoke<boolean>("write_project_config", { projectPath, config: JSON.stringify(config) });
+}
+
+/** Create a new git branch. */
+export async function createBranch(projectPath: string, name: string, base?: string): Promise<boolean> {
+  return invoke<boolean>("create_branch", { projectPath, name, base: base ?? null });
+}
+
+/** Delete a git branch. */
+export async function deleteBranch(projectPath: string, name: string, force?: boolean): Promise<boolean> {
+  return invoke<boolean>("delete_branch", { projectPath, name, force: force ?? false });
+}
+
+/** Get diff stats between a branch and base. */
+export async function getBranchDiff(projectPath: string, branch: string, base?: string): Promise<string> {
+  return invoke<string>("get_branch_diff", { projectPath, branch, base: base ?? null });
 }
 
 /* ── Event subscription ──────────────────────────────────────── */

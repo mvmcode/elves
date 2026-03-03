@@ -22,6 +22,7 @@ import { SkillEditor } from "@/components/editors/SkillEditor";
 import { McpManager } from "@/components/editors/McpManager";
 import { SessionHistory } from "@/components/project/SessionHistory";
 import { SessionComparison } from "@/components/project/SessionComparison";
+import { ProjectWorkspace } from "@/components/workspace/ProjectWorkspace";
 import { GitPanel } from "@/components/git/GitPanel";
 import { FileTreePanel } from "@/components/files/FileTreePanel";
 import { FileViewer } from "@/components/files/FileViewer";
@@ -307,6 +308,10 @@ export function Shell(): React.JSX.Element {
         ) : activeView === "comparison" ? (
           <div className="flex flex-1 overflow-hidden">
             <SessionComparison />
+          </div>
+        ) : activeView === "workspace" ? (
+          <div className="flex flex-1 overflow-hidden">
+            <ProjectWorkspace />
           </div>
         ) : activeView === "settings" ? (
           <SettingsView

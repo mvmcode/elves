@@ -3,6 +3,7 @@
 mod agents;
 mod commands;
 mod db;
+mod project;
 
 use agents::process::ProcessManager;
 use commands::projects::DbState;
@@ -180,6 +181,20 @@ pub fn run() {
             commands::git::git_worktree_add,
             commands::git::git_worktree_remove,
             commands::git::get_git_state,
+            commands::git::create_branch,
+            commands::git::delete_branch,
+            commands::git::get_branch_diff,
+            commands::workspace::create_workspace,
+            commands::workspace::list_workspaces,
+            commands::workspace::get_workspace_diff,
+            commands::workspace::push_workspace,
+            commands::workspace::create_pr_from_workspace,
+            commands::workspace::merge_workspace,
+            commands::workspace::remove_workspace,
+            commands::workspace::complete_workspace,
+            commands::workspace::init_elves_dir,
+            commands::workspace::read_project_config,
+            commands::workspace::write_project_config,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");

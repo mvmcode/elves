@@ -98,6 +98,17 @@ function IconExpand(): React.JSX.Element {
   );
 }
 
+function IconWorkspace(): React.JSX.Element {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="8" height="8" />
+      <rect x="14" y="3" width="8" height="8" />
+      <rect x="2" y="13" width="8" height="8" />
+      <rect x="14" y="13" width="8" height="8" />
+    </svg>
+  );
+}
+
 /** Navigation items — most switch the active view, "files" toggles the file tree panel. */
 interface NavItem {
   readonly id: string;
@@ -108,6 +119,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
+  { id: "workspace", view: "workspace", label: "Workspaces", Icon: IconWorkspace },
   { id: "session", view: "session", label: "Workshop", Icon: IconWorkshop },
   { id: "files", label: "Files", Icon: IconFiles, isPanel: true },
   { id: "memory", view: "memory", label: "Memory", Icon: IconMemory },
