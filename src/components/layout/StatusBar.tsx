@@ -4,6 +4,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAppStore } from "@/stores/app";
 import { useSessionStore } from "@/stores/session";
+import { useGitStore } from "@/stores/git";
+import { useProjectStore } from "@/stores/project";
+import { useUiStore } from "@/stores/ui";
+import { BranchSwitcher } from "@/components/git/BranchSwitcher";
 import type { Runtime } from "@/types/elf";
 
 /** Runtime display metadata. */
@@ -22,6 +26,23 @@ export function StatusBar(): React.JSX.Element {
   const setDefaultRuntime = useAppStore((s) => s.setDefaultRuntime);
   const activeSession = useSessionStore((s) => s.activeSession);
   const elves = useSessionStore((s) => s.elves);
+  const stagedFiles = useGitStore((s) => s.stagedFiles);
+  const unstagedFiles = useGitStore((s) => s.unstagedFiles);
+  const refreshBranch = useGitStore((s) => s.refreshBranch);
+  const activeProject = useProjectStore((s) => {
+    const id = s.activeProjectId;
+    return id ? s.projects.find((p) => p.id === id) : undefined;
+  });
+  const setActiveView = useUiStore((s) => s.setActiveView);
+
+  const totalChanges = stagedFiles.length + unstagedFiles.length;
+
+  /** Load branch info when a project is active. */
+  useEffect(() => {
+    if (activeProject?.path) {
+      void refreshBranch(activeProject.path);
+    }
+  }, [activeProject?.path, refreshBranch]);
 
   const isActive = activeSession?.status === "active";
   const isCompleted = activeSession?.status === "completed";
@@ -107,6 +128,21 @@ export function StatusBar(): React.JSX.Element {
           ].join(" ")}
         />
       </button>
+
+      {/* Branch display + change count */}
+      <div className="flex items-center gap-2">
+        <BranchSwitcher />
+        {totalChanges > 0 && (
+          <button
+            onClick={() => setActiveView("git")}
+            className="flex cursor-pointer items-center gap-1 border-[2px] border-border/20 bg-error/10 px-1.5 py-0 font-mono text-[10px] font-bold text-error transition-all duration-100 hover:border-border/40 hover:bg-error/20"
+            title={`${totalChanges} uncommitted change${totalChanges !== 1 ? "s" : ""}`}
+            data-testid="git-changes-badge"
+          >
+            {totalChanges}
+          </button>
+        )}
+      </div>
 
       {/* Center: Status */}
       <span className="font-display text-[10px] font-bold uppercase tracking-wider">

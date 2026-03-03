@@ -5,7 +5,7 @@ import { useAppStore } from "@/stores/app";
 import { getRuntimeControlConfig } from "@/lib/runtime-controls";
 import type { ClaudeAgent } from "@/types/claude";
 
-/** Renders the option pickers: Agent (when supported), Model, Mode, and Team toggle. */
+/** Renders the option pickers: Agent (when supported), Model, Mode, Effort, Budget, and Team toggle. */
 export function TaskBarPickers(): React.JSX.Element {
   const defaultRuntime = useAppStore((s) => s.defaultRuntime);
   const controlConfig = getRuntimeControlConfig(defaultRuntime);
@@ -15,6 +15,8 @@ export function TaskBarPickers(): React.JSX.Element {
       {controlConfig.supportsCustomAgents && <AgentPicker />}
       <ModelPicker />
       <ModePicker />
+      {controlConfig.effortLevels.length > 0 && <EffortPicker />}
+      <BudgetInput />
       <TeamToggle />
     </div>
   );
@@ -216,6 +218,105 @@ function ModePicker(): React.JSX.Element {
   );
 }
 
+/** Compact neo-brutalist dropdown for selecting an effort/thinking level — options driven by runtime config. */
+function EffortPicker(): React.JSX.Element {
+  const selectedEffort = useAppStore((s) => s.selectedEffort);
+  const setSelectedEffort = useAppStore((s) => s.setSelectedEffort);
+  const defaultRuntime = useAppStore((s) => s.defaultRuntime);
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useClickOutside(containerRef, () => setIsOpen(false));
+
+  const controlConfig = getRuntimeControlConfig(defaultRuntime);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={[
+          "flex cursor-pointer items-center gap-1 border-token-thin border-border rounded-token-sm px-2 py-1 font-mono text-xs font-bold transition-all duration-100",
+          selectedEffort !== null
+            ? "bg-[#C3B1E1]/30 shadow-[2px_2px_0px_0px_#000]"
+            : "bg-surface-elevated hover:bg-surface-light",
+        ].join(" ")}
+      >
+        <span className="text-[10px] text-label text-text-light/50">Effort:</span>
+        <span>{effortDisplayLabel(selectedEffort, controlConfig.effortLevels)}</span>
+        <span className="text-[8px]">{isOpen ? "\u25B2" : "\u25BC"}</span>
+      </button>
+      {isOpen && (
+        <div className="absolute left-0 top-full z-50 mt-1 min-w-[160px] border-token-normal border-border bg-surface-elevated shadow-brutal-sm rounded-token-md">
+          <DropdownItem
+            label="Default"
+            description="Use settings default"
+            isSelected={selectedEffort === null}
+            onClick={() => {
+              setSelectedEffort(null);
+              setIsOpen(false);
+            }}
+          />
+          {controlConfig.effortLevels.map((level) => (
+            <DropdownItem
+              key={level.id}
+              label={level.label}
+              description={`${level.label} thinking effort`}
+              isSelected={selectedEffort === level.id}
+              onClick={() => {
+                setSelectedEffort(level.id);
+                setIsOpen(false);
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Compact neo-brutalist inline number input for setting a per-session USD budget cap. */
+function BudgetInput(): React.JSX.Element {
+  const budgetCap = useAppStore((s) => s.budgetCap);
+  const setBudgetCap = useAppStore((s) => s.setBudgetCap);
+
+  const handleChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const value = event.target.value;
+      if (value === "") {
+        setBudgetCap(null);
+        return;
+      }
+      const parsed = parseFloat(value);
+      if (!isNaN(parsed) && parsed >= 0) {
+        setBudgetCap(parsed);
+      }
+    },
+    [setBudgetCap],
+  );
+
+  return (
+    <div
+      className={[
+        "flex items-center gap-1 border-token-thin border-border rounded-token-sm px-2 py-1 font-mono text-xs font-bold transition-all duration-100",
+        budgetCap !== null
+          ? "bg-success/20 shadow-[2px_2px_0px_0px_#000]"
+          : "bg-surface-elevated",
+      ].join(" ")}
+    >
+      <span className="text-[10px] text-label text-text-light/50">$</span>
+      <input
+        type="number"
+        min={0}
+        step={0.5}
+        placeholder="Cap"
+        value={budgetCap ?? ""}
+        onChange={handleChange}
+        className="w-12 bg-transparent text-right font-mono text-xs outline-none placeholder:text-text-light/30"
+      />
+    </div>
+  );
+}
+
 /** Checkbox-style toggle button to force team mode for the next task. */
 function TeamToggle(): React.JSX.Element {
   const forceTeamMode = useAppStore((s) => s.forceTeamMode);
@@ -235,6 +336,17 @@ function TeamToggle(): React.JSX.Element {
       <span>{forceTeamMode ? "ON" : "OFF"}</span>
     </button>
   );
+}
+
+/** Display label for the selected effort level. Looks up the label from config, falls back to capitalized id. */
+function effortDisplayLabel(
+  effortId: string | null,
+  effortLevels: readonly { id: string; label: string }[],
+): string {
+  if (effortId === null) return "Default";
+  const found = effortLevels.find((e) => e.id === effortId);
+  if (found) return found.label;
+  return effortId.charAt(0).toUpperCase() + effortId.slice(1);
 }
 
 /** Display label for the selected approval mode. Looks up the label from config, falls back to capitalized id. */

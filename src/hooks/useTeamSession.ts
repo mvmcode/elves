@@ -6,6 +6,7 @@ import { useCallback } from "react";
 import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/project";
 import { useAppStore } from "@/stores/app";
+import { useSettingsStore } from "@/stores/settings";
 import {
   analyzeTask as invokeAnalyzeTask,
   startTask as invokeStartTask,
@@ -19,6 +20,7 @@ import { generateElf, getStatusMessage } from "@/lib/elf-names";
 import type { Runtime, ElfStatus } from "@/types/elf";
 import type { TaskPlan } from "@/types/session";
 import type { ClaudeSpawnOptions } from "@/types/claude";
+import { buildAugmentedPrompt } from "@/components/layout/FileAttachment";
 
 /**
  * Provides the task lifecycle for analysis and deployment:
@@ -54,15 +56,18 @@ export function useTeamSession(): {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const defaultRuntime = useAppStore((s) => s.defaultRuntime);
 
-  /** Build ClaudeSpawnOptions from current app store selections. */
+  /** Build ClaudeSpawnOptions from current app store selections, falling through to settings defaults. */
   const buildSpawnOptions = useCallback((): ClaudeSpawnOptions => {
-    const { selectedAgent, selectedModel, selectedApprovalMode, budgetCap } =
+    const { selectedAgent, selectedModel, selectedApprovalMode, budgetCap, selectedEffort } =
       useAppStore.getState();
+    const settings = useSettingsStore.getState();
     return {
       agent: selectedAgent?.slug ?? undefined,
-      model: selectedModel ?? selectedAgent?.model ?? undefined,
-      permissionMode: selectedApprovalMode ?? undefined,
-      maxBudgetUsd: budgetCap ?? undefined,
+      model: selectedModel ?? selectedAgent?.model ?? settings.defaultModel ?? undefined,
+      permissionMode: selectedApprovalMode ?? settings.defaultPermissionMode ?? undefined,
+      maxBudgetUsd: budgetCap ?? settings.defaultBudgetCap ?? undefined,
+      effort: selectedEffort ?? settings.defaultEffort ?? undefined,
+      appendSystemPrompt: settings.customSystemPrompt || undefined,
     };
   }, []);
 
@@ -94,12 +99,17 @@ export function useTeamSession(): {
         /* Ensure we have an available floor */
         ensureAvailableFloor();
 
+        /* Augment the task text with any attached file contents, then clear attachments */
+        const { attachedFiles, clearAttachedFiles } = useAppStore.getState();
+        const augmentedTask = buildAugmentedPrompt(task, attachedFiles);
+        clearAttachedFiles();
+
         /* Pre-task: build context from project memories (boosts relevance for used memories) */
         buildProjectContext(activeProjectId).catch((error: unknown) => {
           console.error("Failed to build project context:", error);
         });
 
-        const plan = await invokeAnalyzeTask(task, activeProjectId);
+        const plan = await invokeAnalyzeTask(augmentedTask, activeProjectId);
 
         /* When forceTeamMode is active, override solo classification to show plan preview
          * so the user can configure roles before deployment. */
@@ -113,12 +123,12 @@ export function useTeamSession(): {
           /* Solo task — skip plan preview, deploy immediately */
           const runtime = defaultRuntime;
           const spawnOptions = buildSpawnOptions();
-          const sessionId = await invokeStartTask(activeProjectId, task, runtime, spawnOptions);
+          const sessionId = await invokeStartTask(activeProjectId, augmentedTask, runtime, spawnOptions);
 
           startSession({
             id: sessionId,
             projectId: activeProjectId,
-            task,
+            task: augmentedTask,
             runtime,
             plan,
             appliedOptions: {

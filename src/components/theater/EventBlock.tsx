@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ElfEvent, ElfEventType } from "@/types/elf";
 import { ToolCallCard } from "./ToolCallCard";
 import { MarkdownLite } from "@/lib/markdown-lite";
+import { PlanViewer } from "./PlanViewer";
 
 /** Display variant controlling padding and truncation. */
 export type EventBlockVariant = "compact" | "terminal";
@@ -65,7 +66,6 @@ export function EventBlock({
   variant,
   elfColor,
 }: EventBlockProps): React.JSX.Element {
-  const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
   const [isResultExpanded, setIsResultExpanded] = useState(false);
   const payload = event.payload as Record<string, unknown>;
   const isTerminal = variant === "terminal";
@@ -84,11 +84,9 @@ export function EventBlock({
     );
   }
 
-  /* Thinking block: purple dashed border, collapsible */
+  /* Thinking block: rendered through PlanViewer with isThinking styling */
   if (event.type === "thinking") {
     const text = String(payload.text ?? "thinking...");
-    const isLong = text.length > 80;
-    const displayText = isThinkingExpanded || !isLong ? text : `${text.slice(0, 80)}...`;
 
     return (
       <div
@@ -96,20 +94,7 @@ export function EventBlock({
         data-testid="event-block"
         data-event-type="thinking"
       >
-        <div className="flex items-start justify-between gap-2">
-          <p className="font-mono text-xs italic text-purple-400" style={{ whiteSpace: "pre-wrap" }}>
-            {displayText.slice(0, textLimit)}
-          </p>
-          {isLong && (
-            <button
-              onClick={() => setIsThinkingExpanded((prev) => !prev)}
-              className="shrink-0 cursor-pointer border-none bg-transparent p-0 font-mono text-xs text-purple-300 hover:text-purple-100"
-              data-testid="thinking-toggle"
-            >
-              {isThinkingExpanded ? "Hide" : "Show reasoning..."}
-            </button>
-          )}
-        </div>
+        <PlanViewer text={text} isThinking={true} />
       </div>
     );
   }

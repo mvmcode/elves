@@ -1,8 +1,9 @@
 /* FileTreeNode — recursive tree node for the file explorer.
- * Renders a directory (expandable) or file (with git status indicator). */
+ * Renders a directory (expandable) or file (with git status indicator and type icon). */
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useFileExplorerStore } from "@/stores/fileExplorer";
+import { useUiStore } from "@/stores/ui";
 import { listDirectory } from "@/lib/tauri";
 import type { FileEntry } from "@/types/filesystem";
 
@@ -11,9 +12,10 @@ interface FileTreeNodeProps {
   readonly depth: number;
   readonly projectPath: string;
   readonly gitStatusMap: Readonly<Record<string, string>>;
+  readonly searchQuery?: string;
 }
 
-/** Map file extension to a display color. */
+/** Map file extension to a display color for the file type icon. */
 function extensionColor(ext: string | null): string {
   switch (ext) {
     case "ts":
@@ -43,6 +45,67 @@ function extensionColor(ext: string | null): string {
   }
 }
 
+/** SVG icon for file type based on extension. */
+function FileTypeIcon({ extension }: { readonly extension: string | null }): React.JSX.Element {
+  const color = extensionColor(extension);
+
+  switch (extension) {
+    case "ts":
+    case "tsx":
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
+          <rect x="2" y="2" width="20" height="20" rx="2" fill={color} fillOpacity={0.15} stroke={color} strokeWidth="1.5" />
+          <text x="12" y="16" textAnchor="middle" fill={color} fontSize="10" fontWeight="bold" fontFamily="monospace">TS</text>
+        </svg>
+      );
+    case "js":
+    case "jsx":
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
+          <rect x="2" y="2" width="20" height="20" rx="2" fill={color} fillOpacity={0.15} stroke={color} strokeWidth="1.5" />
+          <text x="12" y="16" textAnchor="middle" fill={color} fontSize="10" fontWeight="bold" fontFamily="monospace">JS</text>
+        </svg>
+      );
+    case "rs":
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
+          <rect x="2" y="2" width="20" height="20" rx="2" fill={color} fillOpacity={0.15} stroke={color} strokeWidth="1.5" />
+          <text x="12" y="16" textAnchor="middle" fill={color} fontSize="10" fontWeight="bold" fontFamily="monospace">RS</text>
+        </svg>
+      );
+    case "json":
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
+          <rect x="2" y="2" width="20" height="20" rx="2" fill={color} fillOpacity={0.15} stroke={color} strokeWidth="1.5" />
+          <text x="12" y="16" textAnchor="middle" fill={color} fontSize="9" fontWeight="bold" fontFamily="monospace">{"{}"}</text>
+        </svg>
+      );
+    case "md":
+    case "mdx":
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
+          <rect x="2" y="2" width="20" height="20" rx="2" fill={color} fillOpacity={0.15} stroke={color} strokeWidth="1.5" />
+          <text x="12" y="16" textAnchor="middle" fill={color} fontSize="9" fontWeight="bold" fontFamily="monospace">MD</text>
+        </svg>
+      );
+    case "css":
+    case "scss":
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
+          <rect x="2" y="2" width="20" height="20" rx="2" fill={color} fillOpacity={0.15} stroke={color} strokeWidth="1.5" />
+          <text x="12" y="16" textAnchor="middle" fill={color} fontSize="9" fontWeight="bold" fontFamily="monospace">#</text>
+        </svg>
+      );
+    default:
+      return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+      );
+  }
+}
+
 /** Git status indicator color and label. */
 function gitStatusIndicator(code: string): { color: string; label: string } | null {
   const index = code.trim();
@@ -66,13 +129,32 @@ function dirHasGitChanges(
   return Object.keys(gitStatusMap).some((filePath) => filePath.startsWith(prefix));
 }
 
-export function FileTreeNode({ entry, depth, projectPath, gitStatusMap }: FileTreeNodeProps): React.JSX.Element {
+/** Recursively checks if an entry or any descendant matches the search query. */
+function entryMatchesSearch(
+  entry: FileEntry,
+  query: string,
+  dirCache: ReadonlyMap<string, readonly FileEntry[]>,
+): boolean {
+  const lowerQuery = query.toLowerCase();
+  if (entry.name.toLowerCase().includes(lowerQuery)) return true;
+  if (entry.isDir) {
+    const children = dirCache.get(entry.path);
+    if (children) {
+      return children.some((child) => entryMatchesSearch(child, query, dirCache));
+    }
+  }
+  return false;
+}
+
+export function FileTreeNode({ entry, depth, projectPath, gitStatusMap, searchQuery }: FileTreeNodeProps): React.JSX.Element {
   const expandedDirs = useFileExplorerStore((s) => s.expandedDirs);
   const dirCache = useFileExplorerStore((s) => s.dirCache);
   const loadingDirs = useFileExplorerStore((s) => s.loadingDirs);
   const toggleDir = useFileExplorerStore((s) => s.toggleDir);
   const setDirEntries = useFileExplorerStore((s) => s.setDirEntries);
   const setDirLoading = useFileExplorerStore((s) => s.setDirLoading);
+  const selectedFilePath = useUiStore((s) => s.selectedFilePath);
+  const setSelectedFilePath = useUiStore((s) => s.setSelectedFilePath);
 
   const isExpanded = expandedDirs.has(entry.path);
   const isLoading = loadingDirs.has(entry.path);
@@ -86,7 +168,6 @@ export function FileTreeNode({ entry, depth, projectPath, gitStatusMap }: FileTr
   const handleToggle = useCallback(async (): Promise<void> => {
     toggleDir(entry.path);
 
-    // If expanding and not cached, fetch children
     if (!expandedDirs.has(entry.path) && !dirCache.has(entry.path)) {
       setDirLoading(entry.path, true);
       try {
@@ -99,6 +180,16 @@ export function FileTreeNode({ entry, depth, projectPath, gitStatusMap }: FileTr
       }
     }
   }, [entry.path, expandedDirs, dirCache, toggleDir, setDirEntries, setDirLoading]);
+
+  const handleFileClick = useCallback((): void => {
+    setSelectedFilePath(entry.path);
+  }, [entry.path, setSelectedFilePath]);
+
+  /** Filter children by search query when present. */
+  const filteredChildren = useMemo(() => {
+    if (!children || !searchQuery?.trim()) return children;
+    return children.filter((child) => entryMatchesSearch(child, searchQuery, dirCache));
+  }, [children, searchQuery, dirCache]);
 
   const paddingLeft = 12 + depth * 16;
 
@@ -162,15 +253,16 @@ export function FileTreeNode({ entry, depth, projectPath, gitStatusMap }: FileTr
         </button>
 
         {/* Children — rendered when expanded */}
-        {isExpanded && children && (
+        {isExpanded && filteredChildren && (
           <div>
-            {children.map((child) => (
+            {filteredChildren.map((child) => (
               <FileTreeNode
                 key={child.path}
                 entry={child}
                 depth={depth + 1}
                 projectPath={projectPath}
                 gitStatusMap={gitStatusMap}
+                searchQuery={searchQuery}
               />
             ))}
           </div>
@@ -184,21 +276,25 @@ export function FileTreeNode({ entry, depth, projectPath, gitStatusMap }: FileTr
   const indicator = gitCode ? gitStatusIndicator(gitCode) : null;
   const isDeleted = gitCode?.trim().startsWith("D") || gitCode?.trim().endsWith("D");
   const isUntracked = gitCode === "??";
+  const isSelected = selectedFilePath === entry.path;
 
   return (
-    <div
-      className="flex w-full items-center gap-1.5 py-[3px] pr-2 font-mono text-xs text-[#9a9790] transition-colors duration-75 hover:bg-white/[0.04]"
+    <button
+      onClick={handleFileClick}
+      className={[
+        "flex w-full cursor-pointer items-center gap-1.5 border-none py-[3px] pr-2 text-left font-mono text-xs transition-colors duration-75",
+        isSelected
+          ? "bg-white/[0.08] text-[#c8c5bd]"
+          : "bg-transparent text-[#9a9790] hover:bg-white/[0.04]",
+      ].join(" ")}
       style={{ paddingLeft }}
       title={indicator ? `${indicator.label}: ${relativePath}` : relativePath}
     >
       {/* Spacer for alignment with chevrons */}
       <span className="w-3 shrink-0" />
 
-      {/* File dot colored by extension */}
-      <span
-        className="h-[7px] w-[7px] shrink-0 rounded-full"
-        style={{ backgroundColor: extensionColor(entry.extension) }}
-      />
+      {/* File type icon */}
+      <FileTypeIcon extension={entry.extension} />
 
       {/* File name */}
       <span
@@ -219,6 +315,6 @@ export function FileTreeNode({ entry, depth, projectPath, gitStatusMap }: FileTr
           title={indicator.label}
         />
       )}
-    </div>
+    </button>
   );
 }

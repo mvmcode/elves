@@ -3,14 +3,17 @@
 import { create } from "zustand";
 import type { WorkshopViewMode } from "@/types/workshop";
 
-/** Top-level views the shell can render in the main content area. */
-export type AppView = "session" | "files" | "memory" | "skills" | "mcp" | "history" | "settings";
+/** Top-level views the shell can render in the main content area.
+ * Note: "files" was removed — it is now a persistent side panel, not a view. */
+export type AppView = "session" | "memory" | "skills" | "mcp" | "history" | "settings" | "git";
 
 /** Panel width constraints for resizable layout. */
 const SIDEBAR_MIN = 200;
 const SIDEBAR_MAX = 400;
 const ACTIVITY_FEED_MIN = 280;
 const ACTIVITY_FEED_MAX = 600;
+const FILE_TREE_MIN = 180;
+const FILE_TREE_MAX = 400;
 
 /** Clamps a value between min and max (inclusive). */
 function clamp(value: number, min: number, max: number): number {
@@ -44,6 +47,12 @@ interface UiState {
   readonly selectedWorkshopElfId: string | null;
   /** Whether the sidebar is collapsed to icon-only mode. */
   readonly isSidebarCollapsed: boolean;
+  /** Whether the file tree side panel is visible. */
+  readonly isFileTreeVisible: boolean;
+  /** Width of the file tree panel in pixels (180–400). */
+  readonly fileTreeWidth: number;
+  /** Path of the file currently open in the FileViewer, or null. */
+  readonly selectedFilePath: string | null;
 
   setTaskBarFocused: (focused: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
@@ -59,6 +68,9 @@ interface UiState {
   toggleWorkshopViewMode: () => void;
   setSelectedWorkshopElfId: (id: string | null) => void;
   toggleSidebarCollapsed: () => void;
+  toggleFileTree: () => void;
+  setFileTreeWidth: (width: number) => void;
+  setSelectedFilePath: (path: string | null) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -75,6 +87,9 @@ export const useUiStore = create<UiState>((set) => ({
   workshopViewMode: "workshop" as WorkshopViewMode,
   selectedWorkshopElfId: null,
   isSidebarCollapsed: false,
+  isFileTreeVisible: false,
+  fileTreeWidth: 250,
+  selectedFilePath: null,
 
   setTaskBarFocused: (focused: boolean) => set({ isTaskBarFocused: focused }),
   setSettingsOpen: (open: boolean) => set({ isSettingsOpen: open }),
@@ -92,4 +107,7 @@ export const useUiStore = create<UiState>((set) => ({
   })),
   setSelectedWorkshopElfId: (id: string | null) => set({ selectedWorkshopElfId: id }),
   toggleSidebarCollapsed: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
+  toggleFileTree: () => set((state) => ({ isFileTreeVisible: !state.isFileTreeVisible })),
+  setFileTreeWidth: (width: number) => set({ fileTreeWidth: clamp(width, FILE_TREE_MIN, FILE_TREE_MAX) }),
+  setSelectedFilePath: (path: string | null) => set({ selectedFilePath: path }),
 }));

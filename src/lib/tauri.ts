@@ -11,6 +11,7 @@ import type { McpServer } from "@/types/mcp";
 import type { Template } from "@/types/template";
 import type { ClaudeDiscovery, ClaudeSpawnOptions } from "@/types/claude";
 import type { FileEntry } from "@/types/filesystem";
+import type { GitBranchInfo, GitCommit } from "@/types/git";
 
 /** Detect available AI runtimes (Claude Code, Codex) on the system */
 export async function detectRuntimes(): Promise<RuntimeInfo> {
@@ -337,6 +338,58 @@ export async function listDirectory(path: string): Promise<FileEntry[]> {
 /** Get git status for all files in a project. Returns map of relative_path -> status_code. */
 export async function gitStatus(projectPath: string): Promise<Record<string, string>> {
   return invoke<Record<string, string>>("git_status", { projectPath });
+}
+
+/* ── Git commands ─────────────────────────────────────────────── */
+
+/** Get current branch, local branches, and remote branches. */
+export async function gitBranch(projectPath: string): Promise<GitBranchInfo> {
+  return invoke<GitBranchInfo>("git_branch", { projectPath });
+}
+
+/** Get recent commit log. Defaults to 50 entries. */
+export async function gitLog(projectPath: string, maxCount?: number): Promise<GitCommit[]> {
+  return invoke<GitCommit[]>("git_log", { projectPath, maxCount: maxCount ?? null });
+}
+
+/** Get unified diff of unstaged changes, optionally for a single file. */
+export async function gitDiff(projectPath: string, filePath?: string): Promise<string> {
+  return invoke<string>("git_diff", { projectPath, filePath: filePath ?? null });
+}
+
+/** Get unified diff of staged changes. */
+export async function gitDiffStaged(projectPath: string): Promise<string> {
+  return invoke<string>("git_diff_staged", { projectPath });
+}
+
+/** Stage files via `git add`. */
+export async function gitStage(projectPath: string, filePaths: string[]): Promise<boolean> {
+  return invoke<boolean>("git_stage", { projectPath, filePaths });
+}
+
+/** Unstage files via `git restore --staged`. */
+export async function gitUnstage(projectPath: string, filePaths: string[]): Promise<boolean> {
+  return invoke<boolean>("git_unstage", { projectPath, filePaths });
+}
+
+/** Create a commit with the given message. */
+export async function gitCommit(projectPath: string, message: string): Promise<boolean> {
+  return invoke<boolean>("git_commit", { projectPath, message });
+}
+
+/** Push current branch to remote. */
+export async function gitPush(projectPath: string): Promise<string> {
+  return invoke<string>("git_push", { projectPath });
+}
+
+/** Pull from remote for current branch. */
+export async function gitPull(projectPath: string): Promise<string> {
+  return invoke<string>("git_pull", { projectPath });
+}
+
+/** Switch to a different local branch. */
+export async function gitSwitchBranch(projectPath: string, branchName: string): Promise<boolean> {
+  return invoke<boolean>("git_switch_branch", { projectPath, branchName });
 }
 
 /* ── Event subscription ──────────────────────────────────────── */

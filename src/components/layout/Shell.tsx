@@ -12,19 +12,18 @@ import { ElfTheater } from "@/components/theater/ElfTheater";
 import { WorkshopCanvas } from "@/components/workshop/WorkshopCanvas";
 import { WorkshopOverlay } from "@/components/workshop/WorkshopOverlay";
 import { SessionControlCard } from "@/components/session/SessionControlCard";
-import { AgentPromptPopup } from "@/components/session/AgentPromptPopup";
-import { classifyPromptType } from "@/lib/prompt-classifier";
 import { ActivityFeed } from "@/components/feed/ActivityFeed";
 import { PlanPreview } from "@/components/theater/PlanPreview";
 import { TaskGraph } from "@/components/theater/TaskGraph";
 import { ThinkingPanel } from "@/components/theater/ThinkingPanel";
 import { MemoryExplorer } from "@/components/memory/MemoryExplorer";
-import { MemorySettings } from "@/components/settings/MemorySettings";
-import ThemePicker from "@/components/settings/ThemePicker";
+import { SettingsView } from "@/components/settings/SettingsView";
 import { SkillEditor } from "@/components/editors/SkillEditor";
 import { McpManager } from "@/components/editors/McpManager";
 import { SessionHistory } from "@/components/project/SessionHistory";
-import { FileExplorer } from "@/components/files/FileExplorer";
+import { GitPanel } from "@/components/git/GitPanel";
+import { FileTreePanel } from "@/components/files/FileTreePanel";
+import { FileViewer } from "@/components/files/FileViewer";
 import { BottomTerminalPanel } from "@/components/terminal/BottomTerminalPanel";
 import { ShortcutOverlay } from "@/components/shared/ShortcutOverlay";
 import { ToastContainer } from "@/components/shared/Toast";
@@ -72,12 +71,15 @@ export function Shell(): React.JSX.Element {
     (state) => (state.activeFloorId ? state.floors[state.activeFloorId]?.isHistorical : false) ?? false,
   );
   const isTerminalPanelOpen = useUiStore((state) => state.isTerminalPanelOpen);
+  const isFileTreeVisible = useUiStore((state) => state.isFileTreeVisible);
+  const fileTreeWidth = useUiStore((state) => state.fileTreeWidth);
+  const setFileTreeWidth = useUiStore((state) => state.setFileTreeWidth);
+  const selectedFilePath = useUiStore((state) => state.selectedFilePath);
   const workshopViewMode = useUiStore((state) => state.workshopViewMode);
   const needsInput = useSessionStore((state) => state.needsInput);
   const lastResultText = useSessionStore((state) => state.lastResultText);
   const activeFloorId = useSessionStore((state) => state.activeFloorId);
   const setNeedsInputOnFloor = useSessionStore((state) => state.setNeedsInputOnFloor);
-  const toggleTerminalPanel = useUiStore((state) => state.toggleTerminalPanel);
   const { deployWithPlan, stopSession, continueSession } = useTeamSession();
   const {
     handleCreateMemory,
@@ -165,6 +167,14 @@ export function Shell(): React.JSX.Element {
     side: "left",
   });
 
+  const fileTreeResize = useResizable({
+    initialWidth: fileTreeWidth,
+    onWidthChange: setFileTreeWidth,
+    minWidth: 180,
+    maxWidth: 400,
+    side: "right",
+  });
+
   /** Snapshot of a completed session shown in the summary card before the session clears. */
   interface CompletedSessionSummary {
     readonly id: string;
@@ -244,6 +254,18 @@ export function Shell(): React.JSX.Element {
       {/* Icon sidebar — narrow left strip */}
       <Sidebar />
 
+      {/* File tree panel — collapsible, between sidebar and main content */}
+      {isFileTreeVisible && (
+        <div className="relative flex h-full shrink-0">
+          <FileTreePanel />
+          <ResizeHandle
+            side="right"
+            onMouseDown={fileTreeResize.handleProps.onMouseDown}
+            isDragging={fileTreeResize.isDragging}
+          />
+        </div>
+      )}
+
       {/* Main area */}
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Command palette / TaskBar */}
@@ -253,11 +275,7 @@ export function Shell(): React.JSX.Element {
         <FloorBar />
 
         {/* View routing — session workshop, memory, skills, MCP, history, settings */}
-        {activeView === "files" ? (
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <FileExplorer />
-          </div>
-        ) : activeView === "memory" ? (
+        {activeView === "memory" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <MemoryExplorer
               onCreateMemory={handleCreateMemory}
@@ -275,20 +293,20 @@ export function Shell(): React.JSX.Element {
           <div className="flex flex-1 flex-col overflow-y-auto">
             <McpManager />
           </div>
+        ) : activeView === "git" ? (
+          <div className="flex flex-1 overflow-hidden">
+            <GitPanel />
+          </div>
         ) : activeView === "history" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <SessionHistory />
           </div>
         ) : activeView === "settings" ? (
-          <div className="flex flex-1 flex-col overflow-y-auto">
-            <ThemePicker />
-            <div className="border-t-token-normal border-border" />
-            <MemorySettings
-              onClearAll={handleClearAll}
-              onExport={handleExportMemories}
-              onImport={handleImportMemories}
-            />
-          </div>
+          <SettingsView
+            onClearAll={handleClearAll}
+            onExport={handleExportMemories}
+            onImport={handleImportMemories}
+          />
         ) : (
           <>
             {/* Plan Preview phase — shown before deployment for team tasks */}
@@ -341,6 +359,11 @@ export function Shell(): React.JSX.Element {
                       startedAt={activeSession.startedAt}
                       sessionStatus={activeSession.status}
                       isHistorical={isHistoricalFloor}
+                      needsInput={needsInput}
+                      lastResultText={lastResultText}
+                      onSubmitResponse={handlePromptSubmit}
+                      onDismissInput={handlePromptDismiss}
+                      isSubmitting={isPromptSubmitting}
                     />
                   )}
 
@@ -364,6 +387,9 @@ export function Shell(): React.JSX.Element {
                       />
                     </div>
                   )}
+
+                  {/* File viewer — read-only file content when a file is selected in the tree */}
+                  {selectedFilePath && <FileViewer />}
                 </div>
 
                 {/* Activity feed overlay (Cmd+B) — absolute positioned, does not push layout */}
@@ -389,26 +415,11 @@ export function Shell(): React.JSX.Element {
                         </button>
                       </div>
                       <div className="flex-1 overflow-y-auto">
-                        <ActivityFeed events={events} maxHeight="100%" />
+                        <ActivityFeed events={events} maxHeight="100%" needsInput={needsInput} />
                       </div>
                     </div>
                   </div>
                 )}
-
-                {/* Agent prompt popup — centered above StatusBar when Claude asks a question */}
-                <AnimatePresence>
-                  {needsInput && (
-                    <AgentPromptPopup
-                      questionText={lastResultText ?? "Claude is waiting for your input."}
-                      promptType={classifyPromptType(lastResultText ?? "")}
-                      leadElf={elves[0] ?? null}
-                      onSubmit={handlePromptSubmit}
-                      onDismiss={handlePromptDismiss}
-                      onOpenTerminal={toggleTerminalPanel}
-                      isSubmitting={isPromptSubmitting}
-                    />
-                  )}
-                </AnimatePresence>
 
                 {/* Floating session control card */}
                 <SessionControlCard />
@@ -468,12 +479,13 @@ export function Shell(): React.JSX.Element {
                       </motion.div>
                     )}
                   </AnimatePresence>
-                  {!completedSummary && (
+                  {!completedSummary && !selectedFilePath && (
                     <EmptyState
                       message="Your elves are bored. Give them something to do."
                       submessage="Type a task above and summon the elves to get started."
                     />
                   )}
+                  {selectedFilePath && <FileViewer />}
                 </div>
               )
             )}

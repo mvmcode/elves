@@ -166,6 +166,16 @@ pub fn run() {
             commands::pty::kill_pty,
             commands::filesystem::list_directory,
             commands::filesystem::git_status,
+            commands::git::git_branch,
+            commands::git::git_log,
+            commands::git::git_diff,
+            commands::git::git_diff_staged,
+            commands::git::git_stage,
+            commands::git::git_unstage,
+            commands::git::git_commit,
+            commands::git::git_push,
+            commands::git::git_pull,
+            commands::git::git_switch_branch,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");

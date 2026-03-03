@@ -22,6 +22,17 @@ interface SettingsState {
   /** Sound effect volume (0.0 to 1.0) */
   readonly soundVolume: number;
 
+  /** Default model for new sessions (null = use runtime/agent default) */
+  readonly defaultModel: string | null;
+  /** Default permission/approval mode (null = use runtime default) */
+  readonly defaultPermissionMode: string | null;
+  /** Default effort/thinking level (null = use runtime default) */
+  readonly defaultEffort: string | null;
+  /** Default per-session budget cap in USD (null = no cap) */
+  readonly defaultBudgetCap: number | null;
+  /** Custom system prompt appended to every agent invocation */
+  readonly customSystemPrompt: string;
+
   /** Set the active theme and apply it to the document */
   setTheme: (theme: ThemeName) => void;
   /** Toggle auto-learn on or off */
@@ -36,6 +47,16 @@ interface SettingsState {
   setSoundEnabled: (enabled: boolean) => void;
   /** Set the sound volume (0.0 to 1.0) */
   setSoundVolume: (volume: number) => void;
+  /** Set the default model */
+  setDefaultModel: (model: string | null) => void;
+  /** Set the default permission mode */
+  setDefaultPermissionMode: (mode: string | null) => void;
+  /** Set the default effort level */
+  setDefaultEffort: (effort: string | null) => void;
+  /** Set the default budget cap */
+  setDefaultBudgetCap: (cap: number | null) => void;
+  /** Set the custom system prompt */
+  setCustomSystemPrompt: (prompt: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -49,6 +70,12 @@ export const useSettingsStore = create<SettingsState>()(
       soundEnabled: true,
       soundVolume: 0.5,
 
+      defaultModel: null,
+      defaultPermissionMode: null,
+      defaultEffort: null,
+      defaultBudgetCap: null,
+      customSystemPrompt: "",
+
       setTheme: (theme: ThemeName) => {
         document.documentElement.setAttribute("data-theme", theme);
         set({ theme });
@@ -59,6 +86,11 @@ export const useSettingsStore = create<SettingsState>()(
       setMaxContextInjection: (maxContextInjection: number) => set({ maxContextInjection }),
       setSoundEnabled: (soundEnabled: boolean) => set({ soundEnabled }),
       setSoundVolume: (soundVolume: number) => set({ soundVolume: Math.max(0, Math.min(1, soundVolume)) }),
+      setDefaultModel: (defaultModel: string | null) => set({ defaultModel }),
+      setDefaultPermissionMode: (defaultPermissionMode: string | null) => set({ defaultPermissionMode }),
+      setDefaultEffort: (defaultEffort: string | null) => set({ defaultEffort }),
+      setDefaultBudgetCap: (defaultBudgetCap: number | null) => set({ defaultBudgetCap }),
+      setCustomSystemPrompt: (customSystemPrompt: string) => set({ customSystemPrompt }),
     }),
     {
       name: "elves-settings",

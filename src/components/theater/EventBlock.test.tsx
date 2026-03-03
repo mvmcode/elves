@@ -20,28 +20,29 @@ function createEvent(overrides?: Partial<ElfEvent>): ElfEvent {
 }
 
 describe("EventBlock", () => {
-  it("renders thinking event with italic text", () => {
+  it("renders thinking event with PlanViewer", () => {
     const event = createEvent({ type: "thinking", payload: { text: "Analyzing the bug..." } });
     render(<EventBlock event={event} variant="terminal" />);
     const block = screen.getByTestId("event-block");
     expect(block.getAttribute("data-event-type")).toBe("thinking");
     expect(block.textContent).toContain("Analyzing the bug...");
+    expect(screen.getByTestId("plan-viewer")).toBeInTheDocument();
   });
 
-  it("shows collapsible toggle for long thinking text", () => {
-    const longText = "A".repeat(200);
+  it("shows collapsible toggle for long thinking text via PlanViewer", () => {
+    const longText = "A".repeat(600);
     const event = createEvent({ type: "thinking", payload: { text: longText } });
     render(<EventBlock event={event} variant="terminal" />);
-    expect(screen.getByTestId("thinking-toggle")).toBeInTheDocument();
-    expect(screen.getByTestId("thinking-toggle").textContent).toBe("Show reasoning...");
+    expect(screen.getByTestId("plan-viewer-toggle")).toBeInTheDocument();
+    expect(screen.getByTestId("plan-viewer-toggle").textContent).toBe("Show full reasoning");
   });
 
-  it("expands thinking text on toggle click", () => {
-    const longText = "A".repeat(200);
+  it("expands thinking text on PlanViewer toggle click", () => {
+    const longText = "A".repeat(600);
     const event = createEvent({ type: "thinking", payload: { text: longText } });
     render(<EventBlock event={event} variant="terminal" />);
-    fireEvent.click(screen.getByTestId("thinking-toggle"));
-    expect(screen.getByTestId("thinking-toggle").textContent).toBe("Hide");
+    fireEvent.click(screen.getByTestId("plan-viewer-toggle"));
+    expect(screen.getByTestId("plan-viewer-toggle").textContent).toBe("Collapse");
   });
 
   it("renders tool_call with pill badge", () => {
