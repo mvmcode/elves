@@ -80,7 +80,7 @@ pub async fn save_session_replay(
         .dialog()
         .file()
         .set_title("Save Session Replay")
-        .set_file_name(&format!("elves-replay-{}.html", &session_id[..8.min(session_id.len())]))
+        .set_file_name(format!("elves-replay-{}.html", &session_id[..8.min(session_id.len())]))
         .add_filter("HTML", &["html"])
         .blocking_save_file();
 
