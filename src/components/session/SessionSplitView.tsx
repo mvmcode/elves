@@ -11,6 +11,7 @@
 import { useCallback, useRef, useState, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { WorkshopCanvas } from "@/components/workshop/WorkshopCanvas";
+import { FileViewer } from "@/components/files/FileViewer";
 import { PermissionPopup } from "@/components/session/PermissionPopup";
 import { XTerminal } from "@/components/terminal/XTerminal";
 import type { XTerminalHandle } from "@/components/terminal/XTerminal";
@@ -74,6 +75,8 @@ export function SessionSplitView(): React.JSX.Element {
 
   const isTerminalOpen = useUiStore((s) => s.isTerminalPanelOpen);
   const toggleTerminal = useUiStore((s) => s.toggleTerminalPanel);
+  const isFocusMode = useUiStore((s) => s.isFocusMode);
+  const selectedFilePath = useUiStore((s) => s.selectedFilePath);
 
   /* Terminal right-panel width (local state — persists within session) */
   const [terminalWidth, setTerminalWidth] = useState(TERMINAL_DEFAULT_WIDTH);
@@ -177,56 +180,75 @@ export function SessionSplitView(): React.JSX.Element {
     });
   }, [ptyId]);
 
+  /** In focus mode, hide only WorkshopCanvas — FileViewer stays visible if a file is open. */
+  const showWorkshop = !isFocusMode && !selectedFilePath;
+  const showFileViewer = !!selectedFilePath;
+  const showLeftPane = showWorkshop || showFileViewer;
+
   return (
     <div className="relative flex flex-1 overflow-hidden">
-      {/* Left: Workshop canvas — fills available space */}
-      <div className="relative flex flex-1 flex-col overflow-hidden">
-        <div className="flex-1 overflow-hidden">
-          <WorkshopCanvas elves={elves} events={events} />
+      {/* Left: Workshop canvas or FileViewer */}
+      {showLeftPane && (
+        <div className="relative flex flex-1 flex-col overflow-hidden">
+          {showFileViewer ? (
+            <FileViewer />
+          ) : showWorkshop ? (
+            <>
+              <div className="flex-1 overflow-hidden">
+                <WorkshopCanvas elves={elves} events={events} />
+              </div>
+
+              {/* Idle overlay when no session is active */}
+              {!activeSession && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="border-[3px] border-border/20 bg-white/80 px-8 py-6 text-center shadow-brutal-sm">
+                    <p className="font-display text-2xl font-black tracking-tight text-text-light/30">
+                      Type a task above to summon the elves.
+                    </p>
+                    <p className="mt-2 font-body text-sm text-text-light/20">
+                      Your workshop awaits instructions.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : null}
+
+          {/* Permission popup — centered overlay on left pane */}
+          <AnimatePresence>
+            {pendingPermission && (
+              <PermissionPopup
+                permission={pendingPermission}
+                onRespond={handlePermissionResponse}
+              />
+            )}
+          </AnimatePresence>
         </div>
+      )}
 
-        {/* Idle overlay when no session is active */}
-        {!activeSession && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="border-[3px] border-border/20 bg-white/80 px-8 py-6 text-center shadow-brutal-sm">
-              <p className="font-display text-2xl font-black tracking-tight text-text-light/30">
-                Type a task above to summon the elves.
-              </p>
-              <p className="mt-2 font-body text-sm text-text-light/20">
-                Your workshop awaits instructions.
-              </p>
-            </div>
-          </div>
-        )}
+      {/* Compact control pill — floats at bottom-left of the outer container */}
+      {activeSession && (
+        <SessionControlPill
+          isTerminalOpen={isTerminalOpen}
+          onToggleTerminal={toggleTerminal}
+          isFocusMode={isFocusMode}
+        />
+      )}
 
-        {/* Permission popup — centered overlay on workshop */}
-        <AnimatePresence>
-          {pendingPermission && (
-            <PermissionPopup
-              permission={pendingPermission}
-              onRespond={handlePermissionResponse}
+      {/* Right (or full-width in focus mode without file viewer): PTY terminal panel */}
+      {(isTerminalOpen || isFocusMode) && (
+        <div
+          className={isFocusMode && !showFileViewer ? "relative flex flex-1" : "relative flex shrink-0"}
+          style={isFocusMode && !showFileViewer ? undefined : { width: terminalWidth }}
+        >
+          {/* Resize handle on the left edge — hidden when terminal is full-width */}
+          {!(isFocusMode && !showFileViewer) && (
+            <ResizeHandle
+              side="left"
+              onMouseDown={terminalResize.handleProps.onMouseDown}
+              isDragging={terminalResize.isDragging}
             />
           )}
-        </AnimatePresence>
-
-        {/* Compact control pill — bottom-left of workshop */}
-        {activeSession && (
-          <SessionControlPill
-            isTerminalOpen={isTerminalOpen}
-            onToggleTerminal={toggleTerminal}
-          />
-        )}
-      </div>
-
-      {/* Right: PTY terminal panel — toggleable */}
-      {isTerminalOpen && (
-        <div className="relative flex shrink-0" style={{ width: terminalWidth }}>
-          {/* Resize handle on the left edge of the terminal panel */}
-          <ResizeHandle
-            side="left"
-            onMouseDown={terminalResize.handleProps.onMouseDown}
-            isDragging={terminalResize.isDragging}
-          />
 
           <div className="flex flex-1 flex-col overflow-hidden border-l-[3px] border-border bg-[#1A1A2E]">
             {ptyId ? (
@@ -290,13 +312,15 @@ export function SessionSplitView(): React.JSX.Element {
 interface SessionControlPillProps {
   readonly isTerminalOpen: boolean;
   readonly onToggleTerminal: () => void;
+  readonly isFocusMode: boolean;
 }
 
 /**
  * Minimal floating pill at bottom-left showing session status, elapsed time,
  * and action buttons (STOP, RESUME, TERMINAL toggle).
  */
-function SessionControlPill({ isTerminalOpen, onToggleTerminal }: SessionControlPillProps): React.JSX.Element {
+function SessionControlPill({ isTerminalOpen, onToggleTerminal, isFocusMode }: SessionControlPillProps): React.JSX.Element {
+  const toggleFocusMode = useUiStore((s) => s.toggleFocusMode);
   const activeSession = useSessionStore((s) => s.activeSession);
   const elves = useSessionStore((s) => s.elves);
   const lastEventAt = useSessionStore((s) => s.lastEventAt);
@@ -396,6 +420,17 @@ function SessionControlPill({ isTerminalOpen, onToggleTerminal }: SessionControl
           ].join(" ")}
         >
           {isTerminalOpen ? "\u25C0 TERM" : "\u25B6 TERM"}
+        </button>
+
+        <button
+          onClick={toggleFocusMode}
+          className={[
+            "cursor-pointer border-[2px] border-border px-2.5 py-0.5 font-display text-[9px] font-bold uppercase tracking-widest shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none",
+            isFocusMode ? "bg-elf-gold" : "bg-white",
+          ].join(" ")}
+          title="Toggle focus mode (⌘⇧F)"
+        >
+          {isFocusMode ? "EXIT FOCUS" : "FOCUS"}
         </button>
       </div>
     </div>
