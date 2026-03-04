@@ -19,6 +19,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 ///
 /// Returns the session ID. The frontend subscribes to Tauri events keyed by
 /// this session ID to receive real-time updates from the agent.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn start_task(
     app: AppHandle,
@@ -171,6 +172,7 @@ pub struct StartTaskPtyResult {
 ///
 /// When `resume_session_id` is present in spawn options, launches `claude --resume <id>`
 /// instead of a new task. DB session/elf creation is skipped for resume — reuses existing rows.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn start_task_pty(
     app: AppHandle,
@@ -417,6 +419,7 @@ const ELF_COLORS: &[&str] = &["#FFD93D", "#FF6B6B", "#6BCB77", "#4D96FF", "#FF8B
 /// then spawns Claude Code in team mode with the full team prompt.
 ///
 /// Returns the session ID. The frontend subscribes to events keyed by this ID.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn start_team_task(
     app: AppHandle,

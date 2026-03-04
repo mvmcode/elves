@@ -667,7 +667,7 @@ pub fn discover_git_repos(
             }
 
             // Otherwise keep searching deeper
-            if depth + 1 <= depth_limit {
+            if depth < depth_limit {
                 queue.push_back((abs_path, depth + 1));
             }
         }
