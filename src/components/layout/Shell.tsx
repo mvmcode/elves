@@ -175,10 +175,10 @@ export function Shell(): React.JSX.Element {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-surface-light">
-      {/* Icon sidebar — narrow left strip */}
+      {/* Icon sidebar */}
       <Sidebar />
 
-      {/* File tree panel — collapsible, between sidebar and main content */}
+      {/* File tree panel */}
       {isFileTreeVisible && (
         <div className="relative flex h-full shrink-0">
           <FileTreePanel />
@@ -195,7 +195,7 @@ export function Shell(): React.JSX.Element {
         {/* Command palette / TaskBar */}
         <TaskBar />
 
-        {/* Floor tabs — at top, like editor tabs */}
+        {/* Floor tabs */}
         <FloorBar />
 
         {/* View routing */}
@@ -316,7 +316,7 @@ export function Shell(): React.JSX.Element {
         {/* Shortcut overlay — toggled via Cmd+/ */}
         <ShortcutOverlay isOpen={shortcutOverlayOpen} onClose={toggleOverlay} />
 
-        {/* Status bar — always visible at bottom */}
+        {/* Status bar */}
         <StatusBar />
       </main>
 
