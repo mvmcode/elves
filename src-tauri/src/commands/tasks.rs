@@ -6,7 +6,9 @@ use crate::agents::codex_adapter;
 use crate::agents::interop;
 use crate::agents::process::ProcessManager;
 use crate::commands::projects::DbState;
+use crate::commands::pty::PtyManager;
 use crate::db;
+use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 /// Start a task: creates a session, spawns an elf, starts the Claude process.
@@ -26,6 +28,7 @@ pub async fn start_task(
     task: String,
     runtime: String,
     options: Option<String>,
+    working_dir: Option<String>,
 ) -> Result<String, String> {
     let session_id = uuid::Uuid::new_v4().to_string();
     let elf_id = uuid::Uuid::new_v4().to_string();
@@ -54,13 +57,16 @@ pub async fn start_task(
         .map_err(|e| format!("Database error: {e}"))?;
     }
 
-    // 3. Get the project's working directory
-    let working_dir = {
-        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
-        let project = db::projects::get_project(&conn, &project_id)
-            .map_err(|e| format!("Database error: {e}"))?
-            .ok_or("Project not found")?;
-        project.path.clone()
+    // 3. Get the working directory — use override if provided, else fall back to project path
+    let working_dir = match working_dir {
+        Some(dir) => dir,
+        None => {
+            let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+            let project = db::projects::get_project(&conn, &project_id)
+                .map_err(|e| format!("Database error: {e}"))?
+                .ok_or("Project not found")?;
+            project.path.clone()
+        }
     };
 
     // 4. Emit elf:spawned event to frontend
@@ -146,6 +152,178 @@ pub async fn start_task(
     }
 
     Ok(session_id)
+}
+
+/// Result returned from start_task_pty — contains both session and PTY identifiers.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartTaskPtyResult {
+    pub session_id: String,
+    pub pty_id: String,
+}
+
+/// Start a task in PTY-first mode: creates a session, spawns an elf, and launches
+/// Claude directly in an interactive PTY (no --print mode).
+///
+/// The frontend gets both a session ID (for event routing and DB) and a PTY ID
+/// (for wiring xterm.js). The PTY reader thread in pty.rs handles all output
+/// via `pty:data:{ptyId}` events — no stdout streaming thread needed here.
+///
+/// When `resume_session_id` is present in spawn options, launches `claude --resume <id>`
+/// instead of a new task. DB session/elf creation is skipped for resume — reuses existing rows.
+#[tauri::command]
+pub async fn start_task_pty(
+    app: AppHandle,
+    db: State<'_, DbState>,
+    pty_mgr: State<'_, PtyManager>,
+    project_id: String,
+    task: String,
+    runtime: String,
+    working_dir: Option<String>,
+    options: Option<String>,
+) -> Result<StartTaskPtyResult, String> {
+    // Parse spawn options early — we need to check for resume_session_id
+    let spawn_options: ClaudeSpawnOptions = match options {
+        Some(ref json) => match serde_json::from_str(json) {
+            Ok(opts) => opts,
+            Err(e) => {
+                log::warn!("Failed to parse spawn options: {e}, json={json}");
+                ClaudeSpawnOptions::default()
+            }
+        },
+        None => ClaudeSpawnOptions::default(),
+    };
+
+    let is_resume = spawn_options.resume_session_id.is_some();
+
+    // For resume: reuse existing session. For new task: create DB rows.
+    let session_id = if is_resume {
+        // Use the task string as the ELVES session ID for resume
+        // (the frontend passes the existing ELVES session ID as the task param)
+        uuid::Uuid::new_v4().to_string()
+    } else {
+        uuid::Uuid::new_v4().to_string()
+    };
+
+    if !is_resume {
+        let elf_id = uuid::Uuid::new_v4().to_string();
+
+        // 1. Create session in DB
+        {
+            let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+            db::sessions::create_session(&conn, &session_id, &project_id, &task, &runtime)
+                .map_err(|e| format!("Database error: {e}"))?;
+        }
+
+        // 2. Create elf in DB
+        {
+            let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+            db::elves::create_elf(
+                &conn,
+                &elf_id,
+                &session_id,
+                "Elf",
+                None,
+                "\u{1F916}",
+                "#FFD93D",
+                None,
+                &runtime,
+            )
+            .map_err(|e| format!("Database error: {e}"))?;
+        }
+
+        // Emit elf:spawned event
+        let _ = app.emit(
+            "elf:spawned",
+            serde_json::json!({
+                "sessionId": &session_id,
+                "elfId": &elf_id,
+            }),
+        );
+    }
+
+    // 3. Resolve working directory
+    let working_dir = match working_dir {
+        Some(dir) => dir,
+        None => {
+            let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+            let project = db::projects::get_project(&conn, &project_id)
+                .map_err(|e| format!("Database error: {e}"))?
+                .ok_or("Project not found")?;
+            project.path.clone()
+        }
+    };
+
+    // 4. Build memory context for injection (skip for resume — context already loaded)
+    let memory_context = if is_resume {
+        String::new()
+    } else {
+        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+        interop::prepare_context_for_runtime(&conn, &project_id, &runtime)
+            .unwrap_or_else(|e| {
+                log::warn!("Failed to prepare memory context: {e}");
+                String::new()
+            })
+    };
+
+    // 5. Build CLI args
+    let mut args: Vec<String> = Vec::new();
+
+    if let Some(ref resume_id) = spawn_options.resume_session_id {
+        // Resume mode: --resume <claudeSessionId> (no positional task arg)
+        args.push("--resume".to_string());
+        args.push(resume_id.clone());
+    } else {
+        // New task: task as the first positional argument
+        args.push(task.clone());
+    }
+
+    // Apply spawn options as CLI flags
+    if let Some(ref agent) = spawn_options.agent {
+        args.push("--agent".to_string());
+        args.push(agent.clone());
+    }
+    if let Some(ref model) = spawn_options.model {
+        args.push("--model".to_string());
+        args.push(model.clone());
+    }
+    if let Some(ref mode) = spawn_options.permission_mode {
+        args.push("--permission-mode".to_string());
+        args.push(mode.clone());
+    }
+    if let Some(budget) = spawn_options.max_budget_usd {
+        args.push("--max-budget-usd".to_string());
+        args.push(budget.to_string());
+    }
+    if let Some(ref effort) = spawn_options.effort {
+        args.push("--effort".to_string());
+        args.push(effort.clone());
+    }
+
+    // Inject memory context via --append-system-prompt (skip for resume)
+    if !is_resume {
+        let combined_system_prompt = match (&spawn_options.append_system_prompt, memory_context.is_empty()) {
+            (Some(existing), false) => Some(format!("{existing}\n\n{memory_context}")),
+            (Some(existing), true) => Some(existing.clone()),
+            (None, false) => Some(memory_context),
+            (None, true) => None,
+        };
+        if let Some(ref prompt) = combined_system_prompt {
+            args.push("--append-system-prompt".to_string());
+            args.push(prompt.clone());
+        }
+    }
+
+    // 6. Spawn via PtyManager — reuses existing PTY infrastructure
+    let pty_id = pty_mgr.spawn_with_app("claude", &args, &working_dir, &app)
+        .map_err(|e| format!("Failed to spawn PTY: {e}"))?;
+
+    log::info!(
+        "[session {session_id}] Started PTY-first task (resume={}): pty_id={pty_id}, working_dir={working_dir}",
+        is_resume,
+    );
+
+    Ok(StartTaskPtyResult { session_id, pty_id })
 }
 
 /// Stop a running task. Kills the agent process and marks the session as cancelled.
@@ -248,6 +426,7 @@ pub async fn start_team_task(
     task: String,
     plan: TaskPlan,
     options: Option<String>,
+    working_dir: Option<String>,
 ) -> Result<String, String> {
     let session_id = uuid::Uuid::new_v4().to_string();
     let runtime = plan.runtime_recommendation.clone();
@@ -259,13 +438,16 @@ pub async fn start_team_task(
             .map_err(|e| format!("Database error: {e}"))?;
     }
 
-    // 2. Get project working directory
-    let working_dir = {
-        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
-        let project = db::projects::get_project(&conn, &project_id)
-            .map_err(|e| format!("Database error: {e}"))?
-            .ok_or("Project not found")?;
-        project.path.clone()
+    // 2. Get working directory — use override if provided, else fall back to project path
+    let working_dir = match working_dir {
+        Some(dir) => dir,
+        None => {
+            let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+            let project = db::projects::get_project(&conn, &project_id)
+                .map_err(|e| format!("Database error: {e}"))?
+                .ok_or("Project not found")?;
+            project.path.clone()
+        }
     };
 
     // 3. Create elf rows for each role in the plan

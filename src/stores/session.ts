@@ -136,6 +136,12 @@ interface SessionState {
   startSessionOnFloor: (floorId: FloorId, session: StartSessionParams) => void;
   /** Add an elf to a specific floor */
   addElfToFloor: (floorId: FloorId, elf: Elf) => void;
+  /** Set the worktree slug and path on a specific floor */
+  setFloorWorktree: (floorId: FloorId, slug: string, path: string) => void;
+  /** Rename a floor's label */
+  renameFloor: (floorId: FloorId, label: string) => void;
+  /** Set the PTY instance ID on a floor for the session's interactive terminal */
+  setFloorPtyId: (floorId: FloorId, ptyId: string) => void;
 }
 
 /** Extract snapshot fields from a floor for syncing to top-level state. */
@@ -408,6 +414,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       lastEventAt: session.startedAt,
       order: nextOrder,
       isHistorical: true,
+      worktreePath: null,
+      worktreeSlug: null,
+      ptyId: null,
     };
 
     set((state) => ({
@@ -446,6 +455,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         lastEventAt: 0,
         label: "New Floor",
         isHistorical: false,
+        worktreePath: null,
+        worktreeSlug: null,
+        ptyId: null,
       };
 
       const newFloors = { ...state.floors, [floorId]: updatedFloor };
@@ -900,12 +912,53 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         lastEventAt: 0,
         label: "New Floor",
         isHistorical: false,
+        worktreePath: null,
+        worktreeSlug: null,
+        ptyId: null,
       };
 
       return {
         floors: { ...state.floors, [floorId]: updatedFloor },
         ...snapshotFromFloor(updatedFloor),
       };
+    });
+  },
+
+  setFloorWorktree: (floorId: FloorId, slug: string, path: string): void => {
+    set((state) => {
+      const floor = state.floors[floorId];
+      if (!floor) return state;
+
+      const updatedFloor: FloorSession = {
+        ...floor,
+        worktreeSlug: slug,
+        worktreePath: path,
+      };
+
+      const newFloors = { ...state.floors, [floorId]: updatedFloor };
+      return { floors: newFloors };
+    });
+  },
+
+  renameFloor: (floorId: FloorId, label: string): void => {
+    set((state) => {
+      const floor = state.floors[floorId];
+      if (!floor) return state;
+
+      const updatedFloor: FloorSession = { ...floor, label };
+      const newFloors = { ...state.floors, [floorId]: updatedFloor };
+      return { floors: newFloors };
+    });
+  },
+
+  setFloorPtyId: (floorId: FloorId, ptyId: string): void => {
+    set((state) => {
+      const floor = state.floors[floorId];
+      if (!floor) return state;
+
+      const updatedFloor: FloorSession = { ...floor, ptyId };
+      const newFloors = { ...state.floors, [floorId]: updatedFloor };
+      return { floors: newFloors };
     });
   },
 }));

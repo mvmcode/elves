@@ -23,7 +23,7 @@ pub struct GitCommit {
 
 /// Run a git command in the given project directory and return stdout as a String.
 /// Returns Err with a descriptive message on failure.
-fn run_git(project_path: &str, args: &[&str]) -> Result<String, String> {
+pub(crate) fn run_git(project_path: &str, args: &[&str]) -> Result<String, String> {
     let mut cmd_args = vec!["-C", project_path];
     cmd_args.extend_from_slice(args);
 
@@ -396,4 +396,62 @@ pub fn get_git_state(project_path: String) -> Result<GitState, String> {
         is_dirty,
         ahead_behind,
     })
+}
+
+/// Create a new branch, optionally from a given base ref.
+///
+/// Runs `git checkout -b <name> [base]` in the project directory.
+/// Returns true on success.
+#[tauri::command]
+pub fn create_branch(
+    project_path: String,
+    name: String,
+    base: Option<String>,
+) -> Result<bool, String> {
+    if name.trim().is_empty() {
+        return Err("Branch name cannot be empty".to_string());
+    }
+    let mut args = vec!["checkout", "-b", &name];
+    let base_val = base.unwrap_or_default();
+    if !base_val.is_empty() {
+        args.push(&base_val);
+    }
+    run_git(&project_path, &args)?;
+    Ok(true)
+}
+
+/// Delete a local branch.
+///
+/// Runs `git branch -d <name>` (safe delete) or `git branch -D <name>` (force delete).
+/// Returns true on success.
+#[tauri::command]
+pub fn delete_branch(
+    project_path: String,
+    name: String,
+    force: Option<bool>,
+) -> Result<bool, String> {
+    if name.trim().is_empty() {
+        return Err("Branch name cannot be empty".to_string());
+    }
+    let flag = if force.unwrap_or(false) { "-D" } else { "-d" };
+    run_git(&project_path, &["branch", flag, &name])?;
+    Ok(true)
+}
+
+/// Get diff stats between a branch and a base branch.
+///
+/// Runs `git diff --stat [base]...<branch>`. Defaults to "main" as the base.
+/// Returns the raw diff stat output.
+#[tauri::command]
+pub fn get_branch_diff(
+    project_path: String,
+    branch: String,
+    base: Option<String>,
+) -> Result<String, String> {
+    if branch.trim().is_empty() {
+        return Err("Branch name cannot be empty".to_string());
+    }
+    let base_name = base.unwrap_or_else(|| "main".to_string());
+    let range = format!("{base_name}...{branch}");
+    run_git(&project_path, &["diff", "--stat", &range])
 }

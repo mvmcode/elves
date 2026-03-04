@@ -112,8 +112,8 @@ export function SessionTerminal({
           terminalRef.current?.write(event.payload);
 
           /* Feed PTY output through agent detector to find Agent tool calls */
-          const detected = detectorRef.current.feed(event.payload);
-          for (const agent of detected) {
+          const { agents } = detectorRef.current.feed(event.payload);
+          for (const agent of agents) {
             onAgentDetectedRef.current?.(agent);
           }
         });

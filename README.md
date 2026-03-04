@@ -55,8 +55,11 @@ Instead of boring "Running..." or "Processing...", your elves have opinions:
 ### Personality System
 Every agent gets a randomly assigned name (Spark, Tinker, Jingle, Sprocket, Nimble, Flicker, Bramble, Thistle...), an expressive avatar with unique accessories, and a personality quirk that shows up in their status messages. The action button doesn't say "Run." It says **SUMMON THE ELVES**.
 
+### Worktree-First Workspaces
+Every task becomes a git worktree — fully isolated on disk with its own branch. Create a workspace, do the work in the embedded terminal, then "Ship It" to push, merge (with strategy picker), extract memories, and clean up — all in one atomic flow. Parallel tasks never interfere with each other.
+
 ### Multi-Runtime Support
-Works with Claude Code Agent SDK and Codex CLI. Pick your runtime per-project or per-task. Mix freely. A unified adapter layer normalizes both event streams — the frontend never knows which engine is underneath.
+Works with Claude Code Agent SDK and Codex CLI. Pick your runtime per-project or per-task via `.elves/config.json`. A unified adapter layer normalizes both event streams — the frontend never knows which engine is underneath.
 
 ### Persistent Memory
 SQLite-backed memory with FTS5 full-text search. After each session, ELVES extracts decisions, learnings, and context. Relevance scores decay over time and get boosted on access — frequently useful memories stay sharp while stale ones fade. Before each new task, relevant memory is automatically injected into your agent's context.
@@ -64,8 +67,11 @@ SQLite-backed memory with FTS5 full-text search. After each session, ELVES extra
 ### Neo-Brutalist UI
 Thick black borders. Hard drop shadows (no blur). Saturated colors. Oversized typography. Snappy 100-200ms animations. This isn't another gray SaaS dashboard — it looks like a bold poster that happens to orchestrate AI agents.
 
+### Project-Scoped Configuration
+Each project gets a `.elves/config.json` for default runtime, MCP servers, and memory settings. Portable, committable, shareable with teammates.
+
 ### Everything Local
-All data lives in `~/.elves/` on your machine. SQLite for structured data, markdown for human-readable memory. No cloud sync. No accounts. Export everything anytime.
+All data lives on your machine. SQLite for structured data, `.elves/` per project for config. No cloud sync. No accounts. Export everything anytime.
 
 ### Session Replay
 Every session records a full event log. Step through past sessions event-by-event, see what each elf did, review the thinking, browse artifacts. Useful for debugging, learning, and sharing.
@@ -175,37 +181,38 @@ ELVES uses Tauri v2: a Rust backend handles compute-heavy work (process manageme
 The key architectural insight is the **Unified Agent Protocol**. Both Claude Code and Codex emit different event formats. ELVES normalizes everything into a single typed stream (`ElfEvent`) that the frontend subscribes to. The frontend never imports anything runtime-specific — switching from Claude Code to Codex is invisible to the UI layer.
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                        React Frontend                         │
-│  ┌───────────┐ ┌──────────┐ ┌────────┐ ┌────────┐ ┌──────┐ │
-│  │ Workshop  │ │ Memory   │ │ Skills │ │  MCP   │ │ Hist │ │
-│  │ (Theater, │ │ Explorer │ │ Editor │ │Manager │ │ ory  │ │
-│  │ Plan,Feed)│ │ (FTS5)   │ │        │ │        │ │      │ │
-│  └─────┬─────┘ └────┬─────┘ └───┬────┘ └───┬────┘ └──┬───┘ │
-│        └─────────┬───┘           │          │         │     │
-│   Keyboard       │ Tauri IPC    │          │         │     │
-│   Shortcuts ─────┤              │          │         │     │
-│   Sound Engine   │              │          │         │     │
-│   Runtime Picker │              │          │         │     │
-└──────────────────┼──────────────┴──────────┴─────────┘     │
-┌──────────────────┴─────────────────────────────────────────┘
-│                        Rust Backend                           │
-│  ┌──────────┐ ┌─────────────────┐ ┌───────────────────────┐ │
-│  │ Process  │ │ SQLite (WAL)    │ │ Memory Engine         │ │
-│  │ Manager  │ │ Projects, Elves │ │ Context Builder       │ │
-│  │          │ │ Sessions, Events│ │ Heuristic Extraction  │ │
-│  │          │ │ Memory + FTS5   │ │ Relevance Decay       │ │
-│  │          │ │ Skills, MCP     │ └───────────────────────┘ │
-│  │          │ │ Templates       │                            │
-│  └────┬─────┘ └─────────────────┘ ┌───────────────────────┐ │
-│       │                            │ Interop Layer         │ │
-│  ┌────┴──────────────────────────┐ │ Context formatting    │ │
-│  │ Unified Agent Protocol Adapter │ │ per runtime           │ │
-│  └────┬──────────────────────┬───┘ └───────────────────────┘ │
-│       │                      │      ┌──────────────────┐     │
-│       │                      │      │ Task Analyzer     │     │
-│       │                      │      │ (solo vs. team)   │     │
-└───────┼──────────────────────┼──────┴──────────────────┘─────┘
+┌───────────────────────────────────────────────────────────────┐
+│                        React Frontend                          │
+│  ┌───────────┐ ┌───────────┐ ┌──────────┐ ┌────────┐         │
+│  │ Workspace │ │ Workshop  │ │ Memory   │ │ Skills │         │
+│  │ (Worktree │ │ (Theater, │ │ Explorer │ │ Editor │         │
+│  │  Cards,   │ │ Plan,Feed)│ │ (FTS5)   │ │        │         │
+│  │  Ship It) │ │           │ │          │ │        │         │
+│  └─────┬─────┘ └─────┬─────┘ └────┬─────┘ └───┬────┘         │
+│        └──────────┬───┘            │           │              │
+│   Terminal (PTY)  │ Tauri IPC      │           │              │
+│   Git Operations  │                │           │              │
+│   Keyboard ───────┤                │           │              │
+│   Sound Engine    │                │           │              │
+└───────────────────┼────────────────┴───────────┘──────────────┘
+┌───────────────────┴───────────────────────────────────────────┐
+│                        Rust Backend                            │
+│  ┌──────────┐ ┌─────────────────┐ ┌────────────────────────┐ │
+│  │ Process  │ │ SQLite (WAL)    │ │ Workspace Manager      │ │
+│  │ Manager  │ │ Projects, Elves │ │ Git worktree lifecycle  │ │
+│  │          │ │ Sessions, Events│ │ Ship It (push/merge/    │ │
+│  │          │ │ Memory + FTS5   │ │   cleanup)              │ │
+│  │          │ │ Skills, MCP     │ └────────────────────────┘ │
+│  │          │ │ Templates       │ ┌────────────────────────┐ │
+│  └────┬─────┘ └─────────────────┘ │ Project Config         │ │
+│       │                            │ .elves/config.json     │ │
+│  ┌────┴──────────────────────────┐ └────────────────────────┘ │
+│  │ Unified Agent Protocol Adapter │ ┌────────────────────────┐│
+│  └────┬──────────────────────┬───┘ │ Memory + Interop       ││
+│       │                      │      │ Context builder,       ││
+│       │                      │      │ extraction, decay      ││
+│       │                      │      └────────────────────────┘│
+└───────┼──────────────────────┼────────────────────────────────┘
         │                      │
   ┌─────┴───────┐       ┌─────┴────────┐
   │ Claude Code │       │  Codex CLI   │
@@ -271,6 +278,8 @@ elves/
 │   │   ├── shared/              # Button, Card, Input, Panel, Badge, EmptyState, DeployButton,
 │   │   │                        # RuntimePicker, ShortcutOverlay, Dialog, ResizeHandle
 │   │   ├── layout/              # Shell, Sidebar, TaskBar, TopBar, TaskBarPickers
+│   │   ├── workspace/           # ProjectWorkspace, WorkspaceCard, NewWorkspaceDialog,
+│   │   │                        # ShipItDialog, DiffViewer, BranchList, RecentlyShipped
 │   │   ├── theater/             # ElfTheater, ElfCard, ElfAvatar, PlanPreview, TaskGraph,
 │   │   │                        # ThinkingPanel, EventBlock, TerminalOutput
 │   │   ├── terminal/            # XTerminal (xterm.js wrapper), SessionTerminal (PTY lifecycle)
@@ -280,9 +289,10 @@ elves/
 │   │   ├── memory/              # MemoryExplorer, MemoryCard
 │   │   └── settings/            # MemorySettings
 │   ├── stores/                  # Zustand stores (app, project, session, ui, memory, settings,
-│   │                            # skills, mcp, templates, git, comparison)
+│   │                            # skills, mcp, templates, git, comparison, workspace)
 │   ├── types/                   # TypeScript types (elf, session, project, memory, runtime,
-│   │                            # skill, mcp, template, claude, comparison, git-state, floor)
+│   │                            # skill, mcp, template, claude, comparison, git-state, floor,
+│   │                            # workspace)
 │   ├── hooks/                   # useInitialize, useSession, useTeamSession, useSessionEvents,
 │   │                            # useMemoryActions, useSkillActions, useMcpActions,
 │   │                            # useTemplateActions, useKeyboardShortcuts, useSessionHistory,
@@ -295,7 +305,9 @@ elves/
 │       ├── agents/              # Runtime detection, claude/codex adapters, claude discovery,
 │       │                        # interop, task analyzer, context builder, memory extractor
 │       ├── commands/            # Tauri IPC handlers (agents, projects, sessions, tasks,
-│       │                        # memory, skills, mcp, templates, export, pty)
+│       │                        # memory, skills, mcp, templates, export, pty, git, workspace,
+│       │                        # filesystem)
+│       ├── project/             # Project config management (.elves/config.json)
 │       └── db/                  # SQLite schema + migrations (v1-v3), CRUD modules
 │                                # (projects, sessions, elves, events, memory, skills, mcp, templates)
 │
@@ -314,11 +326,13 @@ elves/
 - **Neo-brutalist components**: 3px black borders, hard drop shadows (`box-shadow: 6px 6px 0px 0px #000`), no border-radius by default, bold saturated colors
 - **Tailwind v4**: Design tokens defined via `@theme` in CSS, not a config file
 - **Tauri IPC**: `tauri::command` for request/response, `app.emit()` for streaming events
-- **Zustand stores**: Separate stores per domain (app, project, session, ui, memory, settings, skills, mcp, templates) to prevent unnecessary re-renders
+- **Zustand stores**: Separate stores per domain (app, project, session, ui, memory, settings, skills, mcp, templates, git, comparison, workspace) to prevent unnecessary re-renders
 - **Hook-per-domain IPC**: Each data domain has a dedicated hook (`useMemoryActions`, `useSkillActions`, `useMcpActions`, `useTemplateActions`) that auto-loads data and provides typed CRUD callbacks
 - **Persistent memory**: SQLite + FTS5 full-text search. Relevance decays exponentially (`score *= 0.995^days`), boosted on access. Pinned memories exempt from decay.
 - **Pre/post-task hooks**: Before each task, project context is built from relevant memories. After completion, heuristic extraction pulls decisions, learnings, and context from the event stream.
-- **View routing**: `AppView` union type in Zustand (session/memory/skills/mcp/history/settings) — no React Router needed for a single-window desktop app
+- **View routing**: `AppView` union type in Zustand (session/workspace/memory/skills/mcp/history/settings/git/comparison) — no React Router needed for a single-window desktop app
+- **Worktree-first workspaces**: Every task is a git worktree under `.claude/worktrees/<slug>`. The "Ship It" flow handles push → merge (merge/rebase/squash) → memory extraction → worktree removal → branch deletion as one atomic action.
+- **Project-scoped config**: `.elves/config.json` per project for default runtime, MCP servers, and memory settings. Portable and committable.
 - **Unified agent protocol**: Claude Code and Codex events are normalized into a single typed stream. The interop layer formats context per runtime. Frontend never touches runtime-specific types.
 - **Inline SVG avatars**: 15 unique elf avatars with per-status CSS animations. Zero network requests.
 - **Web Audio API sounds**: Oscillator-based sound effects with no audio file dependencies. 6 effects (spawn, typing, complete, error, chat, deploy).
@@ -333,7 +347,7 @@ elves/
 
 ## Roadmap
 
-All planned phases are complete. Current work focuses on UX polish, stability, and community contributions.
+All core phases are complete. The workspace redesign introduces the worktree-first architecture.
 
 - [x] **Phase 1: Foundation** — Tauri v2 scaffold, design system, SQLite backend, runtime detection
 - [x] **Phase 2: Single Elf Mode** — ElfCard, ActivityFeed, live streaming, session management
@@ -343,6 +357,7 @@ All planned phases are complete. Current work focuses on UX polish, stability, a
 - [x] **Phase 6: Codex Full Support** — Codex adapter with JSONL normalization, multi-agent event attribution, interop layer, runtime picker, template library with seeding + JSON export, session history and comparison
 - [x] **Phase 7: Distribution** — CI/CD with clippy, auto-updater with signing, session replay export, Homebrew cask, landing page with app mockup, OG image generator, community files
 - [x] **Phase 8: Streaming & Terminal** — Real-time stream-json events, Claude discovery, embedded PTY terminal, session resume, resizable panels, solo terminal mode, native dialogs, TaskBar options
+- [x] **Phase 9: Workspace Redesign** — Worktree-first workspaces, Ship It completion flow, project-scoped config, branch management, DiffViewer, merge strategy picker
 
 ---
 

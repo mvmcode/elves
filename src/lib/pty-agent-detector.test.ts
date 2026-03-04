@@ -36,54 +36,54 @@ describe("PtyAgentDetector", () => {
     detector = new PtyAgentDetector();
   });
 
-  it("returns empty array for plain text", () => {
-    const result = detector.feed("Hello world\n");
-    expect(result).toEqual([]);
+  it("returns empty agents array for plain text", () => {
+    const { agents } = detector.feed("Hello world\n");
+    expect(agents).toEqual([]);
   });
 
   it("detects 'Agent tool' header", () => {
-    const result = detector.feed("⏳ Agent tool\n");
-    expect(result).toHaveLength(1);
-    expect(result[0]!.role).toBe("Agent");
+    const { agents } = detector.feed("⏳ Agent tool\n");
+    expect(agents).toHaveLength(1);
+    expect(agents[0]!.role).toBe("Agent");
   });
 
   it("detects bordered Agent header", () => {
-    const result = detector.feed("─── Agent ───\n");
-    expect(result).toHaveLength(1);
+    const { agents } = detector.feed("─── Agent ───\n");
+    expect(agents).toHaveLength(1);
   });
 
   it("detects 'Spawning agent' message", () => {
-    const result = detector.feed("Spawning agent to explore the codebase\n");
-    expect(result).toHaveLength(1);
-    expect(result[0]!.description).toContain("explore the codebase");
+    const { agents } = detector.feed("Spawning agent to explore the codebase\n");
+    expect(agents).toHaveLength(1);
+    expect(agents[0]!.description).toContain("explore the codebase");
   });
 
   it("detects 'Launching a new agent' message", () => {
-    const result = detector.feed("Launching a new agent to fix the bug\n");
-    expect(result).toHaveLength(1);
-    expect(result[0]!.description).toContain("fix the bug");
+    const { agents } = detector.feed("Launching a new agent to fix the bug\n");
+    expect(agents).toHaveLength(1);
+    expect(agents[0]!.description).toContain("fix the bug");
   });
 
   it("detects Agent(type) pattern and extracts role", () => {
-    const result = detector.feed("Agent (Explore)\n");
-    expect(result).toHaveLength(1);
-    expect(result[0]!.role).toBe("Explore");
+    const { agents } = detector.feed("Agent (Explore)\n");
+    expect(agents).toHaveLength(1);
+    expect(agents[0]!.role).toBe("Explore");
   });
 
   it("detects Agent(general-purpose) with hyphenated role", () => {
-    const result = detector.feed("Agent (general-purpose)\n");
-    expect(result).toHaveLength(1);
-    expect(result[0]!.role).toBe("general-purpose");
+    const { agents } = detector.feed("Agent (general-purpose)\n");
+    expect(agents).toHaveLength(1);
+    expect(agents[0]!.role).toBe("general-purpose");
   });
 
   it("detects 'Using the Agent tool' phrasing", () => {
-    const result = detector.feed("Using the Agent tool to research\n");
-    expect(result).toHaveLength(1);
+    const { agents } = detector.feed("Using the Agent tool to research\n");
+    expect(agents).toHaveLength(1);
   });
 
   it("detects 'Spawning teammate' message", () => {
-    const result = detector.feed("Spawning a teammate for implementation\n");
-    expect(result).toHaveLength(1);
+    const { agents } = detector.feed("Spawning a teammate for implementation\n");
+    expect(agents).toHaveLength(1);
   });
 
   it("increments agent count for each detection", () => {
@@ -96,52 +96,52 @@ describe("PtyAgentDetector", () => {
   it("assigns sequential IDs", () => {
     const first = detector.feed("⏳ Agent tool\n");
     const second = detector.feed("Agent (Explore)\n");
-    expect(first[0]!.id).toBe("pty-agent-1");
-    expect(second[0]!.id).toBe("pty-agent-2");
+    expect(first.agents[0]!.id).toBe("pty-agent-1");
+    expect(second.agents[0]!.id).toBe("pty-agent-2");
   });
 
   it("handles chunks split across lines", () => {
     /* First chunk ends mid-line */
     const result1 = detector.feed("⏳ Agent ");
-    expect(result1).toEqual([]);
+    expect(result1.agents).toEqual([]);
 
     /* Second chunk completes the line */
     const result2 = detector.feed("tool\n");
-    expect(result2).toHaveLength(1);
+    expect(result2.agents).toHaveLength(1);
   });
 
   it("handles ANSI codes in Agent tool output", () => {
-    const result = detector.feed("\x1b[33m⏳ Agent tool\x1b[0m\n");
-    expect(result).toHaveLength(1);
+    const { agents } = detector.feed("\x1b[33m⏳ Agent tool\x1b[0m\n");
+    expect(agents).toHaveLength(1);
   });
 
   it("extracts role from subagent_type field in context", () => {
     detector.feed('subagent_type: "Explore"\n');
-    const result = detector.feed("⏳ Agent tool\n");
-    expect(result).toHaveLength(1);
-    expect(result[0]!.role).toBe("Explore");
+    const { agents } = detector.feed("⏳ Agent tool\n");
+    expect(agents).toHaveLength(1);
+    expect(agents[0]!.role).toBe("Explore");
   });
 
   it("extracts description from description field", () => {
     detector.feed('description: "Find all API endpoints"\n');
-    const result = detector.feed("⏳ Agent tool\n");
-    expect(result).toHaveLength(1);
-    expect(result[0]!.description).toBe("Find all API endpoints");
+    const { agents } = detector.feed("⏳ Agent tool\n");
+    expect(agents).toHaveLength(1);
+    expect(agents[0]!.description).toBe("Find all API endpoints");
   });
 
   it("falls back to generic description when none found", () => {
-    const result = detector.feed("⏳ Agent tool\n");
-    expect(result[0]!.description).toBe("Agent task #1");
+    const { agents } = detector.feed("⏳ Agent tool\n");
+    expect(agents[0]!.description).toBe("Agent task #1");
   });
 
   it("does not detect 'agent' in normal sentences", () => {
-    const result = detector.feed("The user agent string is important\n");
-    expect(result).toEqual([]);
+    const { agents } = detector.feed("The user agent string is important\n");
+    expect(agents).toEqual([]);
   });
 
   it("does not detect 'agent' in code comments", () => {
-    const result = detector.feed("// This agent handles requests\n");
-    expect(result).toEqual([]);
+    const { agents } = detector.feed("// This agent handles requests\n");
+    expect(agents).toEqual([]);
   });
 
   it("resets state cleanly", () => {
@@ -149,25 +149,60 @@ describe("PtyAgentDetector", () => {
     expect(detector.totalDetected).toBe(1);
     detector.reset();
     expect(detector.totalDetected).toBe(0);
-    const result = detector.feed("⏳ Agent tool\n");
-    expect(result[0]!.id).toBe("pty-agent-1");
+    const { agents } = detector.feed("⏳ Agent tool\n");
+    expect(agents[0]!.id).toBe("pty-agent-1");
   });
 
   it("detects multiple agents in a single chunk", () => {
-    const result = detector.feed(
+    const { agents } = detector.feed(
       "⏳ Agent tool\nSome output\nAgent (Explore)\n",
     );
-    expect(result).toHaveLength(2);
-    expect(result[0]!.id).toBe("pty-agent-1");
-    expect(result[1]!.id).toBe("pty-agent-2");
-    expect(result[1]!.role).toBe("Explore");
+    expect(agents).toHaveLength(2);
+    expect(agents[0]!.id).toBe("pty-agent-1");
+    expect(agents[1]!.id).toBe("pty-agent-2");
+    expect(agents[1]!.role).toBe("Explore");
   });
 
   it("handles empty input", () => {
-    expect(detector.feed("")).toEqual([]);
+    const { agents } = detector.feed("");
+    expect(agents).toEqual([]);
   });
 
   it("handles input with only newlines", () => {
-    expect(detector.feed("\n\n\n")).toEqual([]);
+    const { agents } = detector.feed("\n\n\n");
+    expect(agents).toEqual([]);
+  });
+});
+
+describe("PtyAgentDetector — permission detection", () => {
+  let detector: PtyAgentDetector;
+
+  beforeEach(() => {
+    detector = new PtyAgentDetector();
+  });
+
+  it("detects simple Allow ToolName? prompt", () => {
+    const { permissions } = detector.feed('Allow Edit? (Y)es/(N)o\n');
+    expect(permissions).toHaveLength(1);
+    expect(permissions[0]!.tool).toBe("Edit");
+  });
+
+  it("detects Allow with description in parens", () => {
+    const { permissions } = detector.feed('Allow Bash("npm test")? (Y)es/(N)o\n');
+    expect(permissions).toHaveLength(1);
+    expect(permissions[0]!.tool).toBe("Bash");
+    expect(permissions[0]!.description).toBe("npm test");
+  });
+
+  it("does not false-positive on normal text containing Allow", () => {
+    const { permissions } = detector.feed("We should allow users to edit files\n");
+    expect(permissions).toEqual([]);
+  });
+
+  it("assigns sequential permission IDs", () => {
+    const first = detector.feed('Allow Edit? (Y)es\n');
+    const second = detector.feed('Allow Bash("ls")? (Y)es\n');
+    expect(first.permissions[0]!.id).toBe("pty-perm-1");
+    expect(second.permissions[0]!.id).toBe("pty-perm-2");
   });
 });

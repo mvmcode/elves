@@ -5,7 +5,7 @@ import type { WorkshopViewMode } from "@/types/workshop";
 
 /** Top-level views the shell can render in the main content area.
  * Note: "files" was removed — it is now a persistent side panel, not a view. */
-export type AppView = "session" | "memory" | "skills" | "mcp" | "history" | "settings" | "git" | "comparison";
+export type AppView = "session" | "memory" | "skills" | "mcp" | "history" | "settings" | "comparison";
 
 /** Panel width constraints for resizable layout. */
 const SIDEBAR_MIN = 200;

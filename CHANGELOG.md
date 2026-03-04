@@ -4,6 +4,28 @@ All notable changes to ELVES are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.2] - 2026-03-03 — Worktree-First Workspace Model
+
+### Added
+- **Workspace view** — new primary view for managing git worktree-based workspaces
+- **WorkspaceCard** — status card with diff summary, elf info, and action buttons (Focus, Diff, Resume, Ship It, Remove)
+- **NewWorkspaceDialog** — create workspaces with slug validation, base branch picker, and runtime selector
+- **ShipItDialog** — merge strategy picker (merge/rebase/squash), memory extraction toggle, step preview
+- **DiffViewer** — file-level diff display with A/M/D badges and +/- line counts
+- **BranchList** — branch viewer with switch, create worktree, and delete actions
+- **RecentlyShipped** — completed workspace history with elf names and memory counts
+- **Workspace Rust backend** — 11 new Tauri commands: `create_workspace`, `list_workspaces`, `get_workspace_diff`, `push_workspace`, `create_pr_from_workspace`, `merge_workspace`, `remove_workspace`, `complete_workspace`, `init_elves_dir`, `read_project_config`, `write_project_config`
+- **Git commands** — `create_branch`, `delete_branch`, `get_branch_diff` added to git module
+- **Project config** — `.elves/config.json` per-project configuration (runtime, MCP servers, memory settings)
+- **Workspace store** — Zustand store for workspace state, diffs, recently shipped history
+- **Workspace types** — `WorkspaceInfo`, `WorkspaceDiff`, `DiffFile`, `ProjectConfig`, `MergeStrategy`, `ShippedWorkspace`
+- **13 new IPC wrappers** in `tauri.ts` for workspace and git operations
+
+### Changed
+- **Shell** routes workspace view via `AppView`
+- **Sidebar** shows workspace icon as first navigation item
+- **AppView** type extended with `"workspace"`
+
 ## [1.0.1] - 2026-03-02 — Stability & UX Polish
 
 ### Fixed

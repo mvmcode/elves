@@ -6,10 +6,9 @@ import { Input } from "@/components/shared/Input";
 import { DeployButton } from "@/components/shared/DeployButton";
 import { useUiStore } from "@/stores/ui";
 import { useProjectStore } from "@/stores/project";
-import { useAppStore } from "@/stores/app";
 import { useSessionStore } from "@/stores/session";
 import { useTeamSession } from "@/hooks/useTeamSession";
-import { TaskBarPickers } from "@/components/layout/TaskBarPickers";
+import { useAppStore } from "@/stores/app";
 import { AttachButton, AttachedFileChips, useFileDragDrop } from "@/components/layout/FileAttachment";
 
 /** Suggestion chips shown when viewing a historical floor. */
@@ -31,14 +30,6 @@ export function TaskBar(): React.JSX.Element {
   const setFocused = useUiStore((s) => s.setTaskBarFocused);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const { analyzeAndDeploy, stopSession, isSessionActive, isSessionCompleted, isPlanPreview } = useTeamSession();
-  const claudeDiscovery = useAppStore((s) => s.claudeDiscovery);
-  const isOptionsExpanded = useAppStore((s) => s.isOptionsExpanded);
-  const setOptionsExpanded = useAppStore((s) => s.setOptionsExpanded);
-  const selectedAgent = useAppStore((s) => s.selectedAgent);
-  const selectedModel = useAppStore((s) => s.selectedModel);
-  const selectedApprovalMode = useAppStore((s) => s.selectedApprovalMode);
-  const forceTeamMode = useAppStore((s) => s.forceTeamMode);
-  const appliedOptions = useSessionStore((s) => s.activeSession?.appliedOptions);
   const isHistoricalFloor = useSessionStore(
     (s) => (s.activeFloorId ? s.floors[s.activeFloorId]?.isHistorical : false) ?? false,
   );
@@ -46,14 +37,6 @@ export function TaskBar(): React.JSX.Element {
   const { isDragOver, dragHandlers } = useFileDragDrop();
 
   const canDeploy = taskText.trim().length > 0 && activeProjectId !== null && !isSessionActive && !isPlanPreview;
-  const defaultRuntime = useAppStore((s) => s.defaultRuntime);
-  const hasOptions = defaultRuntime === "codex" || (claudeDiscovery !== null && claudeDiscovery.claudeDirExists);
-
-  const displayAgent = isSessionActive ? appliedOptions?.agent : selectedAgent?.slug;
-  const displayModel = isSessionActive ? appliedOptions?.model : selectedModel;
-  const displayPermission = isSessionActive ? appliedOptions?.permissionMode : selectedApprovalMode;
-  const displayTeamMode = !isSessionActive && forceTeamMode;
-  const hasActiveSelections = displayAgent != null || displayModel != null || displayPermission != null || displayTeamMode;
 
   const handleDeploy = useCallback(async (): Promise<void> => {
     if (!canDeploy) return;
@@ -182,56 +165,6 @@ export function TaskBar(): React.JSX.Element {
           </div>
         )}
 
-        {/* Options row — agent, model, mode pickers (collapsible) */}
-        {hasOptions && (
-          <div className="mt-1.5">
-            <div className="flex items-center justify-between">
-              {isOptionsExpanded ? (
-                <TaskBarPickers />
-              ) : (
-                <div className="flex items-center gap-2">
-                  {hasActiveSelections && (
-                    <>
-                      {displayAgent != null && (
-                        <span className="border-token-thin border-border bg-info/20 px-2 py-0.5 font-mono text-[10px] font-bold rounded-token-sm">
-                          {displayAgent}
-                        </span>
-                      )}
-                      {displayModel != null && (
-                        <span className="border-token-thin border-border bg-accent/30 px-2 py-0.5 font-mono text-[10px] font-bold rounded-token-sm">
-                          {displayModel}
-                        </span>
-                      )}
-                      {displayPermission != null && (
-                        <span className="border-token-thin border-border bg-success/20 px-2 py-0.5 font-mono text-[10px] font-bold rounded-token-sm">
-                          {displayPermission}
-                        </span>
-                      )}
-                      {displayTeamMode && (
-                        <span className="border-token-thin border-border bg-[#E0C3FC]/30 px-2 py-0.5 font-mono text-[10px] font-bold rounded-token-sm">
-                          Team: ON
-                        </span>
-                      )}
-                    </>
-                  )}
-                  {!hasActiveSelections && (
-                    <span className="text-[10px] text-text-light/50">
-                      {claudeDiscovery?.hasAgents
-                        ? `${claudeDiscovery.agents.length} agent${claudeDiscovery.agents.length !== 1 ? "s" : ""} available`
-                        : "Runtime options"}
-                    </span>
-                  )}
-                </div>
-              )}
-              <button
-                onClick={() => setOptionsExpanded(!isOptionsExpanded)}
-                className="ml-2 shrink-0 cursor-pointer border-token-thin border-border bg-surface-elevated px-2 py-0.5 font-display text-[9px] text-label transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:bg-surface-light rounded-token-sm"
-              >
-                {isOptionsExpanded ? "Less" : "More"}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -5,13 +5,18 @@ import { useAppStore } from "@/stores/app";
 import { getRuntimeControlConfig } from "@/lib/runtime-controls";
 import type { ClaudeAgent } from "@/types/claude";
 
+interface TaskBarPickersProps {
+  /** Layout direction — "horizontal" for inline, "vertical" for stacked in sidebar. */
+  readonly layout?: "horizontal" | "vertical";
+}
+
 /** Renders the option pickers: Agent (when supported), Model, Mode, Effort, Budget, and Team toggle. */
-export function TaskBarPickers(): React.JSX.Element {
+export function TaskBarPickers({ layout = "horizontal" }: TaskBarPickersProps): React.JSX.Element {
   const defaultRuntime = useAppStore((s) => s.defaultRuntime);
   const controlConfig = getRuntimeControlConfig(defaultRuntime);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={layout === "vertical" ? "flex flex-col gap-1.5 w-full" : "flex items-center gap-2"}>
       {controlConfig.supportsCustomAgents && <AgentPicker />}
       <ModelPicker />
       <ModePicker />

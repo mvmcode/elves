@@ -3,6 +3,7 @@
 mod agents;
 mod commands;
 mod db;
+mod project;
 
 use agents::process::ProcessManager;
 use commands::projects::DbState;
@@ -124,6 +125,7 @@ pub fn run() {
             commands::sessions::get_session,
             commands::sessions::list_session_events,
             commands::tasks::start_task,
+            commands::tasks::start_task_pty,
             commands::tasks::stop_task,
             commands::tasks::analyze_task,
             commands::tasks::start_team_task,
@@ -180,6 +182,27 @@ pub fn run() {
             commands::git::git_worktree_add,
             commands::git::git_worktree_remove,
             commands::git::get_git_state,
+            commands::git::create_branch,
+            commands::git::delete_branch,
+            commands::git::get_branch_diff,
+            commands::workspace::create_workspace,
+            commands::workspace::list_workspaces,
+            commands::workspace::get_workspace_diff,
+            commands::workspace::push_workspace,
+            commands::workspace::create_pr_from_workspace,
+            commands::workspace::merge_workspace,
+            commands::workspace::remove_workspace,
+            commands::workspace::complete_workspace,
+            commands::workspace::init_elves_dir,
+            commands::workspace::read_project_config,
+            commands::workspace::write_project_config,
+            commands::workspace::discover_git_repos,
+            commands::workspace::create_multi_repo_workspace,
+            commands::workspace::list_multi_repo_workspaces,
+            commands::workspace::get_multi_repo_workspace_diff,
+            commands::workspace::complete_multi_repo_workspace,
+            commands::workspace::remove_multi_repo_workspace,
+            commands::workspace::push_multi_repo_workspace,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");

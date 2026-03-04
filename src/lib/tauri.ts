@@ -13,6 +13,7 @@ import type { ClaudeDiscovery, ClaudeSpawnOptions } from "@/types/claude";
 import type { FileEntry } from "@/types/filesystem";
 import type { GitBranchInfo, GitCommit } from "@/types/git";
 import type { GitState, WorktreeInfo } from "@/types/git-state";
+import type { WorkspaceInfo, WorkspaceDiff, ProjectConfig, ProjectTopology, MultiRepoWorkspace } from "@/types/workspace";
 
 /** Detect available AI runtimes (Claude Code, Codex) on the system */
 export async function detectRuntimes(): Promise<RuntimeInfo> {
@@ -58,15 +59,36 @@ export async function listSessionEvents(sessionId: string): Promise<SessionEvent
   return invoke<SessionEvent[]>("list_session_events", { sessionId });
 }
 
-/** Start a task — creates session, spawns elf, starts agent process. Returns session ID. */
+/** Start a task — creates session, spawns elf, starts agent process. Returns session ID.
+ * When `workingDir` is provided, the agent runs in that directory instead of the project root. */
 export async function startTask(
   projectId: string,
   task: string,
   runtime: string,
   spawnOptions?: ClaudeSpawnOptions,
+  workingDir?: string,
 ): Promise<string> {
   const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
-  return invoke<string>("start_task", { projectId, task, runtime, options });
+  return invoke<string>("start_task", { projectId, task, runtime, options, workingDir });
+}
+
+/** Result from startTaskPty — contains both the ELVES session ID and the PTY instance ID. */
+export interface StartTaskPtyResult {
+  readonly sessionId: string;
+  readonly ptyId: string;
+}
+
+/** Start a task in PTY-first mode — creates session, spawns elf, launches Claude in an interactive PTY.
+ * Returns both sessionId (for event routing) and ptyId (for xterm.js wiring). */
+export async function startTaskPty(
+  projectId: string,
+  task: string,
+  runtime: string,
+  workingDir?: string,
+  spawnOptions?: ClaudeSpawnOptions,
+): Promise<StartTaskPtyResult> {
+  const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
+  return invoke<StartTaskPtyResult>("start_task_pty", { projectId, task, runtime, workingDir, options });
 }
 
 /** Stop a running task. Returns true if a process was killed. */
@@ -82,15 +104,17 @@ export async function analyzeTask(
   return invoke<TaskPlan>("analyze_task", { task, projectId });
 }
 
-/** Start a team task — creates session, spawns multiple elves per plan. Returns session ID. */
+/** Start a team task — creates session, spawns multiple elves per plan. Returns session ID.
+ * When `workingDir` is provided, the agent runs in that directory instead of the project root. */
 export async function startTeamTask(
   projectId: string,
   task: string,
   plan: TaskPlan,
   spawnOptions?: ClaudeSpawnOptions,
+  workingDir?: string,
 ): Promise<string> {
   const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
-  return invoke<string>("start_team_task", { projectId, task, plan, options });
+  return invoke<string>("start_team_task", { projectId, task, plan, options, workingDir });
 }
 
 /** Stop a team task. Kills all agent processes for the session. */
@@ -419,6 +443,171 @@ export async function gitWorktreeRemove(projectPath: string, worktreePath: strin
 /** Get aggregate git state in a single call — branch, worktrees, dirty, ahead/behind. */
 export async function getGitState(projectPath: string): Promise<GitState> {
   return invoke<GitState>("get_git_state", { projectPath });
+}
+
+/* ── Workspace commands ──────────────────────────────────────── */
+
+/** Initialize the .elves/ directory for a project. */
+export async function initElvesDir(projectPath: string): Promise<boolean> {
+  return invoke<boolean>("init_elves_dir", { projectPath });
+}
+
+/** Create a new workspace (worktree + branch). */
+export async function createWorkspace(
+  projectPath: string,
+  slug: string,
+  baseBranch?: string,
+): Promise<WorkspaceInfo> {
+  return invoke<WorkspaceInfo>("create_workspace", { projectPath, slug, baseBranch: baseBranch ?? null });
+}
+
+/** List all workspaces for a project. */
+export async function listWorkspaces(projectPath: string): Promise<WorkspaceInfo[]> {
+  return invoke<WorkspaceInfo[]>("list_workspaces", { projectPath });
+}
+
+/** Get diff summary for a workspace vs base branch. */
+export async function getWorkspaceDiff(projectPath: string, slug: string): Promise<WorkspaceDiff> {
+  return invoke<WorkspaceDiff>("get_workspace_diff", { projectPath, slug });
+}
+
+/** Push a workspace branch to remote. */
+export async function pushWorkspace(projectPath: string, slug: string): Promise<string> {
+  return invoke<string>("push_workspace", { projectPath, slug });
+}
+
+/** Create a PR from a workspace branch. Returns PR URL. */
+export async function createPrFromWorkspace(
+  projectPath: string,
+  slug: string,
+  title: string,
+  body: string,
+): Promise<string> {
+  return invoke<string>("create_pr_from_workspace", { projectPath, slug, title, body });
+}
+
+/** Merge a workspace branch into a target branch. */
+export async function mergeWorkspace(
+  projectPath: string,
+  slug: string,
+  targetBranch: string,
+  strategy: string,
+): Promise<boolean> {
+  return invoke<boolean>("merge_workspace", { projectPath, slug, targetBranch, strategy });
+}
+
+/** Remove a workspace (worktree + branch). */
+export async function removeWorkspace(
+  projectPath: string,
+  slug: string,
+  force?: boolean,
+): Promise<boolean> {
+  return invoke<boolean>("remove_workspace", { projectPath, slug, force: force ?? false });
+}
+
+/** Complete a workspace — push, merge, cleanup. The full "Ship It" flow. */
+export async function completeWorkspace(
+  projectPath: string,
+  slug: string,
+  strategy: string,
+  extractMemory: boolean,
+): Promise<boolean> {
+  return invoke<boolean>("complete_workspace", { projectPath, slug, strategy, extractMemory });
+}
+
+/** Read project-scoped config from .elves/config.json. */
+export async function readProjectConfig(projectPath: string): Promise<ProjectConfig> {
+  return invoke<ProjectConfig>("read_project_config", { projectPath });
+}
+
+/** Write project-scoped config to .elves/config.json. */
+export async function writeProjectConfig(projectPath: string, config: ProjectConfig): Promise<boolean> {
+  return invoke<boolean>("write_project_config", { projectPath, config: JSON.stringify(config) });
+}
+
+/* ── Multi-repo workspace commands ───────────────────────────── */
+
+/** Discover the git topology of a project directory. */
+export async function discoverGitRepos(
+  projectPath: string,
+  maxDepth?: number,
+): Promise<ProjectTopology> {
+  return invoke<ProjectTopology>("discover_git_repos", { projectPath, maxDepth: maxDepth ?? null });
+}
+
+/** Create a workspace across multiple repositories. */
+export async function createMultiRepoWorkspace(
+  projectPath: string,
+  slug: string,
+  repoPaths: string[],
+  baseBranch?: string,
+): Promise<MultiRepoWorkspace> {
+  return invoke<MultiRepoWorkspace>("create_multi_repo_workspace", {
+    projectPath, slug, repoPaths, baseBranch: baseBranch ?? null,
+  });
+}
+
+/** List all workspaces grouped by slug across multiple repos. */
+export async function listMultiRepoWorkspaces(
+  projectPath: string,
+  repoPaths: string[],
+): Promise<MultiRepoWorkspace[]> {
+  return invoke<MultiRepoWorkspace[]>("list_multi_repo_workspaces", { projectPath, repoPaths });
+}
+
+/** Get aggregate diff across multiple repos for a workspace slug. */
+export async function getMultiRepoWorkspaceDiff(
+  projectPath: string,
+  slug: string,
+  repoPaths: string[],
+): Promise<WorkspaceDiff> {
+  return invoke<WorkspaceDiff>("get_multi_repo_workspace_diff", { projectPath, slug, repoPaths });
+}
+
+/** Complete (Ship It) a workspace across multiple repos. */
+export async function completeMultiRepoWorkspace(
+  projectPath: string,
+  slug: string,
+  repoPaths: string[],
+  strategy: string,
+  extractMemory: boolean,
+): Promise<boolean> {
+  return invoke<boolean>("complete_multi_repo_workspace", {
+    projectPath, slug, repoPaths, strategy, extractMemory,
+  });
+}
+
+/** Remove a workspace from all repos. */
+export async function removeMultiRepoWorkspace(
+  projectPath: string,
+  slug: string,
+  repoPaths: string[],
+): Promise<boolean> {
+  return invoke<boolean>("remove_multi_repo_workspace", { projectPath, slug, repoPaths });
+}
+
+/** Push workspace branch in all repos. */
+export async function pushMultiRepoWorkspace(
+  projectPath: string,
+  slug: string,
+  repoPaths: string[],
+): Promise<boolean> {
+  return invoke<boolean>("push_multi_repo_workspace", { projectPath, slug, repoPaths });
+}
+
+/** Create a new git branch. */
+export async function createBranch(projectPath: string, name: string, base?: string): Promise<boolean> {
+  return invoke<boolean>("create_branch", { projectPath, name, base: base ?? null });
+}
+
+/** Delete a git branch. */
+export async function deleteBranch(projectPath: string, name: string, force?: boolean): Promise<boolean> {
+  return invoke<boolean>("delete_branch", { projectPath, name, force: force ?? false });
+}
+
+/** Get diff stats between a branch and base. */
+export async function getBranchDiff(projectPath: string, branch: string, base?: string): Promise<string> {
+  return invoke<string>("get_branch_diff", { projectPath, branch, base: base ?? null });
 }
 
 /* ── Event subscription ──────────────────────────────────────── */

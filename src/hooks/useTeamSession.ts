@@ -9,13 +9,15 @@ import { useAppStore } from "@/stores/app";
 import { useSettingsStore } from "@/stores/settings";
 import {
   analyzeTask as invokeAnalyzeTask,
-  startTask as invokeStartTask,
+  startTaskPty as invokeStartTaskPty,
   startTeamTask as invokeStartTeamTask,
   stopTask as invokeStopTask,
   stopTeamTask as invokeStopTeamTask,
   buildProjectContext,
+  createWorkspace,
 } from "@/lib/tauri";
 import { generateElf, getStatusMessage } from "@/lib/elf-names";
+import { generateWorkspaceSlug } from "@/lib/slug";
 import type { Runtime, ElfStatus } from "@/types/elf";
 import type { TaskPlan } from "@/types/session";
 import type { ClaudeSpawnOptions } from "@/types/claude";
@@ -38,6 +40,7 @@ export function useTeamSession(): {
   analyzeAndDeploy: (task: string) => Promise<void>;
   deployWithPlan: (plan: TaskPlan) => Promise<void>;
   stopSession: () => Promise<void>;
+  resumeSession: () => Promise<void>;
   isSessionActive: boolean;
   isSessionCompleted: boolean;
   isPlanPreview: boolean;
@@ -52,7 +55,14 @@ export function useTeamSession(): {
   const acceptPlan = useSessionStore((s) => s.acceptPlan);
   const createFloor = useSessionStore((s) => s.createFloor);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const activeProjectPath = useProjectStore((s) => {
+    if (!s.activeProjectId) return null;
+    return s.projects.find((p) => p.id === s.activeProjectId)?.path ?? null;
+  });
   const defaultRuntime = useAppStore((s) => s.defaultRuntime);
+  const setFloorWorktree = useSessionStore((s) => s.setFloorWorktree);
+  const setFloorPtyId = useSessionStore((s) => s.setFloorPtyId);
+  const renameFloor = useSessionStore((s) => s.renameFloor);
 
   /** Build ClaudeSpawnOptions from current app store selections, falling through to settings defaults. */
   const buildSpawnOptions = useCallback((): ClaudeSpawnOptions => {
@@ -107,6 +117,22 @@ export function useTeamSession(): {
           console.error("Failed to build project context:", error);
         });
 
+        /* Auto-create a worktree for task isolation (silently falls back to project root) */
+        let worktreeWorkingDir: string | undefined;
+        const activeFloorIdNow = useSessionStore.getState().activeFloorId;
+        if (activeProjectPath && activeFloorIdNow) {
+          try {
+            const slug = generateWorkspaceSlug(augmentedTask);
+            const workspaceInfo = await createWorkspace(activeProjectPath, slug);
+            worktreeWorkingDir = workspaceInfo.path;
+            setFloorWorktree(activeFloorIdNow, slug, workspaceInfo.path);
+          } catch (worktreeError) {
+            console.warn("Auto-worktree creation failed, using project root:", worktreeError);
+          }
+          /* Rename the floor tab to reflect the task */
+          renameFloor(activeFloorIdNow, augmentedTask.slice(0, 30) || "Task");
+        }
+
         const plan = await invokeAnalyzeTask(augmentedTask, activeProjectId);
 
         /* When forceTeamMode is active, override solo classification to show plan preview
@@ -118,10 +144,18 @@ export function useTeamSession(): {
         }
 
         if (plan.complexity === "solo") {
-          /* Solo task — skip plan preview, deploy immediately */
+          /* Solo task — skip plan preview, deploy immediately via PTY-first */
           const runtime = defaultRuntime;
           const spawnOptions = buildSpawnOptions();
-          const sessionId = await invokeStartTask(activeProjectId, augmentedTask, runtime, spawnOptions);
+          const { sessionId, ptyId } = await invokeStartTaskPty(
+            activeProjectId, augmentedTask, runtime, worktreeWorkingDir, spawnOptions,
+          );
+
+          /* Store ptyId on the floor so SessionSplitView can wire xterm to it */
+          const currentFloorId = useSessionStore.getState().activeFloorId;
+          if (currentFloorId) {
+            setFloorPtyId(currentFloorId, ptyId);
+          }
 
           startSession({
             id: sessionId,
@@ -176,7 +210,7 @@ export function useTeamSession(): {
         console.error("Failed to analyze task:", error);
       }
     },
-    [activeProjectId, defaultRuntime, buildSpawnOptions, ensureAvailableFloor, startSession, addElf, addEvent, updateElfStatus, showPlanPreview],
+    [activeProjectId, activeProjectPath, defaultRuntime, buildSpawnOptions, ensureAvailableFloor, startSession, addElf, addEvent, updateElfStatus, showPlanPreview, setFloorWorktree, setFloorPtyId, renameFloor],
   );
 
   /**
@@ -190,8 +224,12 @@ export function useTeamSession(): {
       const runtime = defaultRuntime;
 
       try {
+        /* Use worktree path from the active floor if one was created during analyzeAndDeploy */
+        const activeFloor = useSessionStore.getState().floors[useSessionStore.getState().activeFloorId ?? ""];
+        const worktreeWorkingDir = activeFloor?.worktreePath ?? undefined;
+
         const spawnOptions = buildSpawnOptions();
-        const sessionId = await invokeStartTeamTask(activeProjectId, plan.taskGraph[0]?.label ?? "Team task", plan, spawnOptions);
+        const sessionId = await invokeStartTeamTask(activeProjectId, plan.taskGraph[0]?.label ?? "Team task", plan, spawnOptions, worktreeWorkingDir);
 
         startSession({
           id: sessionId,
@@ -253,6 +291,49 @@ export function useTeamSession(): {
   const updateAllElfStatusOnFloor = useSessionStore((s) => s.updateAllElfStatusOnFloor);
   const endSessionOnFloor = useSessionStore((s) => s.endSessionOnFloor);
 
+  /**
+   * Resume a completed/cancelled session using Claude's --resume flag.
+   * Reads the claudeSessionId from the active floor's session and spawns
+   * a new PTY with --resume <claudeSessionId>. Reuses existing elves.
+   */
+  const resumeSession = useCallback(async (): Promise<void> => {
+    if (!activeProjectId) return;
+
+    const state = useSessionStore.getState();
+    const floorId = state.activeFloorId;
+    if (!floorId) return;
+
+    const floor = state.floors[floorId];
+    const claudeSessionId = floor?.session?.claudeSessionId;
+    if (!claudeSessionId) {
+      console.warn("Cannot resume: no claudeSessionId on active floor");
+      return;
+    }
+
+    try {
+      const runtime = defaultRuntime;
+      const worktreeWorkingDir = floor.worktreePath ?? undefined;
+      const spawnOptions = buildSpawnOptions();
+
+      const { ptyId } = await invokeStartTaskPty(
+        activeProjectId,
+        "Resuming session...",
+        runtime,
+        worktreeWorkingDir,
+        { ...spawnOptions, resumeSessionId: claudeSessionId },
+      );
+
+      /* Store new ptyId on the floor and transition session back to active */
+      setFloorPtyId(floorId, ptyId);
+      endSessionOnFloor(floorId, "active");
+
+      /* Re-activate elves */
+      updateAllElfStatusOnFloor(floorId, "working");
+    } catch (error) {
+      console.error("Failed to resume session:", error);
+    }
+  }, [activeProjectId, defaultRuntime, buildSpawnOptions, setFloorPtyId, endSessionOnFloor, updateAllElfStatusOnFloor]);
+
   const stopSession = useCallback(async (): Promise<void> => {
     if (!activeSession) return;
 
@@ -281,6 +362,7 @@ export function useTeamSession(): {
     analyzeAndDeploy,
     deployWithPlan,
     stopSession,
+    resumeSession,
     isSessionActive: activeSession !== null && activeSession.status === "active",
     isSessionCompleted: activeSession !== null && activeSession.status === "completed",
     isPlanPreview,

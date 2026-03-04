@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import { useProjectStore } from "@/stores/project";
 import { useUiStore } from "@/stores/ui";
 import type { AppView } from "@/stores/ui";
+import { SidebarSettings } from "@/components/layout/SidebarSettings";
 
 /** SVG icon components for crisp rendering at any size. */
 function IconWorkshop(): React.JSX.Element {
@@ -51,16 +52,6 @@ function IconMcp(): React.JSX.Element {
   );
 }
 
-function IconGit(): React.JSX.Element {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="6" y1="3" x2="6" y2="15" />
-      <circle cx="18" cy="6" r="3" />
-      <circle cx="6" cy="18" r="3" />
-      <path d="M18 9a9 9 0 01-9 9" />
-    </svg>
-  );
-}
 
 function IconHistory(): React.JSX.Element {
   return (
@@ -98,6 +89,7 @@ function IconExpand(): React.JSX.Element {
   );
 }
 
+
 /** Navigation items — most switch the active view, "files" toggles the file tree panel. */
 interface NavItem {
   readonly id: string;
@@ -108,12 +100,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
-  { id: "session", view: "session", label: "Workshop", Icon: IconWorkshop },
+  { id: "session", view: "session", label: "Session", Icon: IconWorkshop },
   { id: "files", label: "Files", Icon: IconFiles, isPanel: true },
   { id: "memory", view: "memory", label: "Memory", Icon: IconMemory },
   { id: "skills", view: "skills", label: "Skills", Icon: IconSkills },
   { id: "mcp", view: "mcp", label: "MCP Servers", Icon: IconMcp },
-  { id: "git", view: "git", label: "Git", Icon: IconGit },
   { id: "history", view: "history", label: "History", Icon: IconHistory },
   { id: "settings", view: "settings", label: "Settings", Icon: IconSettings },
 ];
@@ -149,7 +140,7 @@ export function Sidebar(): React.JSX.Element {
   return (
     <aside
       className={[
-        "no-select flex h-full shrink-0 flex-col border-r-[3px] border-border bg-[#F0EDE6] transition-[width] duration-150",
+        "no-select flex h-full shrink-0 flex-col border-r-[3px] border-border bg-surface transition-[width] duration-150",
         isCollapsed ? "w-[52px]" : "w-[180px]",
       ].join(" ")}
       data-testid="icon-sidebar"
@@ -192,7 +183,7 @@ export function Sidebar(): React.JSX.Element {
                   "flex h-7 w-7 cursor-pointer items-center justify-center rounded-sm border-[2px] font-display text-[10px] font-black uppercase transition-all duration-100",
                   isActive
                     ? "border-border bg-elf-gold text-text-light shadow-brutal-xs"
-                    : "border-transparent bg-transparent text-text-light/60 hover:border-border/40 hover:bg-white hover:text-text-light",
+                    : "border-transparent bg-transparent text-text-light/60 hover:border-border/40 hover:bg-surface-elevated hover:text-text-light",
                 ].join(" ")}
                 title={project.name}
               >
@@ -205,7 +196,7 @@ export function Sidebar(): React.JSX.Element {
                   "group flex w-full cursor-pointer items-center rounded-sm border-[2px] transition-all duration-100",
                   isActive
                     ? "border-border bg-elf-gold text-text-light shadow-brutal-xs"
-                    : "border-transparent bg-transparent text-text-light/60 hover:border-border/40 hover:bg-white hover:text-text-light",
+                    : "border-transparent bg-transparent text-text-light/60 hover:border-border/40 hover:bg-surface-elevated hover:text-text-light",
                 ].join(" ")}
               >
                 <button
@@ -275,13 +266,21 @@ export function Sidebar(): React.JSX.Element {
 
               {/* Tooltip — only in collapsed mode */}
               {isCollapsed && (
-                <span className="pointer-events-none absolute left-[52px] z-50 hidden whitespace-nowrap border-[2px] border-border bg-white px-2 py-1 font-display text-[10px] font-bold uppercase tracking-wider text-text-light shadow-brutal-sm group-hover:block">
+                <span className="pointer-events-none absolute left-[52px] z-50 hidden whitespace-nowrap border-[2px] border-border bg-surface-elevated px-2 py-1 font-display text-[10px] font-bold uppercase tracking-wider text-text-light shadow-brutal-sm group-hover:block">
                   {item.label}
                 </span>
               )}
             </button>
           );
         })}
+      </div>
+
+      {/* Settings panel — above bottom controls */}
+      <div className={[
+        "border-t-[2px] border-border/40 py-2",
+        isCollapsed ? "flex flex-col items-center" : "",
+      ].join(" ")}>
+        <SidebarSettings isCollapsed={isCollapsed} />
       </div>
 
       {/* Bottom: new project + collapse toggle */}
@@ -293,7 +292,7 @@ export function Sidebar(): React.JSX.Element {
         <button
           onClick={() => setNewProjectDialogOpen(true)}
           className={[
-            "flex cursor-pointer items-center gap-2 border-[2px] border-border/40 bg-white font-display text-text-light/50 transition-all duration-100 hover:border-border hover:bg-elf-gold hover:text-text-light hover:shadow-brutal-xs",
+            "flex cursor-pointer items-center gap-2 border-[2px] border-border/40 bg-surface-elevated font-display text-text-light/50 transition-all duration-100 hover:border-border hover:bg-elf-gold hover:text-text-light hover:shadow-brutal-xs",
             isCollapsed
               ? "h-8 w-8 justify-center text-base font-bold"
               : "w-full rounded-sm px-2 py-1.5 text-xs font-bold uppercase tracking-wider",
