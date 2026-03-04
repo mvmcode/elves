@@ -1,6 +1,8 @@
 /* WorkspaceCard — displays a single worktree-based workspace with its elf, status, diff summary, and actions. */
 
 import { useCallback } from "react";
+import { useSessionStore } from "@/stores/session";
+import { useUiStore } from "@/stores/ui";
 import type { WorkspaceInfo } from "@/types/workspace";
 
 interface WorkspaceCardProps {
@@ -48,6 +50,22 @@ export function WorkspaceCard({
 }: WorkspaceCardProps): React.JSX.Element {
   const handleFocus = useCallback(() => onFocus(workspace.slug), [onFocus, workspace.slug]);
   const handleResume = useCallback(() => onResume(workspace.slug), [onResume, workspace.slug]);
+
+  /** Navigate to the floor tab linked to this workspace's worktree slug. */
+  const handleGoToFloor = useCallback((): void => {
+    const { floors, switchFloor, createFloor } = useSessionStore.getState();
+    const matchingFloor = Object.values(floors).find(
+      (floor) => floor.worktreeSlug === workspace.slug,
+    );
+    if (matchingFloor) {
+      switchFloor(matchingFloor.id);
+    } else {
+      /* No matching floor — create one linked to this worktree */
+      const floorId = createFloor(workspace.slug);
+      useSessionStore.getState().setFloorWorktree(floorId, workspace.slug, workspace.path);
+    }
+    useUiStore.getState().setActiveView("session");
+  }, [workspace.slug, workspace.path]);
   const handleDiff = useCallback(() => onDiff(workspace.slug), [onDiff, workspace.slug]);
   const handleShipIt = useCallback(() => onShipIt(workspace.slug), [onShipIt, workspace.slug]);
   const handleRemove = useCallback(() => {
@@ -92,6 +110,14 @@ export function WorkspaceCard({
 
       {/* Action buttons */}
       <div className="flex flex-wrap gap-2">
+        <button
+          onClick={handleGoToFloor}
+          className="cursor-pointer border-[2px] border-border bg-info px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+          data-testid="workspace-goto-floor-btn"
+        >
+          Go to Floor
+        </button>
+
         <button
           onClick={handleFocus}
           className="cursor-pointer border-[2px] border-border bg-elf-gold px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-text-light shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"

@@ -125,6 +125,7 @@ pub fn run() {
             commands::sessions::get_session,
             commands::sessions::list_session_events,
             commands::tasks::start_task,
+            commands::tasks::start_task_pty,
             commands::tasks::stop_task,
             commands::tasks::analyze_task,
             commands::tasks::start_team_task,

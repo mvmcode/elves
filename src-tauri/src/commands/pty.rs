@@ -24,6 +24,85 @@ impl PtyManager {
     pub fn new() -> Self {
         Self(Mutex::new(HashMap::new()))
     }
+
+    /// Spawn a new PTY process programmatically (from another Tauri command).
+    ///
+    /// Same as the `spawn_pty` command but callable directly with an AppHandle reference.
+    /// Starts a background reader thread that emits `pty:data:{id}` and `pty:exit:{id}` events.
+    /// Returns the unique pty_id string.
+    pub fn spawn_with_app(
+        &self,
+        command: &str,
+        args: &[String],
+        cwd: &str,
+        app: &AppHandle,
+    ) -> Result<String, String> {
+        let pty_system = native_pty_system();
+        let pair = pty_system
+            .openpty(PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| format!("Failed to open PTY: {e}"))?;
+
+        let mut cmd = CommandBuilder::new(command);
+        for arg in args {
+            cmd.arg(arg);
+        }
+        cmd.cwd(cwd);
+        // Clear CLAUDECODE env var to allow spawning from within a Claude Code session
+        cmd.env("CLAUDECODE", "");
+
+        let child = pair
+            .slave
+            .spawn_command(cmd)
+            .map_err(|e| format!("Failed to spawn command: {e}"))?;
+
+        drop(pair.slave);
+
+        let pty_id = uuid::Uuid::new_v4().to_string();
+        let writer = pair
+            .master
+            .take_writer()
+            .map_err(|e| format!("Failed to take PTY writer: {e}"))?;
+
+        let mut reader = pair
+            .master
+            .try_clone_reader()
+            .map_err(|e| format!("Failed to clone PTY reader: {e}"))?;
+
+        let instance = PtyInstance {
+            writer,
+            master: pair.master,
+            child,
+        };
+        self.0
+            .lock()
+            .map_err(|e| format!("Failed to lock PTY state: {e}"))?
+            .insert(pty_id.clone(), instance);
+
+        let pty_id_clone = pty_id.clone();
+        let app_clone = app.clone();
+        std::thread::spawn(move || {
+            let mut buf = [0u8; 4096];
+            loop {
+                match reader.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        let data = String::from_utf8_lossy(&buf[..n]).to_string();
+                        let _ = app_clone.emit(&format!("pty:data:{}", pty_id_clone), data);
+                    }
+                    Err(_) => break,
+                }
+            }
+            let _ = app_clone.emit(&format!("pty:exit:{}", pty_id_clone), 0i32);
+        });
+
+        log::info!("Spawned PTY {pty_id}: {command} {}", args.join(" "));
+        Ok(pty_id)
+    }
 }
 
 /// Spawn a new PTY process. Returns a unique pty_id string.

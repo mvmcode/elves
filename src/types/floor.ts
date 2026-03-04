@@ -21,6 +21,12 @@ export interface FloorSession {
   readonly lastEventAt: number;
   readonly order: number;
   readonly isHistorical: boolean;
+  /** Path to the auto-created worktree directory, null when running in project root. */
+  readonly worktreePath: string | null;
+  /** Slug identifier for the worktree (e.g. "fix-login-button-a3f2"). */
+  readonly worktreeSlug: string | null;
+  /** PTY instance ID for the session's interactive terminal, null when no PTY is active. */
+  readonly ptyId: string | null;
 }
 
 /** Creates a new empty floor with default values. */
@@ -38,5 +44,8 @@ export function createEmptyFloor(id: FloorId, order: number, label?: string): Fl
     lastEventAt: 0,
     order,
     isHistorical: false,
+    worktreePath: null,
+    worktreeSlug: null,
+    ptyId: null,
   };
 }

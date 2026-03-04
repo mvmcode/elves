@@ -349,40 +349,6 @@ export function useSessionEvents(): void {
       }),
     );
 
-    /* Listen for interactive mode transition (print process killed, PTY takes over) */
-    interface SessionInteractivePayload {
-      readonly sessionId: string;
-    }
-    cleanups.push(
-      subscribeSafe<SessionInteractivePayload>("session:interactive", (data) => {
-        const store = useSessionStore.getState();
-        const floorId = store.getFloorBySessionId(data.sessionId);
-        if (!floorId) return;
-
-        const floor = store.floors[floorId];
-        if (!floor) return;
-
-        store.setInteractiveModeOnFloor(floorId, true);
-
-        const runtime = floor.session?.runtime ?? "claude-code";
-        store.addEventToFloor(floorId, {
-          id: `event-interactive-${Date.now()}`,
-          timestamp: Date.now(),
-          elfId: "system",
-          elfName: "System",
-          runtime,
-          type: "task_update",
-          payload: { message: "Switched to interactive terminal mode" },
-        });
-
-        /* Update lead elf status */
-        const leadElf = floor.elves[0];
-        if (leadElf) {
-          store.updateElfStatusOnFloor(floorId, leadElf.id, "working");
-        }
-      }),
-    );
-
     /* Listen for session completion (Claude process exited successfully) */
     cleanups.push(
       subscribeSafe<SessionCompletedPayload>("session:completed", (data) => {
@@ -392,9 +358,6 @@ export function useSessionEvents(): void {
 
         const floor = store.floors[floorId];
         if (!floor) return;
-
-        /* If in interactive mode, the print process was killed intentionally — ignore */
-        if (floor.isInteractiveMode) return;
 
         /* Guard against duplicate completion events (StrictMode or event replay) */
         if (floor.session?.status === "completed") return;

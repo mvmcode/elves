@@ -323,13 +323,18 @@ export function ProjectWorkspace(): React.JSX.Element {
     <div className="flex flex-1 flex-col overflow-y-auto p-6" data-testid="project-workspace">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="font-display text-2xl font-bold tracking-tight">Workspaces</h2>
-          {topology?.kind === "multi_repo" && (
-            <span className="border-[2px] border-border bg-accent-blue px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-white">
-              Multi-repo: {topology.repos.length} repos
-            </span>
-          )}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <h2 className="font-display text-2xl font-bold tracking-tight">Workspaces</h2>
+            {topology?.kind === "multi_repo" && (
+              <span className="border-[2px] border-border bg-accent-blue px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-white">
+                Multi-repo: {topology.repos.length} repos
+              </span>
+            )}
+          </div>
+          <p className="font-body text-xs text-text-muted">
+            Workspaces are created automatically when you deploy a task.
+          </p>
         </div>
         <div className="flex gap-2">
           <button
@@ -340,10 +345,11 @@ export function ProjectWorkspace(): React.JSX.Element {
           </button>
           <button
             onClick={() => setNewDialogOpen(true)}
-            className="cursor-pointer border-[2px] border-border bg-elf-gold px-4 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-text-light shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+            className="cursor-pointer border-[2px] border-border/50 bg-surface-elevated px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-text-muted shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
             data-testid="new-workspace-btn"
+            title="Manually create a workspace (optional)"
           >
-            + New Workspace
+            +
           </button>
         </div>
       </div>
@@ -409,7 +415,7 @@ export function ProjectWorkspace(): React.JSX.Element {
                 No workspaces yet.
               </p>
               <p className="mt-1 font-body text-sm text-text-muted">
-                Create one to start working across {topology.repos.length} repositories.
+                Deploy a task from the chat bar and a workspace will be created automatically.
               </p>
             </div>
           )
@@ -446,7 +452,7 @@ export function ProjectWorkspace(): React.JSX.Element {
                 No workspaces yet.
               </p>
               <p className="mt-1 font-body text-sm text-text-muted">
-                Create one to start working. Each workspace is a git worktree with its own elf.
+                Deploy a task from the chat bar and a workspace will be created automatically.
               </p>
             </div>
           )

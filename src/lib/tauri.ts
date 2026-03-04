@@ -59,15 +59,36 @@ export async function listSessionEvents(sessionId: string): Promise<SessionEvent
   return invoke<SessionEvent[]>("list_session_events", { sessionId });
 }
 
-/** Start a task — creates session, spawns elf, starts agent process. Returns session ID. */
+/** Start a task — creates session, spawns elf, starts agent process. Returns session ID.
+ * When `workingDir` is provided, the agent runs in that directory instead of the project root. */
 export async function startTask(
   projectId: string,
   task: string,
   runtime: string,
   spawnOptions?: ClaudeSpawnOptions,
+  workingDir?: string,
 ): Promise<string> {
   const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
-  return invoke<string>("start_task", { projectId, task, runtime, options });
+  return invoke<string>("start_task", { projectId, task, runtime, options, workingDir });
+}
+
+/** Result from startTaskPty — contains both the ELVES session ID and the PTY instance ID. */
+export interface StartTaskPtyResult {
+  readonly sessionId: string;
+  readonly ptyId: string;
+}
+
+/** Start a task in PTY-first mode — creates session, spawns elf, launches Claude in an interactive PTY.
+ * Returns both sessionId (for event routing) and ptyId (for xterm.js wiring). */
+export async function startTaskPty(
+  projectId: string,
+  task: string,
+  runtime: string,
+  workingDir?: string,
+  spawnOptions?: ClaudeSpawnOptions,
+): Promise<StartTaskPtyResult> {
+  const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
+  return invoke<StartTaskPtyResult>("start_task_pty", { projectId, task, runtime, workingDir, options });
 }
 
 /** Stop a running task. Returns true if a process was killed. */
@@ -83,15 +104,17 @@ export async function analyzeTask(
   return invoke<TaskPlan>("analyze_task", { task, projectId });
 }
 
-/** Start a team task — creates session, spawns multiple elves per plan. Returns session ID. */
+/** Start a team task — creates session, spawns multiple elves per plan. Returns session ID.
+ * When `workingDir` is provided, the agent runs in that directory instead of the project root. */
 export async function startTeamTask(
   projectId: string,
   task: string,
   plan: TaskPlan,
   spawnOptions?: ClaudeSpawnOptions,
+  workingDir?: string,
 ): Promise<string> {
   const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
-  return invoke<string>("start_team_task", { projectId, task, plan, options });
+  return invoke<string>("start_team_task", { projectId, task, plan, options, workingDir });
 }
 
 /** Stop a team task. Kills all agent processes for the session. */

@@ -12,6 +12,22 @@ export interface DetectedAgent {
   readonly role: string;
 }
 
+/** A permission request detected from PTY output (Claude asking for user approval). */
+export interface DetectedPermission {
+  /** Unique key for deduplication. */
+  readonly id: string;
+  /** The tool name Claude is requesting permission for (e.g., "Edit", "Bash"). */
+  readonly tool: string;
+  /** Description of the action (e.g., file path or command). */
+  readonly description: string;
+}
+
+/** Result from feeding a PTY chunk — may contain agents and/or permission requests. */
+export interface FeedResult {
+  readonly agents: readonly DetectedAgent[];
+  readonly permissions: readonly DetectedPermission[];
+}
+
 /**
  * Strip ANSI escape sequences from terminal output.
  * Handles CSI sequences (\x1b[...X), OSC sequences (\x1b]...ST), and single-char escapes.
@@ -76,6 +92,18 @@ const DESC_EXTRACTION_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
+ * Patterns that match Claude Code permission prompts in PTY output.
+ * Claude renders these as: "Allow <ToolName>? (Y)es/(N)o/..." or
+ * "Allow Bash("npm test")? (Y)es/(N)o/(A)lways/(D)eny always"
+ */
+const PERMISSION_PATTERNS: readonly RegExp[] = [
+  /* Standard permission prompt: Allow ToolName? or Allow ToolName("...") */
+  /Allow\s+([\w]+)(?:\("([^"]*)"\))?\s*\?/,
+  /* Variant with parenthesized details: Allow ToolName(arg)? */
+  /Allow\s+([\w]+)\(([^)]*)\)\s*\?/,
+];
+
+/**
  * Stateful detector that scans raw PTY output for Claude Code Agent tool invocations.
  * Maintains a line buffer across chunks (PTY output arrives in arbitrary-sized chunks
  * that can split lines). When an Agent tool call is detected, returns a DetectedAgent.
@@ -92,20 +120,22 @@ const DESC_EXTRACTION_PATTERNS: readonly RegExp[] = [
 export class PtyAgentDetector {
   private lineBuffer = "";
   private agentCount = 0;
+  private permissionCount = 0;
   /** Lines surrounding the current detection — used for description extraction. */
   private recentLines: string[] = [];
   /** Maximum recent lines to keep for context extraction. */
   private static readonly CONTEXT_WINDOW = 5;
 
   /**
-   * Feed a raw PTY output chunk. Returns an array of newly detected agents
-   * (empty array if no new agents found in this chunk).
+   * Feed a raw PTY output chunk. Returns detected agents and permission requests
+   * found in this chunk (empty arrays if nothing detected).
    */
-  feed(rawChunk: string): readonly DetectedAgent[] {
+  feed(rawChunk: string): FeedResult {
     const stripped = stripAnsi(rawChunk);
     this.lineBuffer += stripped;
 
-    const results: DetectedAgent[] = [];
+    const agents: DetectedAgent[] = [];
+    const permissions: DetectedPermission[] = [];
     const lines = this.lineBuffer.split("\n");
     /* Keep the last (possibly incomplete) line in the buffer */
     this.lineBuffer = lines.pop() ?? "";
@@ -120,27 +150,40 @@ export class PtyAgentDetector {
         this.recentLines.shift();
       }
 
+      /* Check for agent spawns */
       const isSpawn = AGENT_SPAWN_PATTERNS.some((pattern) => pattern.test(line));
       if (isSpawn) {
         this.agentCount++;
         const role = this.extractRole(line);
         const description = this.extractDescription(line);
 
-        results.push({
+        agents.push({
           id: `pty-agent-${this.agentCount}`,
           description,
           role,
         });
       }
+
+      /* Check for permission requests */
+      const permMatch = this.matchPermission(line);
+      if (permMatch) {
+        this.permissionCount++;
+        permissions.push({
+          id: `pty-perm-${this.permissionCount}`,
+          tool: permMatch.tool,
+          description: permMatch.description,
+        });
+      }
     }
 
-    return results;
+    return { agents, permissions };
   }
 
   /** Reset all internal state. Call when switching PTY sessions. */
   reset(): void {
     this.lineBuffer = "";
     this.agentCount = 0;
+    this.permissionCount = 0;
     this.recentLines = [];
   }
 
@@ -179,5 +222,19 @@ export class PtyAgentDetector {
       }
     }
     return `Agent task #${this.agentCount}`;
+  }
+
+  /** Match a permission request line, returning tool name and description if found. */
+  private matchPermission(line: string): { tool: string; description: string } | null {
+    for (const pattern of PERMISSION_PATTERNS) {
+      const match = pattern.exec(line);
+      if (match?.[1]) {
+        return {
+          tool: match[1],
+          description: match[2] ?? "",
+        };
+      }
+    }
+    return null;
   }
 }

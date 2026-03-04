@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import { useProjectStore } from "@/stores/project";
 import { useUiStore } from "@/stores/ui";
 import type { AppView } from "@/stores/ui";
+import { SidebarSettings } from "@/components/layout/SidebarSettings";
 
 /** SVG icon components for crisp rendering at any size. */
 function IconWorkshop(): React.JSX.Element {
@@ -51,16 +52,6 @@ function IconMcp(): React.JSX.Element {
   );
 }
 
-function IconGit(): React.JSX.Element {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="6" y1="3" x2="6" y2="15" />
-      <circle cx="18" cy="6" r="3" />
-      <circle cx="6" cy="18" r="3" />
-      <path d="M18 9a9 9 0 01-9 9" />
-    </svg>
-  );
-}
 
 function IconHistory(): React.JSX.Element {
   return (
@@ -98,16 +89,6 @@ function IconExpand(): React.JSX.Element {
   );
 }
 
-function IconWorkspace(): React.JSX.Element {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="3" width="8" height="8" />
-      <rect x="14" y="3" width="8" height="8" />
-      <rect x="2" y="13" width="8" height="8" />
-      <rect x="14" y="13" width="8" height="8" />
-    </svg>
-  );
-}
 
 /** Navigation items — most switch the active view, "files" toggles the file tree panel. */
 interface NavItem {
@@ -119,13 +100,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
-  { id: "workspace", view: "workspace", label: "Workspaces", Icon: IconWorkspace },
-  { id: "session", view: "session", label: "Workshop", Icon: IconWorkshop },
+  { id: "session", view: "session", label: "Session", Icon: IconWorkshop },
   { id: "files", label: "Files", Icon: IconFiles, isPanel: true },
   { id: "memory", view: "memory", label: "Memory", Icon: IconMemory },
   { id: "skills", view: "skills", label: "Skills", Icon: IconSkills },
   { id: "mcp", view: "mcp", label: "MCP Servers", Icon: IconMcp },
-  { id: "git", view: "git", label: "Git", Icon: IconGit },
   { id: "history", view: "history", label: "History", Icon: IconHistory },
   { id: "settings", view: "settings", label: "Settings", Icon: IconSettings },
 ];
@@ -294,6 +273,14 @@ export function Sidebar(): React.JSX.Element {
             </button>
           );
         })}
+      </div>
+
+      {/* Settings panel — above bottom controls */}
+      <div className={[
+        "border-t-[2px] border-border/40 py-2",
+        isCollapsed ? "flex flex-col items-center" : "",
+      ].join(" ")}>
+        <SidebarSettings isCollapsed={isCollapsed} />
       </div>
 
       {/* Bottom: new project + collapse toggle */}

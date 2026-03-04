@@ -1,5 +1,5 @@
 /* App shell — IDE-like layout with icon sidebar, command palette, top tabs, and status bar.
- * Inspired by Cursor/VS Code: narrow icon bar left, tabs + palette + content center, status bottom. */
+ * PTY-first: session view uses SessionSplitView (elf panel + live terminal). */
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,25 +8,17 @@ import { TaskBar } from "./TaskBar";
 import { FloorBar } from "./FloorBar";
 import { StatusBar } from "./StatusBar";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { ElfTheater } from "@/components/theater/ElfTheater";
-import { WorkshopCanvas } from "@/components/workshop/WorkshopCanvas";
-import { WorkshopOverlay } from "@/components/workshop/WorkshopOverlay";
-import { SessionControlCard } from "@/components/session/SessionControlCard";
-import { ActivityFeed } from "@/components/feed/ActivityFeed";
+import { SessionSplitView } from "@/components/session/SessionSplitView";
+/* SessionControlCard removed — controls are now inline in SessionSplitView as SessionControlPill */
 import { PlanPreview } from "@/components/theater/PlanPreview";
-import { TaskGraph } from "@/components/theater/TaskGraph";
-import { ThinkingPanel } from "@/components/theater/ThinkingPanel";
 import { MemoryExplorer } from "@/components/memory/MemoryExplorer";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { SkillEditor } from "@/components/editors/SkillEditor";
 import { McpManager } from "@/components/editors/McpManager";
 import { SessionHistory } from "@/components/project/SessionHistory";
 import { SessionComparison } from "@/components/project/SessionComparison";
-import { ProjectWorkspace } from "@/components/workspace/ProjectWorkspace";
-import { GitPanel } from "@/components/git/GitPanel";
 import { FileTreePanel } from "@/components/files/FileTreePanel";
 import { FileViewer } from "@/components/files/FileViewer";
-import { BottomTerminalPanel } from "@/components/terminal/BottomTerminalPanel";
 import { ShortcutOverlay } from "@/components/shared/ShortcutOverlay";
 import { ToastContainer } from "@/components/shared/Toast";
 import { NewProjectDialog } from "@/components/project/NewProjectDialog";
@@ -38,7 +30,6 @@ import { useMemoryActions } from "@/hooks/useMemoryActions";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useSessionEvents } from "@/hooks/useSessionEvents";
 import { useProjectContext } from "@/hooks/useProjectContext";
-import { useAutoInteractive } from "@/hooks/useAutoInteractive";
 import { useSounds } from "@/hooks/useSounds";
 import { useResizable } from "@/hooks/useResizable";
 import { onEvent } from "@/lib/tauri";
@@ -50,9 +41,9 @@ import { onEvent } from "@/lib/tauri";
  * │Bar │──────────────────────────────────│
  * │    │  FloorBar (tabs)                 │
  * │ ⚒  │──────────────────────────────────│
- * │ 🧠 │  Main Content Area               │
- * │ ⚡ │   (Workshop/Theater/Memory/etc)   │
- * │ 🔌 │                  ActivityFeed    │
+ * │ 🧠 │  SessionSplitView                │
+ * │ ⚡ │   (Elf Panel | PTY Terminal)      │
+ * │ 🔌 │                                  │
  * │ 📜 │──────────────────────────────────│
  * │ ⚙  │  StatusBar (bottom)              │
  * └────┴──────────────────────────────────┘
@@ -61,25 +52,13 @@ export function Shell(): React.JSX.Element {
   const activeView = useUiStore((state) => state.activeView);
   const isNewProjectDialogOpen = useUiStore((state) => state.isNewProjectDialogOpen);
   const setNewProjectDialogOpen = useUiStore((state) => state.setNewProjectDialogOpen);
-  const activityFeedWidth = useUiStore((state) => state.activityFeedWidth);
-  const setActivityFeedWidth = useUiStore((state) => state.setActivityFeedWidth);
-  const isActivityFeedVisible = useUiStore((state) => state.isActivityFeedVisible);
-  const toggleActivityFeed = useUiStore((state) => state.toggleActivityFeed);
   const activeSession = useSessionStore((state) => state.activeSession);
-  const elves = useSessionStore((state) => state.elves);
-  const events = useSessionStore((state) => state.events);
-  const thinkingStream = useSessionStore((state) => state.thinkingStream);
   const isPlanPreview = useSessionStore((state) => state.isPlanPreview);
   const pendingPlan = useSessionStore((state) => state.pendingPlan);
-  const isHistoricalFloor = useSessionStore(
-    (state) => (state.activeFloorId ? state.floors[state.activeFloorId]?.isHistorical : false) ?? false,
-  );
-  const isTerminalPanelOpen = useUiStore((state) => state.isTerminalPanelOpen);
   const isFileTreeVisible = useUiStore((state) => state.isFileTreeVisible);
   const fileTreeWidth = useUiStore((state) => state.fileTreeWidth);
   const setFileTreeWidth = useUiStore((state) => state.setFileTreeWidth);
   const selectedFilePath = useUiStore((state) => state.selectedFilePath);
-  const workshopViewMode = useUiStore((state) => state.workshopViewMode);
   const { deployWithPlan, stopSession } = useTeamSession();
   const {
     handleCreateMemory,
@@ -99,37 +78,8 @@ export function Shell(): React.JSX.Element {
   /* Subscribe to Tauri backend events (elf:event, session:completed) */
   useSessionEvents();
 
-  /* Auto-open terminal panel when a session transitions to "active". */
-  const prevSessionStatusRef = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    const currentStatus = activeSession?.status;
-    if (prevSessionStatusRef.current !== "active" && currentStatus === "active") {
-      useUiStore.getState().openTerminalPanel();
-    }
-    prevSessionStatusRef.current = currentStatus;
-  }, [activeSession?.status]);
-
   /* Load project-scoped context (git state, etc.) when active project changes */
   useProjectContext();
-
-  /* Auto-transition to interactive mode on stall if the setting is enabled */
-  useAutoInteractive();
-
-  /* Global Space key listener for toggling workshop/card view.
-   * Lives here (not in WorkshopCanvas) so it works from both views. */
-  useEffect(() => {
-    function handleSpaceToggle(event: KeyboardEvent): void {
-      if (event.code !== "Space") return;
-      const target = event.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
-      if (activeView !== "session" || !activeSession) return;
-      if (isPlanPreview) return;
-      event.preventDefault();
-      useUiStore.getState().toggleWorkshopViewMode();
-    }
-    window.addEventListener("keydown", handleSpaceToggle);
-    return () => window.removeEventListener("keydown", handleSpaceToggle);
-  }, [activeView, activeSession, isPlanPreview]);
 
   /* Listen for native menu events from Tauri backend */
   useEffect(() => {
@@ -144,9 +94,6 @@ export function Shell(): React.JSX.Element {
           store.closeFloor(floorId);
         }
       },
-      "menu:toggle_workshop": () => useUiStore.getState().toggleWorkshopViewMode(),
-      "menu:toggle_activity": () => useUiStore.getState().toggleActivityFeed(),
-      "menu:toggle_terminal": () => useUiStore.getState().toggleTerminalPanel(),
       "menu:toggle_settings": () => {
         const store = useUiStore.getState();
         store.setActiveView(store.activeView === "settings" ? "session" : "settings");
@@ -162,14 +109,6 @@ export function Shell(): React.JSX.Element {
 
     return () => cleanups.forEach((unsub) => unsub());
   }, [toggleOverlay]);
-
-  const feedResize = useResizable({
-    initialWidth: activityFeedWidth,
-    onWidthChange: setActivityFeedWidth,
-    minWidth: 280,
-    maxWidth: 600,
-    side: "left",
-  });
 
   const fileTreeResize = useResizable({
     initialWidth: fileTreeWidth,
@@ -226,12 +165,6 @@ export function Shell(): React.JSX.Element {
     setCompletedSummary(null);
   }, []);
 
-  const [isThinkingVisible, setIsThinkingVisible] = useState(false);
-
-  const handleToggleThinking = useCallback((): void => {
-    setIsThinkingVisible((prev) => !prev);
-  }, []);
-
   const handleDeploy = useCallback(
     (plan: Parameters<typeof deployWithPlan>[0]): void => {
       play("deploy");
@@ -239,19 +172,6 @@ export function Shell(): React.JSX.Element {
     },
     [deployWithPlan, play],
   );
-
-  /** Whether the session completed successfully (elves in "done" or "sleeping" state) */
-  const isCompleted =
-    activeSession?.status === "completed" && elves.length > 0;
-
-  /** Whether this is a team session with a task graph */
-  const hasTaskGraph =
-    activeSession?.plan != null &&
-    activeSession.plan.complexity === "team" &&
-    activeSession.plan.taskGraph.length > 0;
-
-  /** Lead elf ID for crown badge */
-  const leadElfId = elves.length > 0 ? elves[0]?.id : undefined;
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-surface-light">
@@ -278,7 +198,7 @@ export function Shell(): React.JSX.Element {
         {/* Floor tabs — at top, like editor tabs */}
         <FloorBar />
 
-        {/* View routing — session workshop, memory, skills, MCP, history, settings */}
+        {/* View routing */}
         {activeView === "memory" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <MemoryExplorer
@@ -297,10 +217,6 @@ export function Shell(): React.JSX.Element {
           <div className="flex flex-1 flex-col overflow-y-auto">
             <McpManager />
           </div>
-        ) : activeView === "git" ? (
-          <div className="flex flex-1 overflow-hidden">
-            <GitPanel />
-          </div>
         ) : activeView === "history" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <SessionHistory />
@@ -308,10 +224,6 @@ export function Shell(): React.JSX.Element {
         ) : activeView === "comparison" ? (
           <div className="flex flex-1 overflow-hidden">
             <SessionComparison />
-          </div>
-        ) : activeView === "workspace" ? (
-          <div className="flex flex-1 overflow-hidden">
-            <ProjectWorkspace />
           </div>
         ) : activeView === "settings" ? (
           <SettingsView
@@ -328,114 +240,16 @@ export function Shell(): React.JSX.Element {
               </div>
             )}
 
-            {/* Active session — show ElfTheater, TaskGraph, ThinkingPanel, SessionControlCard */}
+            {/* Active session — workshop-first view with inline controls */}
             {!isPlanPreview && activeSession ? (
               <div className="relative flex flex-1 overflow-hidden">
-                {/* Center — elf workshop + task graph + thinking panel */}
-                <div className="flex flex-1 flex-col overflow-y-auto">
-                  {/* Celebration / needs-input banner on completion */}
-                  <AnimatePresence>
-                    {isCompleted && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
-                        className="border-b-token-normal border-border bg-success px-6 py-3 text-center"
-                        data-testid="celebration-banner"
-                      >
-                        <p className="font-display text-xl text-heading tracking-wide text-white">
-                          All Done!
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Workshop view (pixel art) or Card view — toggled via Space */}
-                  {workshopViewMode === "workshop" && !isHistoricalFloor ? (
-                    <div className="relative flex flex-1 overflow-hidden">
-                      <WorkshopCanvas elves={elves} events={events} />
-                      <WorkshopOverlay
-                        elves={elves}
-                        events={events}
-                        startedAt={activeSession.startedAt}
-                        tasksDone={0}
-                        tasksTotal={0}
-                      />
-                    </div>
-                  ) : (
-                    <ElfTheater
-                      elves={elves}
-                      events={events}
-                      leadElfId={leadElfId}
-                      startedAt={activeSession.startedAt}
-                      sessionStatus={activeSession.status}
-                      isHistorical={isHistoricalFloor}
-                    />
-                  )}
-
-                  {/* Task Graph — shown for team sessions */}
-                  {hasTaskGraph && activeSession.plan && (
-                    <div className="border-t-token-normal border-border px-4 py-4">
-                      <h3 className="mb-2 font-display text-sm text-label text-text-muted-light">
-                        Task Graph
-                      </h3>
-                      <TaskGraph nodes={activeSession.plan.taskGraph} />
-                    </div>
-                  )}
-
-                  {/* Thinking Panel — shown for team sessions */}
-                  {hasTaskGraph && (
-                    <div className="border-t-token-normal border-border px-4 py-3">
-                      <ThinkingPanel
-                        thoughts={thinkingStream}
-                        isVisible={isThinkingVisible}
-                        onToggle={handleToggleThinking}
-                      />
-                    </div>
-                  )}
-
-                  {/* File viewer — read-only file content when a file is selected in the tree */}
-                  {selectedFilePath && <FileViewer />}
-                </div>
-
-                {/* Activity feed overlay (Cmd+B) — absolute positioned, does not push layout */}
-                {isActivityFeedVisible && (
-                  <div
-                    className="absolute right-0 top-0 z-20 h-full border-l-[2px] border-border bg-surface-elevated shadow-brutal-lg"
-                    style={{ width: activityFeedWidth }}
-                  >
-                    <ResizeHandle
-                      side="left"
-                      onMouseDown={feedResize.handleProps.onMouseDown}
-                      isDragging={feedResize.isDragging}
-                    />
-                    <div className="flex h-full flex-col">
-                      <div className="flex items-center justify-between border-b-[2px] border-border px-3 py-2">
-                        <h3 className="font-display text-xs text-label">Activity</h3>
-                        <button
-                          onClick={toggleActivityFeed}
-                          className="cursor-pointer border-none bg-transparent p-1 font-mono text-xs font-bold text-text-light/40 hover:text-text-light"
-                          title="Close activity feed (Cmd+B)"
-                        >
-                          {"\u00BB"}
-                        </button>
-                      </div>
-                      <div className="flex-1 overflow-y-auto">
-                        <ActivityFeed events={events} maxHeight="100%" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Floating session control card */}
-                <SessionControlCard />
+                <SessionSplitView />
               </div>
             ) : (
               /* Empty state — no session and not in plan preview */
               !isPlanPreview && (
                 <div className="flex flex-1 flex-col overflow-hidden">
-                  {/* Completion summary card — shown briefly after a session completes */}
+                  {/* Completion summary card */}
                   <AnimatePresence>
                     {completedSummary && (
                       <motion.div
@@ -498,9 +312,6 @@ export function Shell(): React.JSX.Element {
             )}
           </>
         )}
-
-        {/* Bottom terminal panel — slides up when toggled from SessionControlCard */}
-        {isTerminalPanelOpen && <BottomTerminalPanel />}
 
         {/* Shortcut overlay — toggled via Cmd+/ */}
         <ShortcutOverlay isOpen={shortcutOverlayOpen} onClose={toggleOverlay} />
