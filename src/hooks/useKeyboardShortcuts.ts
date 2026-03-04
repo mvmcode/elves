@@ -27,6 +27,8 @@ export const SHORTCUT_DEFINITIONS: readonly ShortcutDef[] = [
   { keys: "⌘ /", description: "Toggle shortcut help" },
   { keys: "⌘ B", description: "Toggle activity feed" },
   { keys: "⌘ R", description: "Toggle runtime" },
+  { keys: "⌘ ⇧ F", description: "Toggle focus mode" },
+  { keys: "⌘ S", description: "Save open file" },
   { keys: "Space", description: "Toggle workshop / card view" },
   { keys: "Escape", description: "Close panel / unfocus" },
 ] as const;
@@ -105,6 +107,11 @@ export function useKeyboardShortcuts(
             }
             return;
           }
+          case "f": {
+            event.preventDefault();
+            useUiStore.getState().toggleFocusMode();
+            return;
+          }
           default:
             break;
         }
@@ -175,6 +182,15 @@ export function useKeyboardShortcuts(
           /* Handled by RuntimePicker — just prevent default */
           event.preventDefault();
           break;
+
+        case "s": {
+          event.preventDefault();
+          const ui = useUiStore.getState();
+          if (ui.isFileEditing && ui.isFileDirty) {
+            window.dispatchEvent(new CustomEvent("elves:save-file"));
+          }
+          break;
+        }
 
         default: {
           /* Cmd+1 through Cmd+9 to switch projects */

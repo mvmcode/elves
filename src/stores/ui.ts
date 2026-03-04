@@ -53,6 +53,12 @@ interface UiState {
   readonly fileTreeWidth: number;
   /** Path of the file currently open in the FileViewer, or null. */
   readonly selectedFilePath: string | null;
+  /** Whether focus mode is active (hides all chrome, terminal fills screen). */
+  readonly isFocusMode: boolean;
+  /** Whether the file editor is in edit mode (vs read-only). */
+  readonly isFileEditing: boolean;
+  /** Whether the file has unsaved changes. */
+  readonly isFileDirty: boolean;
 
   setTaskBarFocused: (focused: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
@@ -73,6 +79,9 @@ interface UiState {
   toggleFileTree: () => void;
   setFileTreeWidth: (width: number) => void;
   setSelectedFilePath: (path: string | null) => void;
+  toggleFocusMode: () => void;
+  setFileEditing: (editing: boolean) => void;
+  setFileDirty: (dirty: boolean) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -92,6 +101,9 @@ export const useUiStore = create<UiState>((set) => ({
   isFileTreeVisible: false,
   fileTreeWidth: 250,
   selectedFilePath: null,
+  isFocusMode: false,
+  isFileEditing: false,
+  isFileDirty: false,
 
   setTaskBarFocused: (focused: boolean) => set({ isTaskBarFocused: focused }),
   setSettingsOpen: (open: boolean) => set({ isSettingsOpen: open }),
@@ -112,5 +124,11 @@ export const useUiStore = create<UiState>((set) => ({
   toggleSidebarCollapsed: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
   toggleFileTree: () => set((state) => ({ isFileTreeVisible: !state.isFileTreeVisible })),
   setFileTreeWidth: (width: number) => set({ fileTreeWidth: clamp(width, FILE_TREE_MIN, FILE_TREE_MAX) }),
-  setSelectedFilePath: (path: string | null) => set({ selectedFilePath: path }),
+  setSelectedFilePath: (path: string | null) => set({ selectedFilePath: path, isFileEditing: false, isFileDirty: false }),
+  toggleFocusMode: () => set((state) => ({
+    isFocusMode: !state.isFocusMode,
+    ...(!state.isFocusMode ? { isTerminalPanelOpen: true } : {}),
+  })),
+  setFileEditing: (editing: boolean) => set({ isFileEditing: editing }),
+  setFileDirty: (dirty: boolean) => set({ isFileDirty: dirty }),
 }));
