@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ELVES — Summon Your AI Workshop</title>
-  <meta name="description" content="A visual, personality-driven desktop app for orchestrating AI agent teams. Type a task. Watch your elves collaborate. Ship faster.">
+  <title>ELVES — AI Agent Orchestration for Your Codebase</title>
+  <meta name="description" content="A desktop app for orchestrating AI agent teams with worktree-isolated workspaces. Type a task. Get an embedded terminal. Ship faster.">
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="ELVES — Summon Your AI Workshop">
-  <meta property="og:description" content="A visual, personality-driven desktop app for orchestrating AI agent teams. Type a task. Watch your elves collaborate. Ship faster.">
+  <meta property="og:title" content="ELVES — AI Agent Orchestration for Your Codebase">
+  <meta property="og:description" content="A desktop app for orchestrating AI agent teams with worktree-isolated workspaces. Type a task. Get an embedded terminal. Ship faster.">
   <meta property="og:image" content="https://mvmcode.github.io/elves/og-image.png">
   <meta property="og:url" content="https://mvmcode.github.io/elves">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="ELVES — Summon Your AI Workshop">
-  <meta name="twitter:description" content="A visual, personality-driven desktop app for orchestrating AI agent teams. Type a task. Watch your elves collaborate. Ship faster.">
+  <meta name="twitter:title" content="ELVES — AI Agent Orchestration for Your Codebase">
+  <meta name="twitter:description" content="A desktop app for orchestrating AI agent teams with worktree-isolated workspaces. Type a task. Get an embedded terminal. Ship faster.">
   <meta name="twitter:image" content="https://mvmcode.github.io/elves/og-image.png">
 
   <!-- Favicon -->
@@ -291,8 +291,8 @@
       color: var(--text-light);
     }
 
-    /* Floating elves decoration */
-    .hero-elves {
+    /* Floating decoration */
+    .hero-decor {
       position: absolute;
       top: 0;
       left: 0;
@@ -301,17 +301,15 @@
       pointer-events: none;
       z-index: 1;
     }
-    .floating-elf {
+    .floating-icon {
       position: absolute;
       font-size: 48px;
       animation: float 6s ease-in-out infinite;
     }
-    .floating-elf:nth-child(1) { top: 15%; left: 8%; animation-delay: 0s; }
-    .floating-elf:nth-child(2) { top: 25%; right: 10%; animation-delay: 1.5s; }
-    .floating-elf:nth-child(3) { bottom: 20%; left: 12%; animation-delay: 3s; }
-    .floating-elf:nth-child(4) { bottom: 25%; right: 8%; animation-delay: 4.5s; }
-    .floating-elf:nth-child(5) { top: 45%; left: 3%; animation-delay: 2s; }
-    .floating-elf:nth-child(6) { top: 40%; right: 3%; animation-delay: 3.5s; }
+    .floating-icon:nth-child(1) { top: 15%; left: 8%; animation-delay: 0s; }
+    .floating-icon:nth-child(2) { top: 25%; right: 10%; animation-delay: 1.5s; }
+    .floating-icon:nth-child(3) { bottom: 20%; left: 12%; animation-delay: 3s; }
+    .floating-icon:nth-child(4) { bottom: 25%; right: 8%; animation-delay: 4.5s; }
 
     @keyframes float {
       0%, 100% { transform: translateY(0) rotate(0deg); }
@@ -756,7 +754,7 @@
       .section-title {
         font-size: 36px;
       }
-      .floating-elf {
+      .floating-icon {
         display: none;
       }
     }
@@ -856,19 +854,17 @@
 
   <!-- ==================== HERO ==================== -->
   <section class="hero" id="hero">
-    <div class="hero-elves">
-      <span class="floating-elf">🧝‍♂️</span>
-      <span class="floating-elf">🧝‍♀️</span>
-      <span class="floating-elf">🔨</span>
-      <span class="floating-elf">✨</span>
-      <span class="floating-elf">🍪</span>
-      <span class="floating-elf">⚡</span>
+    <div class="hero-decor">
+      <span class="floating-icon">&#x2694;&#xFE0F;</span>
+      <span class="floating-icon">&#x1F4BB;</span>
+      <span class="floating-icon">&#x26A1;</span>
+      <span class="floating-icon">&#x2728;</span>
     </div>
     <div class="container">
       <div class="hero-badge reveal">Open Source &bull; macOS</div>
       <h1 class="reveal"><span class="highlight">ELVES</span></h1>
-      <p class="hero-tagline reveal">Summon Your AI Workshop</p>
-      <p class="hero-sub reveal">Type a task. Watch your elves collaborate. Ship faster.</p>
+      <p class="hero-tagline reveal">AI Agent Orchestration for Your Codebase</p>
+      <p class="hero-sub reveal">Type a task. Get an isolated worktree with a live terminal. Ship the branch when it's done.</p>
       <div class="hero-actions reveal">
         <a href="#download" class="btn btn-primary">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -886,24 +882,24 @@
   <section class="what-section" id="features">
     <div class="container">
       <p class="section-label reveal">What Is It</p>
-      <h2 class="section-title reveal">Your personal team of AI agents,<br>with personality.</h2>
-      <p class="section-desc reveal">ELVES is a Tauri desktop app that orchestrates AI agent teams with a visual, fun, neo-brutalist interface. No terminal required.</p>
+      <h2 class="section-title reveal">Worktree-isolated workspaces<br>for AI agent tasks.</h2>
+      <p class="section-desc reveal">ELVES is a Tauri desktop app that orchestrates AI agents in isolated git worktrees with embedded terminals and a neo-brutalist interface.</p>
 
       <div class="feature-grid stagger">
         <div class="feature-card reveal" style="--i: 0">
-          <span class="feature-icon">🤖</span>
-          <h3>Multi-Agent Teams</h3>
-          <p>ELVES auto-decomposes tasks and summons a team of named, personality-driven AI agents. Each elf has a funny name, a unique avatar, and amusing status messages as they work.</p>
+          <span class="feature-icon">&#x1F333;</span>
+          <h3>Worktree Isolation</h3>
+          <p>Every task gets its own git worktree — a fully isolated working directory with its own branch. Parallel tasks never interfere with each other. Ship or discard when done.</p>
         </div>
         <div class="feature-card reveal" style="--i: 1">
-          <span class="feature-icon">🧠</span>
-          <h3>Persistent Memory</h3>
-          <p>SQLite-backed memory with FTS5 search. Your elves remember decisions, context, and preferences across sessions. Relevance decays over time — important memories stay, noise fades.</p>
+          <span class="feature-icon">&#x1F4BB;</span>
+          <h3>Embedded Terminal</h3>
+          <p>A live PTY terminal wired to Claude Code or Codex. Watch the agent work in real-time, respond to permission prompts, and interact directly when needed.</p>
         </div>
         <div class="feature-card reveal" style="--i: 2">
-          <span class="feature-icon">🎨</span>
-          <h3>Visual Editors</h3>
-          <p>Skills editor, MCP server manager, context editor — all with neo-brutalist UI. Configure your agents visually instead of editing YAML files in a terminal.</p>
+          <span class="feature-icon">&#x1F9E0;</span>
+          <h3>Persistent Memory</h3>
+          <p>SQLite-backed memory with FTS5 search. Decisions, context, and preferences persist across sessions. Relevance decays over time — important memories stay, noise fades.</p>
         </div>
       </div>
     </div>
@@ -919,21 +915,21 @@
       <div class="steps stagger">
         <div class="step reveal" style="--i: 0">
           <span class="step-number">1</span>
-          <span class="step-emoji">⌨️</span>
+          <span class="step-emoji">&#x2328;&#xFE0F;</span>
           <h3>Type a Task</h3>
           <p>Describe what you want in plain English. "Add user authentication with OAuth" — that's all it takes.</p>
         </div>
         <div class="step reveal" style="--i: 1">
           <span class="step-number">2</span>
-          <span class="step-emoji">🧝</span>
-          <h3>Elves Deploy</h3>
-          <p>ELVES analyzes complexity, creates a plan, and summons the right team of agents. Review the plan or let them run.</p>
+          <span class="step-emoji">&#x1F333;</span>
+          <h3>Workspace Created</h3>
+          <p>ELVES creates an isolated git worktree, spawns the agent, and opens a live terminal. Watch it work in real-time.</p>
         </div>
         <div class="step reveal" style="--i: 2">
           <span class="step-number">3</span>
-          <span class="step-emoji">✨</span>
-          <h3>Watch the Magic</h3>
-          <p>See your elves collaborate in real-time. Each agent streams their work — file edits, terminal commands, decisions — live.</p>
+          <span class="step-emoji">&#x1F680;</span>
+          <h3>Ship It</h3>
+          <p>When the agent finishes, review the diff, pick a merge strategy, and ship the branch — or remove the worktree to discard.</p>
         </div>
       </div>
     </div>
@@ -948,32 +944,32 @@
 
       <div class="features-grid stagger">
         <div class="feat-card reveal" style="--i: 0">
-          <div class="feat-card-icon">🔀</div>
+          <div class="feat-card-icon">&#x1F500;</div>
           <h3>Auto-Team Decomposition</h3>
           <p>Drop in a complex task and ELVES automatically breaks it into subtasks, assigns agents, and coordinates execution.</p>
         </div>
         <div class="feat-card reveal" style="--i: 1">
-          <div class="feat-card-icon">⚡</div>
+          <div class="feat-card-icon">&#x26A1;</div>
           <h3>Runtime Agnostic</h3>
           <p>Switch between Claude Code and Codex seamlessly. Same memory, same interface — different engine underneath.</p>
         </div>
         <div class="feat-card reveal" style="--i: 2">
-          <div class="feat-card-icon">😄</div>
-          <h3>Funny Personalities</h3>
-          <p>15 named elves with unique personalities. "Biscuit is stress-eating cookies while refactoring your auth module."</p>
+          <div class="feat-card-icon">&#x1F680;</div>
+          <h3>Ship It Flow</h3>
+          <p>One-click merge with strategy picker (merge, rebase, squash). Extracts memories, removes the worktree, deletes the branch. Done.</p>
         </div>
         <div class="feat-card reveal" style="--i: 3">
-          <div class="feat-card-icon">🔄</div>
+          <div class="feat-card-icon">&#x1F504;</div>
           <h3>Session Replay</h3>
           <p>Full event-by-event playback of any session. Scrub through the timeline to see exactly what happened and when.</p>
         </div>
         <div class="feat-card reveal" style="--i: 4">
-          <div class="feat-card-icon">💾</div>
+          <div class="feat-card-icon">&#x1F4BE;</div>
           <h3>Persistent Memory</h3>
           <p>Relevance-scored memory with exponential decay and access boosting. FTS5 full-text search across all project context.</p>
         </div>
         <div class="feat-card reveal" style="--i: 5">
-          <div class="feat-card-icon">🛠️</div>
+          <div class="feat-card-icon">&#x1F6E0;&#xFE0F;</div>
           <h3>Visual Editors</h3>
           <p>Skills, MCP servers, and context — all editable through a clean visual interface. No more YAML wrangling.</p>
         </div>
@@ -992,80 +988,39 @@
           <span class="demo-dot red"></span>
           <span class="demo-dot yellow"></span>
           <span class="demo-dot green"></span>
-          <span class="demo-titlebar-text">ELVES — My Project</span>
+          <span class="demo-titlebar-text">ELVES — my-project</span>
         </div>
         <div class="demo-content" style="padding: 0; text-align: left; display: block;">
-          <!-- Task Bar -->
-          <div style="background: #1A1A2E; border-bottom: 2px solid #333; padding: 10px 16px; display: flex; align-items: center; gap: 10px;">
-            <div style="flex: 1; background: #0D0D1A; border: 2px solid #555; padding: 8px 14px; font-family: var(--font-mono); font-size: 13px; color: #888;">
-              <span style="color: #FFD93D;">$</span> Add OAuth login with Google and GitHub providers
-            </div>
-            <div style="background: #FFD93D; color: #000; border: 2px solid #000; box-shadow: 3px 3px 0px 0px #000; padding: 8px 16px; font-family: var(--font-display); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">
-              SUMMON
-            </div>
+          <!-- Workspace header -->
+          <div style="background: #1A1A2E; border-bottom: 3px solid #333; padding: 10px 16px; display: flex; align-items: center; gap: 12px;">
+            <div style="font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #FFFDF7;">add-oauth-login</div>
+            <div style="background: #4D96FF; color: #FFF; border: 2px solid #000; padding: 2px 8px; font-family: var(--font-mono); font-size: 10px; font-weight: 700; text-transform: uppercase;">claude-code</div>
+            <div style="font-family: var(--font-mono); font-size: 11px; color: #888;">3 files changed</div>
+            <div style="margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: #888;">worktree-add-oauth-login</div>
           </div>
-          <!-- Elf Theater -->
-          <div style="display: flex; gap: 0;">
-            <!-- Elf Cards -->
-            <div style="flex: 1; padding: 16px; display: flex; gap: 12px;">
-              <!-- Spark — working -->
-              <div style="flex: 1; background: #1e1e36; border: 2px solid #FFD93D; box-shadow: 4px 4px 0px 0px #FFD93D; padding: 14px;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-                  <div style="width: 36px; height: 36px; background: #FFD93D; border: 2px solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">🧝</div>
-                  <div>
-                    <div style="font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #FFD93D;">Spark</div>
-                    <div style="font-family: var(--font-mono); font-size: 10px; color: #6BCB77;">WORKING</div>
-                  </div>
-                </div>
-                <div style="font-family: var(--font-body); font-size: 11px; color: #BBB; line-height: 1.5;">
-                  "Spark is typing furiously with nimble elf fingers..."
-                </div>
-                <div style="margin-top: 10px; height: 4px; background: #333; overflow: hidden;">
-                  <div style="width: 65%; height: 100%; background: #FFD93D;"></div>
-                </div>
-              </div>
-              <!-- Tinker — thinking -->
-              <div style="flex: 1; background: #1e1e36; border: 2px solid #A855F7; box-shadow: 4px 4px 0px 0px #A855F7; padding: 14px;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-                  <div style="width: 36px; height: 36px; background: #A855F7; border: 2px solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">🧝</div>
-                  <div>
-                    <div style="font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #A855F7;">Tinker</div>
-                    <div style="font-family: var(--font-mono); font-size: 10px; color: #A855F7;">THINKING</div>
-                  </div>
-                </div>
-                <div style="font-family: var(--font-body); font-size: 11px; color: #BBB; line-height: 1.5;">
-                  "Tinker is staring at the ceiling thinking really hard..."
-                </div>
-                <div style="margin-top: 10px; height: 4px; background: #333; overflow: hidden;">
-                  <div style="width: 30%; height: 100%; background: #A855F7;"></div>
-                </div>
-              </div>
-              <!-- Jingle — done -->
-              <div style="flex: 1; background: #1e1e36; border: 2px solid #6BCB77; box-shadow: 4px 4px 0px 0px #6BCB77; padding: 14px;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-                  <div style="width: 36px; height: 36px; background: #6BCB77; border: 2px solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">🧝</div>
-                  <div>
-                    <div style="font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #6BCB77;">Jingle</div>
-                    <div style="font-family: var(--font-mono); font-size: 10px; color: #6BCB77;">DONE</div>
-                  </div>
-                </div>
-                <div style="font-family: var(--font-body); font-size: 11px; color: #BBB; line-height: 1.5;">
-                  "Jingle finished and is demanding a cookie as payment."
-                </div>
-                <div style="margin-top: 10px; height: 4px; background: #333; overflow: hidden;">
-                  <div style="width: 100%; height: 100%; background: #6BCB77;"></div>
-                </div>
-              </div>
+          <!-- Terminal body -->
+          <div style="background: #0D0D1A; padding: 16px; font-family: var(--font-mono); font-size: 12px; color: #CCC; line-height: 1.8; min-height: 240px;">
+            <div><span style="color: #6BCB77;">$</span> <span style="color: #FFD93D;">claude</span> "Add OAuth login with Google and GitHub providers"</div>
+            <div style="color: #888; margin-top: 8px;">I'll implement OAuth login. Let me start by creating the auth module...</div>
+            <div style="margin-top: 8px;"><span style="color: #4D96FF;">Edit</span> <span style="color: #A855F7;">src/auth/google.ts</span> <span style="color: #6BCB77;">+47 -0</span></div>
+            <div><span style="color: #4D96FF;">Edit</span> <span style="color: #A855F7;">src/auth/github.ts</span> <span style="color: #6BCB77;">+52 -0</span></div>
+            <div><span style="color: #4D96FF;">Edit</span> <span style="color: #A855F7;">src/auth/index.ts</span> <span style="color: #6BCB77;">+12 -3</span></div>
+            <div style="color: #888; margin-top: 8px;">Running tests to verify...</div>
+            <div style="margin-top: 4px;"><span style="color: #6BCB77;">PASS</span> auth/google.test.ts (4 tests)</div>
+            <div><span style="color: #6BCB77;">PASS</span> auth/github.test.ts (5 tests)</div>
+            <div style="color: #FFD93D; margin-top: 8px;">All tests passing. OAuth login is ready to ship.</div>
+          </div>
+          <!-- Footer -->
+          <div style="background: #1A1A2E; border-top: 3px solid #333; padding: 8px 16px; display: flex; align-items: center; gap: 8px;">
+            <div style="background: #6BCB77; color: #FFF; border: 2px solid #000; box-shadow: 3px 3px 0px 0px #000; padding: 4px 12px; font-family: var(--font-display); font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;">
+              Ship It
             </div>
-            <!-- Activity Feed -->
-            <div style="width: 200px; border-left: 2px solid #333; padding: 12px; font-family: var(--font-mono); font-size: 10px; color: #888; overflow: hidden;">
-              <div style="font-family: var(--font-display); font-weight: 700; font-size: 11px; color: #FFD93D; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px;">Activity</div>
-              <div style="margin-bottom: 8px;"><span style="color: #6BCB77;">Jingle</span> wrote auth/google.ts</div>
-              <div style="margin-bottom: 8px;"><span style="color: #FFD93D;">Spark</span> editing auth/github.ts</div>
-              <div style="margin-bottom: 8px;"><span style="color: #A855F7;">Tinker</span> planning OAuth flow</div>
-              <div style="margin-bottom: 8px;"><span style="color: #6BCB77;">Jingle</span> tests passing (4/4)</div>
-              <div style="margin-bottom: 8px;"><span style="color: #FFD93D;">Spark</span> reading docs...</div>
-              <div style="margin-bottom: 8px;"><span style="color: #A855F7;">Tinker</span> created plan.md</div>
+            <div style="background: #555; color: #FFF; border: 2px solid #000; box-shadow: 3px 3px 0px 0px #000; padding: 4px 12px; font-family: var(--font-display); font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;">
+              Remove
+            </div>
+            <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+              <div style="background: rgba(107,203,119,0.2); color: #6BCB77; border: 2px solid rgba(107,203,119,0.5); padding: 2px 6px; font-family: var(--font-mono); font-size: 10px; font-weight: 700; text-transform: uppercase;">ENDED</div>
+              <div style="font-family: var(--font-mono); font-size: 10px; color: #888;">worktree-add-oauth-login</div>
             </div>
           </div>
         </div>
@@ -1077,7 +1032,7 @@
   <section class="download-section" id="download">
     <div class="container">
       <p class="section-label reveal">Get Started</p>
-      <h2 class="section-title reveal">Summon your elves today</h2>
+      <h2 class="section-title reveal">Get started today</h2>
       <p class="section-desc reveal">Free and open source. macOS first, Linux and Windows coming soon.</p>
 
       <div class="download-actions reveal">
