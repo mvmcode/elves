@@ -30,6 +30,7 @@ pub async fn start_task(
     runtime: String,
     options: Option<String>,
     working_dir: Option<String>,
+    worktree_slug: Option<String>,
 ) -> Result<String, String> {
     let session_id = uuid::Uuid::new_v4().to_string();
     let elf_id = uuid::Uuid::new_v4().to_string();
@@ -37,7 +38,7 @@ pub async fn start_task(
     // 1. Create session in DB
     {
         let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
-        db::sessions::create_session(&conn, &session_id, &project_id, &task, &runtime)
+        db::sessions::create_session(&conn, &session_id, &project_id, &task, &runtime, worktree_slug.as_deref())
             .map_err(|e| format!("Database error: {e}"))?;
     }
 
@@ -183,6 +184,7 @@ pub async fn start_task_pty(
     runtime: String,
     working_dir: Option<String>,
     options: Option<String>,
+    worktree_slug: Option<String>,
 ) -> Result<StartTaskPtyResult, String> {
     // Parse spawn options early — we need to check for resume_session_id
     let spawn_options: ClaudeSpawnOptions = match options {
@@ -213,7 +215,7 @@ pub async fn start_task_pty(
         // 1. Create session in DB
         {
             let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
-            db::sessions::create_session(&conn, &session_id, &project_id, &task, &runtime)
+            db::sessions::create_session(&conn, &session_id, &project_id, &task, &runtime, worktree_slug.as_deref())
                 .map_err(|e| format!("Database error: {e}"))?;
         }
 
@@ -430,6 +432,7 @@ pub async fn start_team_task(
     plan: TaskPlan,
     options: Option<String>,
     working_dir: Option<String>,
+    worktree_slug: Option<String>,
 ) -> Result<String, String> {
     let session_id = uuid::Uuid::new_v4().to_string();
     let runtime = plan.runtime_recommendation.clone();
@@ -437,7 +440,7 @@ pub async fn start_team_task(
     // 1. Create session in DB with agent count from plan
     {
         let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
-        db::sessions::create_session(&conn, &session_id, &project_id, &task, &runtime)
+        db::sessions::create_session(&conn, &session_id, &project_id, &task, &runtime, worktree_slug.as_deref())
             .map_err(|e| format!("Database error: {e}"))?;
     }
 
@@ -562,6 +565,191 @@ pub async fn start_team_task(
     }
 
     Ok(session_id)
+}
+
+/// One PTY entry in a team deployment — returned to the frontend per role.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamPtyInfo {
+    pub role: String,
+    pub pty_id: String,
+    pub elf_id: String,
+}
+
+/// Result from start_team_task_pty — session ID plus one PTY per role.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartTeamTaskPtyResult {
+    pub session_id: String,
+    pub pty_entries: Vec<TeamPtyInfo>,
+}
+
+/// Start a team task in PTY-first mode: one interactive PTY per role.
+///
+/// Creates a single session, one elf per role, and spawns separate Claude
+/// processes in interactive PTY mode. Each role gets a role-scoped prompt.
+/// Returns session ID + a list of PTY entries for the frontend to render
+/// in a split terminal grid.
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub async fn start_team_task_pty(
+    app: AppHandle,
+    db: State<'_, DbState>,
+    pty_mgr: State<'_, PtyManager>,
+    project_id: String,
+    task: String,
+    plan: TaskPlan,
+    options: Option<String>,
+    working_dir: Option<String>,
+    worktree_slug: Option<String>,
+) -> Result<StartTeamTaskPtyResult, String> {
+    let session_id = uuid::Uuid::new_v4().to_string();
+    let runtime = plan.runtime_recommendation.clone();
+
+    // 1. Create session in DB
+    {
+        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+        db::sessions::create_session(&conn, &session_id, &project_id, &task, &runtime, worktree_slug.as_deref())
+            .map_err(|e| format!("Database error: {e}"))?;
+    }
+
+    // 2. Resolve working directory
+    let working_dir = match working_dir {
+        Some(dir) => dir,
+        None => {
+            let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+            let project = db::projects::get_project(&conn, &project_id)
+                .map_err(|e| format!("Database error: {e}"))?
+                .ok_or("Project not found")?;
+            project.path.clone()
+        }
+    };
+
+    // 3. Build memory context once (shared across all roles)
+    let memory_context = {
+        let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+        interop::prepare_context_for_runtime(&conn, &project_id, &runtime)
+            .unwrap_or_else(|e| {
+                log::warn!("Failed to prepare team memory context: {e}");
+                String::new()
+            })
+    };
+
+    // 4. Parse spawn options
+    let spawn_options: ClaudeSpawnOptions = match options {
+        Some(ref json) => match serde_json::from_str(json) {
+            Ok(opts) => opts,
+            Err(e) => {
+                log::warn!("Failed to parse team spawn options: {e}, json={json}");
+                ClaudeSpawnOptions::default()
+            }
+        },
+        None => ClaudeSpawnOptions::default(),
+    };
+
+    // Budget splitting: divide total budget by number of roles
+    let per_role_budget = spawn_options.max_budget_usd.map(|b| b / plan.roles.len() as f64);
+
+    // 5. Create elves and spawn PTYs for each role
+    let mut pty_entries: Vec<TeamPtyInfo> = Vec::with_capacity(plan.roles.len());
+
+    for (i, role) in plan.roles.iter().enumerate() {
+        let elf_id = uuid::Uuid::new_v4().to_string();
+        let avatar = ELF_AVATARS.get(i % ELF_AVATARS.len()).unwrap_or(&"\u{1F9DD}");
+        let color = ELF_COLORS.get(i % ELF_COLORS.len()).unwrap_or(&"#FFD93D");
+
+        // Create elf in DB
+        {
+            let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+            db::elves::create_elf(
+                &conn,
+                &elf_id,
+                &session_id,
+                &role.name,
+                Some(&role.name),
+                avatar,
+                color,
+                None,
+                &role.runtime,
+            )
+            .map_err(|e| format!("Database error creating elf: {e}"))?;
+        }
+
+        let _ = app.emit(
+            "elf:spawned",
+            serde_json::json!({
+                "sessionId": &session_id,
+                "elfId": &elf_id,
+                "role": &role.name,
+                "focus": &role.focus,
+            }),
+        );
+
+        // Build role-scoped prompt
+        let role_prompt = format!(
+            "You are the {}. Your focus: {}\n\nTask: {}",
+            role.name, role.focus, task
+        );
+
+        // Build CLI args (same pattern as start_task_pty)
+        let mut args: Vec<String> = Vec::new();
+        args.push(role_prompt);
+
+        if let Some(ref agent) = spawn_options.agent {
+            args.push("--agent".to_string());
+            args.push(agent.clone());
+        }
+        if let Some(ref model) = spawn_options.model {
+            args.push("--model".to_string());
+            args.push(model.clone());
+        }
+        if let Some(ref mode) = spawn_options.permission_mode {
+            args.push("--permission-mode".to_string());
+            args.push(mode.clone());
+        }
+        if let Some(budget) = per_role_budget {
+            args.push("--max-budget-usd".to_string());
+            args.push(budget.to_string());
+        }
+        if let Some(ref effort) = spawn_options.effort {
+            args.push("--effort".to_string());
+            args.push(effort.clone());
+        }
+
+        // Inject memory context via --append-system-prompt
+        let combined_system_prompt = match (&spawn_options.append_system_prompt, memory_context.is_empty()) {
+            (Some(existing), false) => Some(format!("{existing}\n\n{memory_context}")),
+            (Some(existing), true) => Some(existing.clone()),
+            (None, false) => Some(memory_context.clone()),
+            (None, true) => None,
+        };
+        if let Some(ref prompt) = combined_system_prompt {
+            args.push("--append-system-prompt".to_string());
+            args.push(prompt.clone());
+        }
+
+        // Spawn PTY for this role
+        let pty_id = pty_mgr.spawn_with_app("claude", &args, &working_dir, &app)
+            .map_err(|e| format!("Failed to spawn PTY for role {}: {e}", role.name))?;
+
+        log::info!(
+            "[session {session_id}] Spawned team PTY for role '{}': pty_id={pty_id}",
+            role.name,
+        );
+
+        pty_entries.push(TeamPtyInfo {
+            role: role.name.clone(),
+            pty_id,
+            elf_id,
+        });
+    }
+
+    log::info!(
+        "[session {session_id}] Started team PTY task with {} roles",
+        pty_entries.len(),
+    );
+
+    Ok(StartTeamTaskPtyResult { session_id, pty_entries })
 }
 
 /// Stop a team task. Kills all agent processes and marks the session as cancelled.

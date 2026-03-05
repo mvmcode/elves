@@ -1,8 +1,9 @@
 /* SkillEditor — split panel skill browser and markdown editor with neo-brutalist styling. */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { useSkillStore } from "@/stores/skills";
+import type { SearchPhase } from "@/stores/skills";
 import { useSkillActions } from "@/hooks/useSkillActions";
 import { useAppStore } from "@/stores/app";
 import { useTeamSession } from "@/hooks/useTeamSession";
@@ -14,6 +15,7 @@ import { Badge } from "@/components/shared/Badge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { getEmptyState } from "@/lib/funny-copy";
 import type { Skill } from "@/types/skill";
+import type { SkillSearchResult } from "@/types/search";
 
 /** Default template content for new skills. */
 const NEW_SKILL_TEMPLATE = `## Skill Name
@@ -48,11 +50,22 @@ export function SkillEditor(): React.JSX.Element {
   const activeSkillId = useSkillStore((s) => s.activeSkillId);
   const setActiveSkillId = useSkillStore((s) => s.setActiveSkillId);
   const isLoading = useSkillStore((s) => s.isLoading);
+  const searchQuery = useSkillStore((s) => s.searchQuery);
+  const searchResults = useSkillStore((s) => s.searchResults);
+  const isSearching = useSkillStore((s) => s.isSearching);
+  const searchPhase = useSkillStore((s) => s.searchPhase);
+  const searchError = useSkillStore((s) => s.searchError);
+  const setSearchQuery = useSkillStore((s) => s.setSearchQuery);
+  const setSearchError = useSkillStore((s) => s.setSearchError);
+  const clearSearch = useSkillStore((s) => s.clearSearch);
+
   const {
     handleCreateSkill,
     handleUpdateSkill,
     handleDeleteSkill,
     handleImportFromClaude,
+    handleSearch,
+    handleInstallFromSearch,
   } = useSkillActions();
 
   const { analyzeAndDeploy } = useTeamSession();
@@ -67,6 +80,43 @@ export function SkillEditor(): React.JSX.Element {
   const [editContent, setEditContent] = useState("");
   const [editTrigger, setEditTrigger] = useState("");
   const [isDirty, setIsDirty] = useState(false);
+  const [searchElapsed, setSearchElapsed] = useState(0);
+  const searchTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /** Derive installed skill names from actual skill list — not local state. */
+  const installedSkillNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const skill of skills) {
+      names.add(skill.name);
+    }
+    return names;
+  }, [skills]);
+
+  /** Clear search state when this component unmounts (tab switch). */
+  useEffect(() => {
+    return () => {
+      clearSearch();
+    };
+  }, [clearSearch]);
+
+  /** Track elapsed seconds while searching. */
+  useEffect(() => {
+    if (isSearching) {
+      setSearchElapsed(0);
+      searchTimerRef.current = setInterval(() => {
+        setSearchElapsed((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (searchTimerRef.current) {
+        clearInterval(searchTimerRef.current);
+        searchTimerRef.current = null;
+      }
+      setSearchElapsed(0);
+    }
+    return () => {
+      if (searchTimerRef.current) clearInterval(searchTimerRef.current);
+    };
+  }, [isSearching]);
 
   const activeSkill = skills.find((s) => s.id === activeSkillId) ?? null;
 
@@ -131,6 +181,29 @@ export function SkillEditor(): React.JSX.Element {
     });
   }, [handleImportFromClaude]);
 
+  const handleSearchSubmit = useCallback((): void => {
+    void handleSearch(searchQuery);
+  }, [searchQuery, handleSearch]);
+
+  const handleSearchKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>): void => {
+      if (event.key === "Enter") {
+        void handleSearch(searchQuery);
+      }
+      if (event.key === "Escape") {
+        clearSearch();
+      }
+    },
+    [searchQuery, handleSearch, clearSearch],
+  );
+
+  const handleInstallResult = useCallback(
+    (result: SkillSearchResult): void => {
+      void handleInstallFromSearch(result);
+    },
+    [handleInstallFromSearch],
+  );
+
   /** Export skill content as a .md file via native save dialog. */
   const handleExport = useCallback((): void => {
     void (async () => {
@@ -152,6 +225,8 @@ export function SkillEditor(): React.JSX.Element {
   /* Group skills: global first, then project-scoped */
   const globalSkills = skills.filter((s) => s.projectId === null);
   const projectSkills = skills.filter((s) => s.projectId !== null);
+
+  const hasSearchContent = searchResults.length > 0 || searchError !== null;
 
   if (!controlConfig.supportsSkills) {
     return (
@@ -192,6 +267,145 @@ export function SkillEditor(): React.JSX.Element {
           >
             {importStatus ?? "Import from Claude"}
           </Button>
+        </div>
+
+        {/* Search bar — consistent with McpManager */}
+        <div className="border-b-token-normal border-border p-3" data-testid="skill-search">
+          <div className="flex gap-1">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                className="w-full border-token-thin border-border bg-surface-elevated rounded-token-md px-2 py-1.5 pr-6 font-body text-xs outline-none focus:focus-ring"
+                placeholder="Search skills..."
+                disabled={isSearching}
+                data-testid="skill-search-input"
+              />
+              {/* Clear input button */}
+              {(searchQuery || hasSearchContent) && !isSearching && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 font-body text-sm text-text-light/40 hover:text-text-light"
+                  title="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            {isSearching ? (
+              <Button
+                variant="danger"
+                className="px-2 py-1 text-xs"
+                onClick={() => {
+                  useSkillStore.getState().setSearching(false);
+                  useSkillStore.getState().setSearchPhase(null);
+                }}
+              >
+                Cancel
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                className="px-2 py-1 text-xs"
+                onClick={handleSearchSubmit}
+                disabled={!searchQuery.trim()}
+              >
+                Search
+              </Button>
+            )}
+          </div>
+
+          {/* Search progress — consistent with McpManager */}
+          {isSearching && (
+            <div className="mt-2 flex items-center gap-2" data-testid="skill-search-progress">
+              <span className="inline-block h-2 w-2 animate-pulse border-[1px] border-border bg-accent" />
+              <span className="font-body text-xs font-bold">
+                {getSkillSearchPhaseLabel(searchPhase)}
+              </span>
+              <span className="font-mono text-xs text-text-light/50">({searchElapsed}s)</span>
+            </div>
+          )}
+
+          {/* Search error — consistent with McpManager */}
+          {searchError && !isSearching && (
+            <div className="mt-2 flex items-center justify-between rounded-token-sm border-token-thin border-error/40 bg-error/10 px-2 py-1.5" data-testid="skill-search-error">
+              <span className="font-body text-xs font-bold text-error">{searchError}</span>
+              <button
+                onClick={() => setSearchError(null)}
+                className="font-body text-xs text-error hover:underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Search results */}
+          {searchResults.length > 0 && (
+            <div className="mt-2 flex flex-col gap-1" data-testid="skill-search-results">
+              <div className="flex items-center justify-between">
+                <p className="font-body text-xs text-text-light/50">
+                  Results ({searchResults.length})
+                </p>
+                <button
+                  onClick={clearSearch}
+                  className="font-body text-xs text-text-light/50 hover:text-text-light"
+                  title="Close results"
+                >
+                  Close
+                </button>
+              </div>
+              {searchResults.map((result) => {
+                const installed = installedSkillNames.has(result.name);
+                return (
+                  <div
+                    key={`${result.name}-${result.category ?? ""}`}
+                    className={[
+                      "border-token-thin border-border bg-surface-elevated rounded-token-sm p-2",
+                      installed ? "opacity-60" : "",
+                    ].join(" ")}
+                    data-testid="skill-search-result"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="font-body text-xs font-bold truncate" title={result.name}>{result.name}</p>
+                      <div className="flex items-center gap-1">
+                        {result.stars != null && result.stars > 0 && (
+                          <span className="font-mono text-xs text-text-light/50" title="GitHub stars">
+                            {result.stars.toLocaleString()}★
+                          </span>
+                        )}
+                        {result.category && (
+                          <Badge variant="default">{result.category}</Badge>
+                        )}
+                      </div>
+                    </div>
+                    <p className="mt-0.5 font-body text-xs text-text-light/60 line-clamp-2">
+                      {result.description}
+                    </p>
+                    {result.installUrl && (
+                      <a
+                        href={result.installUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-0.5 block truncate font-body text-xs text-info hover:underline"
+                      >
+                        {result.author ?? "GitHub"}
+                      </a>
+                    )}
+                    <Button
+                      variant={installed ? "secondary" : "primary"}
+                      className="mt-1.5 w-full px-2 py-1 text-xs"
+                      onClick={() => handleInstallResult(result)}
+                      disabled={installed}
+                    >
+                      {installed ? "Installed" : "Install"}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Skill list */}
@@ -387,6 +601,20 @@ function ViewModeToggle({
       })}
     </div>
   );
+}
+
+/** Map a search phase to a user-friendly label for the skill search UI. */
+function getSkillSearchPhaseLabel(phase: SearchPhase): string {
+  switch (phase) {
+    case "fetching":
+      return "Searching GitHub...";
+    case "done":
+      return "Done";
+    case "error":
+      return "Search failed";
+    default:
+      return "Searching...";
+  }
 }
 
 /** Individual skill item in the left panel list. */

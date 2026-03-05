@@ -1,19 +1,15 @@
 /* UI state — tracks panel visibility, modals, and transient UI concerns. */
 
 import { create } from "zustand";
-import type { WorkshopViewMode } from "@/types/workshop";
 
-/** Top-level views the shell can render in the main content area.
- * Note: "files" was removed — it is now a persistent side panel, not a view. */
-export type AppView = "session" | "memory" | "skills" | "mcp" | "history" | "settings" | "comparison";
+/** Top-level views the shell can render in the main content area. */
+export type AppView = "workspace" | "files" | "memory" | "skills" | "mcp" | "history" | "settings" | "comparison";
 
 /** Panel width constraints for resizable layout. */
 const SIDEBAR_MIN = 200;
 const SIDEBAR_MAX = 400;
 const ACTIVITY_FEED_MIN = 280;
 const ACTIVITY_FEED_MAX = 600;
-const FILE_TREE_MIN = 180;
-const FILE_TREE_MAX = 400;
 
 /** Clamps a value between min and max (inclusive). */
 function clamp(value: number, min: number, max: number): number {
@@ -41,16 +37,8 @@ interface UiState {
   readonly isTerminalPanelOpen: boolean;
   /** Height of the bottom terminal panel in pixels. */
   readonly terminalPanelHeight: number;
-  /** Workshop view mode — toggle between pixel art workshop and card grid. */
-  readonly workshopViewMode: WorkshopViewMode;
-  /** ID of the elf currently selected in the workshop scene. */
-  readonly selectedWorkshopElfId: string | null;
   /** Whether the sidebar is collapsed to icon-only mode. */
   readonly isSidebarCollapsed: boolean;
-  /** Whether the file tree side panel is visible. */
-  readonly isFileTreeVisible: boolean;
-  /** Width of the file tree panel in pixels (180–400). */
-  readonly fileTreeWidth: number;
   /** Path of the file currently open in the FileViewer, or null. */
   readonly selectedFilePath: string | null;
   /** Whether focus mode is active (hides all chrome, terminal fills screen). */
@@ -72,12 +60,7 @@ interface UiState {
   /** One-shot open — sets isTerminalPanelOpen to true only if currently false. */
   openTerminalPanel: () => void;
   setTerminalPanelHeight: (height: number) => void;
-  setWorkshopViewMode: (mode: WorkshopViewMode) => void;
-  toggleWorkshopViewMode: () => void;
-  setSelectedWorkshopElfId: (id: string | null) => void;
   toggleSidebarCollapsed: () => void;
-  toggleFileTree: () => void;
-  setFileTreeWidth: (width: number) => void;
   setSelectedFilePath: (path: string | null) => void;
   toggleFocusMode: () => void;
   setFileEditing: (editing: boolean) => void;
@@ -87,7 +70,7 @@ interface UiState {
 export const useUiStore = create<UiState>((set) => ({
   isTaskBarFocused: false,
   isSettingsOpen: false,
-  activeView: "session",
+  activeView: "workspace",
   isNewProjectDialogOpen: false,
   sidebarWidth: 256,
   activityFeedWidth: 384,
@@ -95,11 +78,7 @@ export const useUiStore = create<UiState>((set) => ({
   highlightedSessionId: null,
   isTerminalPanelOpen: false,
   terminalPanelHeight: 300,
-  workshopViewMode: "workshop" as WorkshopViewMode,
-  selectedWorkshopElfId: null,
   isSidebarCollapsed: false,
-  isFileTreeVisible: false,
-  fileTreeWidth: 250,
   selectedFilePath: null,
   isFocusMode: false,
   isFileEditing: false,
@@ -116,14 +95,7 @@ export const useUiStore = create<UiState>((set) => ({
   toggleTerminalPanel: () => set((state) => ({ isTerminalPanelOpen: !state.isTerminalPanelOpen })),
   openTerminalPanel: () => set((state) => state.isTerminalPanelOpen ? state : { isTerminalPanelOpen: true }),
   setTerminalPanelHeight: (height: number) => set({ terminalPanelHeight: clamp(height, 150, 800) }),
-  setWorkshopViewMode: (mode: WorkshopViewMode) => set({ workshopViewMode: mode }),
-  toggleWorkshopViewMode: () => set((state) => ({
-    workshopViewMode: state.workshopViewMode === "workshop" ? "cards" : "workshop",
-  })),
-  setSelectedWorkshopElfId: (id: string | null) => set({ selectedWorkshopElfId: id }),
   toggleSidebarCollapsed: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
-  toggleFileTree: () => set((state) => ({ isFileTreeVisible: !state.isFileTreeVisible })),
-  setFileTreeWidth: (width: number) => set({ fileTreeWidth: clamp(width, FILE_TREE_MIN, FILE_TREE_MAX) }),
   setSelectedFilePath: (path: string | null) => set({ selectedFilePath: path, isFileEditing: false, isFileDirty: false }),
   toggleFocusMode: () => set((state) => ({
     isFocusMode: !state.isFocusMode,

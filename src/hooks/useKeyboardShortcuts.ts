@@ -75,7 +75,7 @@ export function useKeyboardShortcuts(
         if (isTaskBarFocused) {
           setTaskBarFocused(false);
         } else {
-          setActiveView("session");
+          setActiveView("workspace");
         }
         return;
       }
@@ -165,12 +165,12 @@ export function useKeyboardShortcuts(
 
         case "m":
           event.preventDefault();
-          setActiveView(activeView === "memory" ? "session" : "memory");
+          setActiveView(activeView === "memory" ? "workspace" : "memory");
           break;
 
         case ",":
           event.preventDefault();
-          setActiveView(activeView === "settings" ? "session" : "settings");
+          setActiveView(activeView === "settings" ? "workspace" : "settings");
           break;
 
         case "/":

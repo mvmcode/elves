@@ -25,6 +25,8 @@ pub struct SessionRow {
     pub summary: Option<String>,
     /// Claude Code's internal session ID, used for `claude --resume`.
     pub claude_session_id: Option<String>,
+    /// Workspace slug linking this session to a worktree-based workspace.
+    pub worktree_slug: Option<String>,
 }
 
 /// Insert a new session into the database. Returns the created session row.
@@ -37,12 +39,13 @@ pub fn create_session(
     project_id: &str,
     task: &str,
     runtime: &str,
+    worktree_slug: Option<&str>,
 ) -> Result<SessionRow, DbError> {
     let now = chrono::Utc::now().timestamp();
     conn.execute(
-        "INSERT INTO sessions (id, project_id, task, runtime, status, agent_count, started_at, tokens_used, cost_estimate)
-         VALUES (?1, ?2, ?3, ?4, 'active', 1, ?5, 0, 0.0)",
-        params![id, project_id, task, runtime, now],
+        "INSERT INTO sessions (id, project_id, task, runtime, status, agent_count, started_at, tokens_used, cost_estimate, worktree_slug)
+         VALUES (?1, ?2, ?3, ?4, 'active', 1, ?5, 0, 0.0, ?6)",
+        params![id, project_id, task, runtime, now, worktree_slug],
     )?;
 
     get_session(conn, id)?.ok_or_else(|| {
@@ -54,7 +57,8 @@ pub fn create_session(
 pub fn get_session(conn: &Connection, id: &str) -> Result<Option<SessionRow>, DbError> {
     let mut stmt = conn.prepare(
         "SELECT id, project_id, task, runtime, status, plan, agent_count,
-                started_at, ended_at, tokens_used, cost_estimate, summary, claude_session_id
+                started_at, ended_at, tokens_used, cost_estimate, summary, claude_session_id,
+                worktree_slug
          FROM sessions WHERE id = ?1",
     )?;
 
@@ -74,6 +78,7 @@ pub fn get_session(conn: &Connection, id: &str) -> Result<Option<SessionRow>, Db
                 cost_estimate: row.get(10)?,
                 summary: row.get(11)?,
                 claude_session_id: row.get(12)?,
+                worktree_slug: row.get(13)?,
             })
         })
         .optional()?;
@@ -88,7 +93,8 @@ pub fn list_sessions(
 ) -> Result<Vec<SessionRow>, DbError> {
     let mut stmt = conn.prepare(
         "SELECT id, project_id, task, runtime, status, plan, agent_count,
-                started_at, ended_at, tokens_used, cost_estimate, summary, claude_session_id
+                started_at, ended_at, tokens_used, cost_estimate, summary, claude_session_id,
+                worktree_slug
          FROM sessions WHERE project_id = ?1 ORDER BY started_at DESC",
     )?;
 
@@ -108,6 +114,7 @@ pub fn list_sessions(
                 cost_estimate: row.get(10)?,
                 summary: row.get(11)?,
                 claude_session_id: row.get(12)?,
+                worktree_slug: row.get(13)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -183,6 +190,45 @@ pub fn cleanup_stale_sessions(conn: &Connection) -> Result<usize, DbError> {
     Ok(rows)
 }
 
+/// Retrieve the most recent session for a given project + workspace slug combination.
+/// Used to offer "Resume" on workspace cards when a previous session exists.
+pub fn get_last_session_for_workspace(
+    conn: &Connection,
+    project_id: &str,
+    worktree_slug: &str,
+) -> Result<Option<SessionRow>, DbError> {
+    let mut stmt = conn.prepare(
+        "SELECT id, project_id, task, runtime, status, plan, agent_count,
+                started_at, ended_at, tokens_used, cost_estimate, summary, claude_session_id,
+                worktree_slug
+         FROM sessions WHERE project_id = ?1 AND worktree_slug = ?2
+         ORDER BY started_at DESC LIMIT 1",
+    )?;
+
+    let result = stmt
+        .query_row(params![project_id, worktree_slug], |row| {
+            Ok(SessionRow {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                task: row.get(2)?,
+                runtime: row.get(3)?,
+                status: row.get(4)?,
+                plan: row.get(5)?,
+                agent_count: row.get(6)?,
+                started_at: row.get(7)?,
+                ended_at: row.get(8)?,
+                tokens_used: row.get(9)?,
+                cost_estimate: row.get(10)?,
+                summary: row.get(11)?,
+                claude_session_id: row.get(12)?,
+                worktree_slug: row.get(13)?,
+            })
+        })
+        .optional()?;
+
+    Ok(result)
+}
+
 /// Use rusqlite's optional() extension for query_row.
 trait OptionalExt<T> {
     fn optional(self) -> Result<Option<T>, rusqlite::Error>;
@@ -227,7 +273,7 @@ mod tests {
         let conn = test_conn();
         seed_project(&conn, "proj-1");
 
-        let session = create_session(&conn, "sess-1", "proj-1", "Fix the login bug", "claude-code")
+        let session = create_session(&conn, "sess-1", "proj-1", "Fix the login bug", "claude-code", None)
             .expect("Should create session");
 
         assert_eq!(session.id, "sess-1");
@@ -254,9 +300,9 @@ mod tests {
         seed_project(&conn, "proj-1");
         seed_project(&conn, "proj-2");
 
-        create_session(&conn, "s1", "proj-1", "Task A", "claude-code").unwrap();
-        create_session(&conn, "s2", "proj-1", "Task B", "claude-code").unwrap();
-        create_session(&conn, "s3", "proj-2", "Task C", "codex").unwrap();
+        create_session(&conn, "s1", "proj-1", "Task A", "claude-code", None).unwrap();
+        create_session(&conn, "s2", "proj-1", "Task B", "claude-code", None).unwrap();
+        create_session(&conn, "s3", "proj-2", "Task C", "codex", None).unwrap();
 
         let sessions = list_sessions(&conn, "proj-1").expect("Should list sessions");
         assert_eq!(sessions.len(), 2);
@@ -279,7 +325,7 @@ mod tests {
     fn update_session_status_to_completed() {
         let conn = test_conn();
         seed_project(&conn, "proj-1");
-        create_session(&conn, "s1", "proj-1", "Task A", "claude-code").unwrap();
+        create_session(&conn, "s1", "proj-1", "Task A", "claude-code", None).unwrap();
 
         let updated = update_session_status(&conn, "s1", "completed", Some("All done"))
             .expect("Should update");
@@ -297,7 +343,7 @@ mod tests {
     fn update_session_status_to_error() {
         let conn = test_conn();
         seed_project(&conn, "proj-1");
-        create_session(&conn, "s1", "proj-1", "Task A", "claude-code").unwrap();
+        create_session(&conn, "s1", "proj-1", "Task A", "claude-code", None).unwrap();
 
         update_session_status(&conn, "s1", "error", Some("Something broke"))
             .expect("Should update");
@@ -312,7 +358,7 @@ mod tests {
     fn update_session_status_to_cancelled() {
         let conn = test_conn();
         seed_project(&conn, "proj-1");
-        create_session(&conn, "s1", "proj-1", "Task A", "claude-code").unwrap();
+        create_session(&conn, "s1", "proj-1", "Task A", "claude-code", None).unwrap();
 
         update_session_status(&conn, "s1", "cancelled", None).expect("Should update");
 
@@ -340,7 +386,7 @@ mod tests {
     fn serializes_to_camel_case_json() {
         let conn = test_conn();
         seed_project(&conn, "proj-1");
-        let session = create_session(&conn, "s1", "proj-1", "Task A", "claude-code").unwrap();
+        let session = create_session(&conn, "s1", "proj-1", "Task A", "claude-code", None).unwrap();
         let json = serde_json::to_string(&session).expect("Should serialize");
         assert!(json.contains("projectId"));
         assert!(json.contains("startedAt"));
@@ -354,7 +400,7 @@ mod tests {
     fn update_session_usage() {
         let conn = test_conn();
         seed_project(&conn, "proj-1");
-        create_session(&conn, "s1", "proj-1", "Task A", "claude-code").unwrap();
+        create_session(&conn, "s1", "proj-1", "Task A", "claude-code", None).unwrap();
 
         let updated = super::update_session_usage(&conn, "s1", 1500, 0.0342)
             .expect("Should update usage");
@@ -395,5 +441,51 @@ mod tests {
         let sessions = list_sessions(&conn, "proj-1").unwrap();
         assert_eq!(sessions[0].id, "newer");
         assert_eq!(sessions[1].id, "older");
+    }
+
+    #[test]
+    fn create_session_with_worktree_slug() {
+        let conn = test_conn();
+        seed_project(&conn, "proj-1");
+
+        let session = create_session(&conn, "s1", "proj-1", "Task A", "claude-code", Some("fix-login"))
+            .expect("Should create session with worktree_slug");
+        assert_eq!(session.worktree_slug.as_deref(), Some("fix-login"));
+    }
+
+    #[test]
+    fn get_last_session_for_workspace_returns_most_recent() {
+        let conn = test_conn();
+        seed_project(&conn, "proj-1");
+
+        // Insert two sessions with the same worktree_slug but different timestamps
+        let ts1 = 1000i64;
+        let ts2 = 2000i64;
+        conn.execute(
+            "INSERT INTO sessions (id, project_id, task, runtime, status, agent_count, started_at, tokens_used, cost_estimate, worktree_slug)
+             VALUES ('older', 'proj-1', 'Old task', 'claude-code', 'completed', 1, ?1, 0, 0.0, 'fix-login')",
+            params![ts1],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO sessions (id, project_id, task, runtime, status, agent_count, started_at, tokens_used, cost_estimate, worktree_slug)
+             VALUES ('newer', 'proj-1', 'New task', 'claude-code', 'completed', 1, ?1, 0, 0.0, 'fix-login')",
+            params![ts2],
+        ).unwrap();
+
+        let result = get_last_session_for_workspace(&conn, "proj-1", "fix-login")
+            .expect("Should query")
+            .expect("Should find session");
+        assert_eq!(result.id, "newer");
+        assert_eq!(result.worktree_slug.as_deref(), Some("fix-login"));
+    }
+
+    #[test]
+    fn get_last_session_for_workspace_returns_none_when_no_match() {
+        let conn = test_conn();
+        seed_project(&conn, "proj-1");
+
+        let result = get_last_session_for_workspace(&conn, "proj-1", "nonexistent")
+            .expect("Should query without error");
+        assert!(result.is_none());
     }
 }

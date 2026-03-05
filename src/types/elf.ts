@@ -3,6 +3,24 @@
 /** Supported agent runtimes */
 export type Runtime = "claude-code" | "codex";
 
+/** Avatar IDs matching the 15 elf names in order. */
+export type AvatarId =
+  | "spark"
+  | "tinker"
+  | "jingle"
+  | "sprocket"
+  | "nimble"
+  | "flicker"
+  | "bramble"
+  | "thistle"
+  | "cobalt"
+  | "pip"
+  | "fern"
+  | "maple"
+  | "cricket"
+  | "rune"
+  | "ember";
+
 /** All possible elf operational states */
 export type ElfStatus =
   | "spawning"

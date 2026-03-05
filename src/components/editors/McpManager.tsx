@@ -1,8 +1,9 @@
 /* McpManager — neo-brutalist card grid for managing MCP server configurations. */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useMcpStore } from "@/stores/mcp";
 import { useMcpActions } from "@/hooks/useMcpActions";
+import type { SearchPhase } from "@/stores/mcp";
 import { useAppStore } from "@/stores/app";
 import { getRuntimeControlConfig } from "@/lib/runtime-controls";
 import { listMcpTools, type McpTool } from "@/lib/tauri";
@@ -11,6 +12,7 @@ import { Badge } from "@/components/shared/Badge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { getEmptyState } from "@/lib/funny-copy";
 import type { McpServer } from "@/types/mcp";
+import type { McpSearchResult } from "@/types/search";
 
 /**
  * MCP server manager with a card grid and add server form.
@@ -22,12 +24,23 @@ export function McpManager(): React.JSX.Element {
 
   const servers = useMcpStore((s) => s.servers);
   const isLoading = useMcpStore((s) => s.isLoading);
+  const searchQuery = useMcpStore((s) => s.searchQuery);
+  const searchResults = useMcpStore((s) => s.searchResults);
+  const isSearching = useMcpStore((s) => s.isSearching);
+  const searchPhase = useMcpStore((s) => s.searchPhase);
+  const searchError = useMcpStore((s) => s.searchError);
+  const setSearchQuery = useMcpStore((s) => s.setSearchQuery);
+  const setSearchError = useMcpStore((s) => s.setSearchError);
+  const clearSearch = useMcpStore((s) => s.clearSearch);
+
   const {
     handleAddServer,
     handleToggleServer,
     handleHealthCheck,
     handleImportFromClaude,
     handleDeleteServer,
+    handleSearch,
+    handleInstallFromSearch,
   } = useMcpActions();
 
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
@@ -39,6 +52,44 @@ export function McpManager(): React.JSX.Element {
   const [toolsData, setToolsData] = useState<Record<string, McpTool[]>>({});
   const [toolsExpanded, setToolsExpanded] = useState<Record<string, boolean>>({});
   const [toolsLoading, setToolsLoading] = useState<Record<string, boolean>>({});
+  const [searchElapsed, setSearchElapsed] = useState(0);
+  const searchTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /** Derive installed names from actual server list — not local state. */
+  const installedNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const server of servers) {
+      names.add(server.name);
+      names.add(server.command);
+    }
+    return names;
+  }, [servers]);
+
+  /** Clear search state when this component unmounts (tab switch). */
+  useEffect(() => {
+    return () => {
+      clearSearch();
+    };
+  }, [clearSearch]);
+
+  /** Track elapsed seconds while searching. */
+  useEffect(() => {
+    if (isSearching) {
+      setSearchElapsed(0);
+      searchTimerRef.current = setInterval(() => {
+        setSearchElapsed((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (searchTimerRef.current) {
+        clearInterval(searchTimerRef.current);
+        searchTimerRef.current = null;
+      }
+      setSearchElapsed(0);
+    }
+    return () => {
+      if (searchTimerRef.current) clearInterval(searchTimerRef.current);
+    };
+  }, [isSearching]);
 
   const handleSubmitAdd = useCallback((): void => {
     if (!addName.trim() || !addCommand.trim()) return;
@@ -68,11 +119,9 @@ export function McpManager(): React.JSX.Element {
 
   const handleShowTools = useCallback((server: McpServer): void => {
     if (toolsData[server.id] !== undefined) {
-      // Already loaded — just toggle visibility
       setToolsExpanded((prev) => ({ ...prev, [server.id]: !prev[server.id] }));
       return;
     }
-    // Fetch tools for the first time
     setToolsLoading((prev) => ({ ...prev, [server.id]: true }));
     void listMcpTools(server.id)
       .then((tools) => {
@@ -93,6 +142,39 @@ export function McpManager(): React.JSX.Element {
   const handleImport = useCallback((): void => {
     void handleImportFromClaude();
   }, [handleImportFromClaude]);
+
+  const handleSearchSubmit = useCallback((): void => {
+    void handleSearch(searchQuery);
+  }, [searchQuery, handleSearch]);
+
+  const handleSearchKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>): void => {
+      if (event.key === "Enter") {
+        void handleSearch(searchQuery);
+      }
+      if (event.key === "Escape") {
+        clearSearch();
+      }
+    },
+    [searchQuery, handleSearch, clearSearch],
+  );
+
+  const handleInstallResult = useCallback(
+    (result: McpSearchResult): void => {
+      void handleInstallFromSearch(result);
+    },
+    [handleInstallFromSearch],
+  );
+
+  /** Check if a search result is already installed by matching name or command. */
+  const isResultInstalled = useCallback(
+    (result: McpSearchResult): boolean => {
+      return installedNames.has(result.name) || installedNames.has(result.command);
+    },
+    [installedNames],
+  );
+
+  const hasSearchContent = searchResults.length > 0 || searchError !== null;
 
   if (!controlConfig.supportsMcp) {
     return (
@@ -129,6 +211,134 @@ export function McpManager(): React.JSX.Element {
           </Button>
         </div>
       </div>
+
+      {/* Search bar */}
+      <div className="mb-4 flex gap-2" data-testid="mcp-search">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            className="w-full border-token-normal border-border bg-surface-elevated rounded-token-md px-3 py-2 pr-8 font-body text-sm outline-none focus:focus-ring"
+            placeholder="Search MCP servers (e.g., github, filesystem, database)..."
+            disabled={isSearching}
+            data-testid="mcp-search-input"
+          />
+          {/* Clear input button */}
+          {(searchQuery || hasSearchContent) && !isSearching && (
+            <button
+              onClick={clearSearch}
+              className="absolute right-2 top-1/2 -translate-y-1/2 font-body text-lg text-text-light/40 hover:text-text-light"
+              title="Clear search"
+            >
+              ×
+            </button>
+          )}
+        </div>
+        {isSearching ? (
+          <Button
+            variant="danger"
+            className="px-4 text-sm"
+            onClick={() => {
+              useMcpStore.getState().setSearching(false);
+              useMcpStore.getState().setSearchPhase(null);
+            }}
+          >
+            Cancel
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            className="px-4 text-sm"
+            onClick={handleSearchSubmit}
+            disabled={!searchQuery.trim()}
+          >
+            Search
+          </Button>
+        )}
+      </div>
+
+      {/* Search progress indicator */}
+      {isSearching && (
+        <div className="mb-4 flex items-center gap-3 border-token-normal border-border bg-accent-light rounded-token-md px-4 py-3" data-testid="mcp-search-progress">
+          <span className="inline-block h-3 w-3 animate-pulse border-token-thin border-border bg-accent" />
+          <span className="font-body text-sm font-bold">
+            {getSearchPhaseLabel(searchPhase)}
+          </span>
+          <span className="font-mono text-xs text-text-light/60">({searchElapsed}s)</span>
+        </div>
+      )}
+
+      {/* Search error banner */}
+      {searchError && !isSearching && (
+        <div className="mb-4 flex items-center justify-between border-token-normal border-border bg-error/10 rounded-token-md px-4 py-3" data-testid="mcp-search-error">
+          <span className="font-body text-sm font-bold text-error">{searchError}</span>
+          <button
+            onClick={() => setSearchError(null)}
+            className="font-body text-xs font-bold text-error hover:underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Search results */}
+      {searchResults.length > 0 && (
+        <div className="mb-4" data-testid="mcp-search-results">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-display text-lg text-heading">
+              Search Results
+              <span className="ml-2 font-body text-sm text-text-light/50">({searchResults.length})</span>
+            </h3>
+            <Button variant="secondary" className="px-3 py-1 text-xs" onClick={clearSearch}>
+              Close Results
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {searchResults.map((result) => {
+              const installed = isResultInstalled(result);
+              return (
+                <div
+                  key={`${result.name}-${result.command}`}
+                  className={[
+                    "border-token-normal border-border bg-surface-elevated rounded-token-md p-4 shadow-brutal",
+                    installed ? "opacity-60" : "",
+                  ].join(" ")}
+                  data-testid="mcp-search-result-card"
+                >
+                  <div className="mb-1 flex items-center justify-between">
+                    <h4 className="font-display text-base font-bold text-heading truncate" title={result.name}>{result.name}</h4>
+                    {result.author && (
+                      <Badge variant="default">{result.author}</Badge>
+                    )}
+                  </div>
+                  <p className="mb-2 font-body text-xs text-text-light/70 line-clamp-2">{result.description}</p>
+                  <p className="mb-1 truncate font-mono text-xs text-text-light/50" title={result.command}>{result.command}</p>
+                  {result.sourceUrl && (
+                    <a
+                      href={result.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mb-2 block truncate font-body text-xs text-info hover:underline"
+                    >
+                      {result.sourceUrl}
+                    </a>
+                  )}
+                  <Button
+                    variant={installed ? "secondary" : "primary"}
+                    className="mt-2 w-full text-xs"
+                    onClick={() => handleInstallResult(result)}
+                    disabled={installed}
+                  >
+                    {installed ? "Installed" : "Install"}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Add server form */}
       {isAddFormOpen && (
@@ -311,4 +521,18 @@ export function McpManager(): React.JSX.Element {
       )}
     </div>
   );
+}
+
+/** Map a search phase to a user-friendly label. */
+function getSearchPhaseLabel(phase: SearchPhase): string {
+  switch (phase) {
+    case "fetching":
+      return "Searching npm registry...";
+    case "done":
+      return "Done";
+    case "error":
+      return "Search failed";
+    default:
+      return "Searching...";
+  }
 }

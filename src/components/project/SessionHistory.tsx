@@ -186,7 +186,7 @@ export function SessionHistory(): React.JSX.Element {
         };
 
         openHistoricalFloor(activeSession, elfEvents);
-        setActiveView("session");
+        setActiveView("workspace");
       } catch (error) {
         console.error("Failed to open session as floor:", error);
       }

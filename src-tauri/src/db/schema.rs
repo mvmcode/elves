@@ -5,7 +5,7 @@ use rusqlite::Connection;
 use super::DbError;
 
 /// Current schema version. Increment this when adding new migrations.
-const CURRENT_VERSION: i32 = 4;
+const CURRENT_VERSION: i32 = 5;
 
 /// Run all pending migrations up to CURRENT_VERSION.
 /// Uses a schema_version table to track which migrations have been applied.
@@ -37,6 +37,9 @@ pub fn run_migrations(conn: &Connection) -> Result<(), DbError> {
     }
     if current < 4 {
         migrate_v4(conn)?;
+    }
+    if current < 5 {
+        migrate_v5(conn)?;
     }
 
     Ok(())
@@ -305,6 +308,28 @@ fn migrate_v4(conn: &Connection) -> Result<(), DbError> {
     )
     .map_err(|e| DbError::Migration {
         version: 4,
+        message: e.to_string(),
+    })?;
+
+    Ok(())
+}
+
+/// Migration v5: Add worktree_slug column to sessions for workspace-session linking.
+///
+/// Stores the workspace slug on each session so we can find the last session for a
+/// given workspace when the user reopens it (session resume support).
+fn migrate_v5(conn: &Connection) -> Result<(), DbError> {
+    conn.execute_batch(
+        "
+        ALTER TABLE sessions ADD COLUMN worktree_slug TEXT;
+        CREATE INDEX IF NOT EXISTS idx_sessions_worktree ON sessions(worktree_slug);
+
+        -- Record this migration
+        INSERT INTO schema_version (version) VALUES (5);
+        ",
+    )
+    .map_err(|e| DbError::Migration {
+        version: 5,
         message: e.to_string(),
     })?;
 
