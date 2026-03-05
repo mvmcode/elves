@@ -222,6 +222,6 @@ describe("SessionHistory", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(mockOpenHistoricalFloor).toHaveBeenCalled();
-    expect(mockSetActiveView).toHaveBeenCalledWith("session");
+    expect(mockSetActiveView).toHaveBeenCalledWith("workspace");
   });
 });

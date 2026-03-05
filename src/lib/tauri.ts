@@ -59,6 +59,14 @@ export async function listSessionEvents(sessionId: string): Promise<SessionEvent
   return invoke<SessionEvent[]>("list_session_events", { sessionId });
 }
 
+/** Get the most recent session for a project + workspace slug. Used for session resume on workspace cards. */
+export async function getLastWorkspaceSession(
+  projectId: string,
+  worktreeSlug: string,
+): Promise<Session | null> {
+  return invoke<Session | null>("get_last_workspace_session", { projectId, worktreeSlug });
+}
+
 /** Start a task — creates session, spawns elf, starts agent process. Returns session ID.
  * When `workingDir` is provided, the agent runs in that directory instead of the project root. */
 export async function startTask(
@@ -86,9 +94,10 @@ export async function startTaskPty(
   runtime: string,
   workingDir?: string,
   spawnOptions?: ClaudeSpawnOptions,
+  worktreeSlug?: string,
 ): Promise<StartTaskPtyResult> {
   const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
-  return invoke<StartTaskPtyResult>("start_task_pty", { projectId, task, runtime, workingDir, options });
+  return invoke<StartTaskPtyResult>("start_task_pty", { projectId, task, runtime, workingDir, options, worktreeSlug });
 }
 
 /** Stop a running task. Returns true if a process was killed. */
@@ -115,6 +124,33 @@ export async function startTeamTask(
 ): Promise<string> {
   const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
   return invoke<string>("start_team_task", { projectId, task, plan, options, workingDir });
+}
+
+/** One PTY entry in a team deployment — one per role. */
+export interface TeamPtyInfo {
+  readonly role: string;
+  readonly ptyId: string;
+  readonly elfId: string;
+}
+
+/** Result from startTeamTaskPty — session ID + PTY entries for split terminal. */
+export interface StartTeamTaskPtyResult {
+  readonly sessionId: string;
+  readonly ptyEntries: readonly TeamPtyInfo[];
+}
+
+/** Start a team task in PTY-first mode — one interactive PTY per role.
+ * Returns session ID + PTY entries for the frontend to render in a split grid. */
+export async function startTeamTaskPty(
+  projectId: string,
+  task: string,
+  plan: TaskPlan,
+  workingDir?: string,
+  spawnOptions?: ClaudeSpawnOptions,
+  worktreeSlug?: string,
+): Promise<StartTeamTaskPtyResult> {
+  const options = spawnOptions ? JSON.stringify(spawnOptions) : undefined;
+  return invoke<StartTeamTaskPtyResult>("start_team_task_pty", { projectId, task, plan, options, workingDir, worktreeSlug });
 }
 
 /** Stop a team task. Kills all agent processes for the session. */
@@ -272,7 +308,7 @@ export async function listMcpServers(): Promise<McpServer[]> {
   return invoke<McpServer[]>("list_mcp_servers");
 }
 
-/** Add a new MCP server configuration. */
+/** Add a new MCP server configuration. Generates a UUID for the server ID. */
 export async function addMcpServer(
   name: string,
   command: string,
@@ -280,7 +316,8 @@ export async function addMcpServer(
   env?: string,
   scope?: string,
 ): Promise<McpServer> {
-  return invoke<McpServer>("add_mcp_server", { name, command, args, env, scope });
+  const id = `mcp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return invoke<McpServer>("add_mcp_server", { id, name, command, args, env, scope });
 }
 
 /** Toggle an MCP server enabled/disabled. */
@@ -608,6 +645,25 @@ export async function deleteBranch(projectPath: string, name: string, force?: bo
 /** Get diff stats between a branch and base. */
 export async function getBranchDiff(projectPath: string, branch: string, base?: string): Promise<string> {
   return invoke<string>("get_branch_diff", { projectPath, branch, base: base ?? null });
+}
+
+/* ── Search commands ──────────────────────────────────────────── */
+
+import type { McpSearchResult, SkillSearchResult } from "@/types/search";
+
+/** Search for MCP servers matching a query via Claude CLI. */
+export async function searchMcpServers(query: string): Promise<McpSearchResult[]> {
+  return invoke<McpSearchResult[]>("search_mcp_servers", { query });
+}
+
+/** Search for skills/prompts matching a query via Claude CLI. */
+export async function searchSkills(query: string): Promise<SkillSearchResult[]> {
+  return invoke<SkillSearchResult[]>("search_skills", { query });
+}
+
+/** Install a skill from a git URL into ~/.claude/commands/. */
+export async function installSkillFromUrl(url: string, projectPath?: string): Promise<boolean> {
+  return invoke<boolean>("install_skill_from_url", { url, projectPath: projectPath ?? null });
 }
 
 /* ── Event subscription ──────────────────────────────────────── */

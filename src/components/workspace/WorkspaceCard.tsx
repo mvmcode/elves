@@ -1,13 +1,20 @@
 /* WorkspaceCard — displays a single worktree-based workspace with its elf, status, diff summary, and actions. */
 
 import { useCallback } from "react";
-import { useSessionStore } from "@/stores/session";
-import { useUiStore } from "@/stores/ui";
 import type { WorkspaceInfo } from "@/types/workspace";
+
+/** Lightweight session info passed to WorkspaceCard for resume support. */
+export interface LastSessionInfo {
+  readonly id: string;
+  readonly task: string;
+  readonly claudeSessionId: string | null;
+  readonly status: string;
+}
 
 interface WorkspaceCardProps {
   readonly workspace: WorkspaceInfo;
-  readonly onFocus: (slug: string) => void;
+  readonly lastSession?: LastSessionInfo | null;
+  readonly onOpen: (slug: string) => void;
   readonly onResume: (slug: string) => void;
   readonly onDiff: (slug: string) => void;
   readonly onShipIt: (slug: string) => void;
@@ -38,34 +45,19 @@ function RuntimeBadge({ runtime }: { readonly runtime?: string }): React.JSX.Ele
 
 /**
  * Card showing a single workspace with its elf assignment, current status,
- * diff summary, and action buttons for focus, diff, ship, and remove.
+ * diff summary, and action buttons for open, diff, ship, and remove.
  */
 export function WorkspaceCard({
   workspace,
-  onFocus,
+  lastSession,
+  onOpen,
   onResume,
   onDiff,
   onShipIt,
   onRemove,
 }: WorkspaceCardProps): React.JSX.Element {
-  const handleFocus = useCallback(() => onFocus(workspace.slug), [onFocus, workspace.slug]);
+  const handleOpen = useCallback(() => onOpen(workspace.slug), [onOpen, workspace.slug]);
   const handleResume = useCallback(() => onResume(workspace.slug), [onResume, workspace.slug]);
-
-  /** Navigate to the floor tab linked to this workspace's worktree slug. */
-  const handleGoToFloor = useCallback((): void => {
-    const { floors, switchFloor, createFloor } = useSessionStore.getState();
-    const matchingFloor = Object.values(floors).find(
-      (floor) => floor.worktreeSlug === workspace.slug,
-    );
-    if (matchingFloor) {
-      switchFloor(matchingFloor.id);
-    } else {
-      /* No matching floor — create one linked to this worktree */
-      const floorId = createFloor(workspace.slug);
-      useSessionStore.getState().setFloorWorktree(floorId, workspace.slug, workspace.path);
-    }
-    useUiStore.getState().setActiveView("session");
-  }, [workspace.slug, workspace.path]);
   const handleDiff = useCallback(() => onDiff(workspace.slug), [onDiff, workspace.slug]);
   const handleShipIt = useCallback(() => onShipIt(workspace.slug), [onShipIt, workspace.slug]);
   const handleRemove = useCallback(() => {
@@ -73,6 +65,10 @@ export function WorkspaceCard({
       onRemove(workspace.slug);
     }
   }, [onRemove, workspace.slug]);
+
+  const diffSummary = workspace.filesChanged > 0
+    ? `${workspace.filesChanged} file${workspace.filesChanged !== 1 ? "s" : ""} changed`
+    : null;
 
   return (
     <div
@@ -94,12 +90,17 @@ export function WorkspaceCard({
       {/* Branch and file change info */}
       <div className="mb-2 font-mono text-xs text-text-muted">
         <span>{workspace.branch}</span>
-        {workspace.filesChanged > 0 && (
-          <span className="ml-2">
-            {workspace.filesChanged} file{workspace.filesChanged !== 1 ? "s" : ""} changed
-          </span>
+        {diffSummary && (
+          <span className="ml-2">{diffSummary}</span>
         )}
       </div>
+
+      {/* Last task subtitle from session history */}
+      {lastSession?.task && (
+        <p className="mb-1 truncate font-body text-xs text-text-muted">
+          Last: {lastSession.task.slice(0, 80)}{lastSession.task.length > 80 ? "..." : ""}
+        </p>
+      )}
 
       {/* Elf status message */}
       {workspace.elfStatus && (
@@ -111,19 +112,11 @@ export function WorkspaceCard({
       {/* Action buttons */}
       <div className="flex flex-wrap gap-2">
         <button
-          onClick={handleGoToFloor}
+          onClick={handleOpen}
           className="cursor-pointer border-[2px] border-border bg-info px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
-          data-testid="workspace-goto-floor-btn"
+          data-testid="workspace-open-btn"
         >
-          Go to Floor
-        </button>
-
-        <button
-          onClick={handleFocus}
-          className="cursor-pointer border-[2px] border-border bg-elf-gold px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-text-light shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
-          data-testid="workspace-focus-btn"
-        >
-          Focus
+          Open
         </button>
 
         <button
@@ -134,7 +127,10 @@ export function WorkspaceCard({
           Diff
         </button>
 
-        {workspace.status === "paused" && (
+        {(workspace.status === "paused" || (
+          lastSession?.claudeSessionId &&
+          ["completed", "cancelled", "error", "failed"].includes(lastSession.status)
+        )) && (
           <button
             onClick={handleResume}
             className="cursor-pointer border-[2px] border-border bg-accent-blue px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"

@@ -90,18 +90,17 @@ function IconExpand(): React.JSX.Element {
 }
 
 
-/** Navigation items — most switch the active view, "files" toggles the file tree panel. */
+/** Navigation items — each switches the active view in the main content area. */
 interface NavItem {
   readonly id: string;
   readonly label: string;
   readonly Icon: () => React.JSX.Element;
-  readonly view?: AppView;
-  readonly isPanel?: boolean;
+  readonly view: AppView;
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
-  { id: "session", view: "session", label: "Session", Icon: IconWorkshop },
-  { id: "files", label: "Files", Icon: IconFiles, isPanel: true },
+  { id: "workspace", view: "workspace", label: "Workspaces", Icon: IconWorkshop },
+  { id: "files", view: "files", label: "Files", Icon: IconFiles },
   { id: "memory", view: "memory", label: "Memory", Icon: IconMemory },
   { id: "skills", view: "skills", label: "Skills", Icon: IconSkills },
   { id: "mcp", view: "mcp", label: "MCP Servers", Icon: IconMcp },
@@ -119,8 +118,6 @@ export function Sidebar(): React.JSX.Element {
   const setNewProjectDialogOpen = useUiStore((s) => s.setNewProjectDialogOpen);
   const isCollapsed = useUiStore((s) => s.isSidebarCollapsed);
   const toggleCollapsed = useUiStore((s) => s.toggleSidebarCollapsed);
-  const isFileTreeVisible = useUiStore((s) => s.isFileTreeVisible);
-  const toggleFileTree = useUiStore((s) => s.toggleFileTree);
   const projects = useProjectStore((s) => s.projects);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const setActiveProject = useProjectStore((s) => s.setActiveProject);
@@ -128,13 +125,9 @@ export function Sidebar(): React.JSX.Element {
 
   const handleNavClick = useCallback(
     (item: NavItem): void => {
-      if (item.isPanel) {
-        toggleFileTree();
-      } else if (item.view) {
-        setActiveView(activeView === item.view && item.view !== "session" ? "session" : item.view);
-      }
+      setActiveView(activeView === item.view && item.view !== "workspace" ? "workspace" : item.view);
     },
-    [activeView, setActiveView, toggleFileTree],
+    [activeView, setActiveView],
   );
 
   return (
@@ -229,7 +222,7 @@ export function Sidebar(): React.JSX.Element {
         isCollapsed ? "items-center" : "px-2",
       ].join(" ")}>
         {NAV_ITEMS.map((item) => {
-          const isActive = item.isPanel ? isFileTreeVisible : activeView === item.view;
+          const isActive = activeView === item.view;
           return (
             <button
               key={item.id}

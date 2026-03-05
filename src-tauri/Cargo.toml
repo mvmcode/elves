@@ -1,6 +1,6 @@
 [package]
 name = "elves"
-version = "1.0.2"
+version = "1.0.3"
 description = "Summon your AI army — visual multi-agent orchestration for Claude Code and Codex"
 authors = ["Mani & Raghavan"]
 edition = "2021"
@@ -29,6 +29,7 @@ dirs = "6"
 tauri-plugin-updater = "2"
 tauri-plugin-dialog = "2.6.0"
 portable-pty = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [dev-dependencies]
 tempfile = "3"

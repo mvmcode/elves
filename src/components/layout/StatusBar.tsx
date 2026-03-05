@@ -165,7 +165,7 @@ export function StatusBar(): React.JSX.Element {
         {/* Change count badge */}
         {totalChanges > 0 && (
           <button
-            onClick={() => setActiveView("session")}
+            onClick={() => setActiveView("workspace")}
             className="flex cursor-pointer items-center gap-1 border-[2px] border-border/20 bg-error/10 px-1.5 py-0 font-mono text-[10px] font-bold text-error transition-all duration-100 hover:border-border/40 hover:bg-error/20"
             title={`${totalChanges} uncommitted change${totalChanges !== 1 ? "s" : ""}`}
             data-testid="git-changes-badge"
@@ -177,7 +177,7 @@ export function StatusBar(): React.JSX.Element {
         {/* Worktree count badge — only shown when multiple worktrees exist */}
         {worktrees.length > 1 && (
           <button
-            onClick={() => setActiveView("session")}
+            onClick={() => setActiveView("workspace")}
             className="flex cursor-pointer items-center gap-1 border-[2px] border-border/20 bg-info/10 px-1.5 py-0 font-mono text-[10px] font-bold text-info transition-all duration-100 hover:border-border/40 hover:bg-info/20"
             title={`${worktrees.length} worktrees`}
             data-testid="git-worktree-count"

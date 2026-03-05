@@ -9,16 +9,18 @@ use tauri::State;
 /// Create a new session within a project. Generates a UUID for the session ID.
 ///
 /// Called when the user starts a new task. The session begins with status "active".
+/// Optionally links the session to a workspace via `worktree_slug`.
 #[tauri::command]
 pub fn create_session(
     db: State<'_, DbState>,
     project_id: String,
     task: String,
     runtime: String,
+    worktree_slug: Option<String>,
 ) -> Result<SessionRow, String> {
     let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
     let id = uuid::Uuid::new_v4().to_string();
-    db::sessions::create_session(&conn, &id, &project_id, &task, &runtime)
+    db::sessions::create_session(&conn, &id, &project_id, &task, &runtime, worktree_slug.as_deref())
         .map_err(|e| format!("Database error: {e}"))
 }
 
@@ -41,6 +43,19 @@ pub fn get_session(
 ) -> Result<Option<SessionRow>, String> {
     let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
     db::sessions::get_session(&conn, &id)
+        .map_err(|e| format!("Database error: {e}"))
+}
+
+/// Get the most recent session for a project + workspace slug combination.
+/// Used by the frontend to offer "Resume" on workspace cards.
+#[tauri::command]
+pub fn get_last_workspace_session(
+    db: State<'_, DbState>,
+    project_id: String,
+    worktree_slug: String,
+) -> Result<Option<SessionRow>, String> {
+    let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+    db::sessions::get_last_session_for_workspace(&conn, &project_id, &worktree_slug)
         .map_err(|e| format!("Database error: {e}"))
 }
 

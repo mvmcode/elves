@@ -4,6 +4,23 @@ All notable changes to ELVES are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.3] - 2026-03-05 — Terminal View Race Fix & Worktree Cleanup
+
+### Fixed
+- **Terminal view race condition** — workspace tab now opens immediately when a task starts. Previously, `openWorkspace(slug)` was called before the workspace existed in the store array (the background `listWorkspaces` call hadn't resolved yet), so `ProjectWorkspace` couldn't find the workspace and rendered the grid instead of the terminal. Fixed by eagerly inserting a provisional `WorkspaceInfo` into the store via new `addWorkspace` method before setting the active tab.
+
+### Added
+- **`addWorkspace` store method** — idempotent method on `useWorkspaceStore` that inserts a workspace into the array immediately if the slug doesn't already exist. Eliminates the race between `openWorkspace` and the async `listWorkspaces` refresh.
+- **"Remove Workspace" button** — when a PTY session ends (exit code received), the terminal footer shows a "Remove" button next to "Ship It". Clicking it deletes the worktree from disk via `removeWorkspace(projectPath, slug, true)` and closes the tab. Prevents orphaned worktrees from accumulating on disk.
+
+### Changed
+- **Solo and team deploy paths** — both `analyzeAndDeploy` (solo) and `deployWithPlan` (team) in `useTeamSession` now call `addWorkspace` with a provisional workspace entry before `openWorkspace`, ensuring the terminal view renders on the first frame.
+- **Landing page** — replaced elf theater mockup with terminal-first workspace demo. Updated hero tagline, feature cards, and "How It Works" steps to reflect the worktree-based workflow. Removed floating elf emoji decorations and personality-themed copy.
+- **README** — rewrote to focus on workspace isolation and embedded terminals. Removed Personality System section, elf status message table, workshop copy examples, elf theater screenshot, and character-themed descriptions. Updated project structure to match current codebase (removed theater/, workshop/). Added backronym for the name.
+
+### Removed
+- **Elf character references in docs** — ELVES is now just the app name, not a personality system. All references to elf avatars, funny status messages, character names, workshop metaphors, and "summon the elves" copy removed from public-facing docs.
+
 ## [1.0.2] - 2026-03-03 — Worktree-First Workspace Model
 
 ### Added

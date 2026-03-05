@@ -88,3 +88,10 @@ export interface MultiRepoWorkspace {
   readonly status: string;
   readonly totalFilesChanged: number;
 }
+
+/** A single PTY entry in a team deployment — one per role. */
+export interface TeamPtyEntry {
+  readonly role: string;
+  readonly ptyId: string;
+  readonly elfId: string;
+}

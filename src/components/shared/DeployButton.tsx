@@ -60,10 +60,10 @@ export function DeployButton(props: DeployButtonProps): React.JSX.Element {
       {/* Main deploy button */}
       <Button
         variant="primary"
-        className="rounded-r-none px-8 py-4 font-display text-lg tracking-widest"
+        className="rounded-r-none px-4 py-2 font-display text-[11px] tracking-widest"
         {...props}
       >
-        Summon the Elves
+        SUMMON
       </Button>
 
       {/* Chevron trigger */}
@@ -71,7 +71,7 @@ export function DeployButton(props: DeployButtonProps): React.JSX.Element {
         type="button"
         onClick={() => setIsPopoverOpen(!isPopoverOpen)}
         className={[
-          "cursor-pointer border-token-normal border-l-0 border-border bg-accent px-3 py-4 font-mono text-sm font-bold text-accent-contrast",
+          "cursor-pointer border-token-normal border-l-0 border-border bg-accent px-2 py-2 font-mono text-[10px] font-bold text-accent-contrast",
           "shadow-brutal transition-all duration-100 ease-out",
           "hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm",
           "active:translate-x-[4px] active:translate-y-[4px] active:shadow-none",

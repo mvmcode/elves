@@ -1,15 +1,23 @@
-/* ProjectWorkspace — main workspace view showing all worktree-based workspaces for the active project. */
+/* ProjectWorkspace — main workspace view showing all worktree-based workspaces for the active project.
+ * Switches between workspace grid (with inline task bar) and WorkspaceTerminalView when a workspace is open. */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useWorkspaceStore } from "@/stores/workspace";
 import { useProjectStore } from "@/stores/project";
+import { useSessionStore } from "@/stores/session";
 import { useGitStore } from "@/stores/git";
-import { WorkspaceCard } from "./WorkspaceCard";
+import { useAppStore } from "@/stores/app";
+import { WorkspaceCard, type LastSessionInfo } from "./WorkspaceCard";
 import { MultiRepoWorkspaceCard } from "./MultiRepoWorkspaceCard";
 import { NewWorkspaceDialog } from "./NewWorkspaceDialog";
 import { ShipItDialog } from "./ShipItDialog";
 import { DiffViewer } from "./DiffViewer";
 import { RecentlyShipped } from "./RecentlyShipped";
+import { WorkspaceTerminalView } from "./WorkspaceTerminalView";
+import { WorkspaceTabBar } from "./WorkspaceTabBar";
+import { Input } from "@/components/shared/Input";
+import { DeployButton } from "@/components/shared/DeployButton";
+import { useTeamSession } from "@/hooks/useTeamSession";
 import * as tauri from "@/lib/tauri";
 import type { WorkspaceInfo, MergeStrategy } from "@/types/workspace";
 
@@ -38,11 +46,21 @@ export function ProjectWorkspace(): React.JSX.Element {
   const multiRepoWorkspaces = useWorkspaceStore((state) => state.multiRepoWorkspaces);
   const setMultiRepoWorkspaces = useWorkspaceStore((state) => state.setMultiRepoWorkspaces);
 
+  const activeWorkspaceSlug = useWorkspaceStore((state) => state.activeWorkspaceSlug);
+  const openWorkspaceSlugs = useWorkspaceStore((state) => state.openWorkspaceSlugs);
+  const openWorkspaceAction = useWorkspaceStore((state) => state.openWorkspace);
   const gitState = useGitStore((state) => state.gitState);
+  const defaultRuntime = useAppStore((state) => state.defaultRuntime);
+  const { analyzeAndDeploy, isSessionActive } = useTeamSession();
+  const setFloorWorktree = useSessionStore((s) => s.setFloorWorktree);
+  const setFloorPtyId = useSessionStore((s) => s.setFloorPtyId);
 
   const [isNewDialogOpen, setNewDialogOpen] = useState(false);
   const [shipItWorkspace, setShipItWorkspace] = useState<WorkspaceInfo | null>(null);
   const [viewingDiffSlug, setViewingDiffSlug] = useState<string | null>(null);
+  const [taskText, setTaskText] = useState("");
+  const taskInputRef = useRef<HTMLInputElement>(null);
+  const [lastSessions, setLastSessions] = useState<Record<string, LastSessionInfo | null>>({});
 
   /** Discover project topology on mount. */
   useEffect(() => {
@@ -81,6 +99,32 @@ export function ProjectWorkspace(): React.JSX.Element {
         });
     }
   }, [activeProject?.path, topology, setWorkspaces, setMultiRepoWorkspaces, setLoading, setError]);
+
+  /** Fetch last session for each workspace to enable resume buttons. */
+  useEffect(() => {
+    if (!activeProject?.id || workspaces.length === 0) return;
+    const projectId = activeProject.id;
+    const promises = workspaces.map((ws) =>
+      tauri.getLastWorkspaceSession(projectId, ws.slug)
+        .then((session): [string, LastSessionInfo | null] => {
+          if (!session) return [ws.slug, null];
+          return [ws.slug, {
+            id: session.id,
+            task: session.task,
+            claudeSessionId: session.claudeSessionId ?? null,
+            status: session.status,
+          }];
+        })
+        .catch((): [string, null] => [ws.slug, null]),
+    );
+    Promise.all(promises).then((entries) => {
+      const map: Record<string, LastSessionInfo | null> = {};
+      for (const [slug, info] of entries) {
+        map[slug] = info;
+      }
+      setLastSessions(map);
+    });
+  }, [activeProject?.id, workspaces]);
 
   /** Helper to get repo paths from topology. */
   const getRepoPaths = useCallback((): string[] => {
@@ -121,20 +165,63 @@ export function ProjectWorkspace(): React.JSX.Element {
     [activeProject?.path, topology, getRepoPaths, setWorkspaces, setMultiRepoWorkspaces, setLoading, setError],
   );
 
-  /** Focus on a workspace — for now, sets it as active. */
-  const handleFocus = useCallback(
+  /** Open a workspace — add tab and switch to terminal view. */
+  const handleOpen = useCallback(
     (slug: string): void => {
-      useWorkspaceStore.getState().setActiveWorkspace(slug);
+      openWorkspaceAction(slug);
     },
-    [],
+    [openWorkspaceAction],
   );
 
-  /** Resume a paused workspace. */
+  /** Resume a workspace session using Claude's --resume flag. */
   const handleResume = useCallback(
-    (_slug: string): void => {
-      // Resume logic will be wired when the agent runtime integration is complete.
+    async (slug: string): Promise<void> => {
+      if (!activeProject?.id) return;
+
+      const session = lastSessions[slug];
+      if (!session?.claudeSessionId) {
+        console.warn("Cannot resume: no claudeSessionId for workspace", slug);
+        return;
+      }
+
+      /* Open the workspace tab */
+      openWorkspaceAction(slug);
+
+      /* Find workspace path */
+      const workspace = workspaces.find((w) => w.slug === slug);
+      const workingDir = workspace?.path;
+
+      try {
+        const runtime = defaultRuntime;
+        const spawnOptions: tauri.StartTaskPtyResult = await tauri.startTaskPty(
+          activeProject.id,
+          "Resuming session...",
+          runtime,
+          workingDir,
+          { resumeSessionId: session.claudeSessionId } as import("@/types/claude").ClaudeSpawnOptions,
+          slug,
+        );
+
+        /* Wire PTY to workspace store */
+        const wsStore = useWorkspaceStore.getState();
+        wsStore.setPtyId(slug, spawnOptions.ptyId);
+        wsStore.updateWorkspaceStatus(slug, "active");
+
+        /* Store PTY on the active floor */
+        const state = useSessionStore.getState();
+        const floorId = state.activeFloorId;
+        if (floorId) {
+          setFloorPtyId(floorId, spawnOptions.ptyId);
+          if (workspace?.path) {
+            setFloorWorktree(floorId, slug, workspace.path);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to resume workspace session:", error);
+        setError(String(error));
+      }
     },
-    [],
+    [activeProject?.id, lastSessions, workspaces, defaultRuntime, openWorkspaceAction, setFloorPtyId, setFloorWorktree, setError],
   );
 
   /** Load and display diff for a workspace. */
@@ -288,13 +375,22 @@ export function ProjectWorkspace(): React.JSX.Element {
     [activeProject?.path, getRepoPaths, setMultiRepoWorkspaces, setLoading, setError],
   );
 
-  /** Focus on a multi-repo workspace. */
-  const handleMultiRepoFocus = useCallback(
+  /** Open a multi-repo workspace — add tab and switch to terminal view. */
+  const handleMultiRepoOpen = useCallback(
     (slug: string): void => {
-      useWorkspaceStore.getState().setActiveWorkspace(slug);
+      openWorkspaceAction(slug);
     },
-    [],
+    [openWorkspaceAction],
   );
+
+  /** Handle task submit — create workspace and deploy agent. */
+  const handleSummon = useCallback(async (): Promise<void> => {
+    const task = taskText.trim();
+    if (!task || !activeProject?.path) return;
+    setTaskText("");
+    taskInputRef.current?.blur();
+    await analyzeAndDeploy(task);
+  }, [taskText, activeProject?.path, analyzeAndDeploy]);
 
   /** Refresh git state. */
   const handleRefreshGit = useCallback((): void => {
@@ -319,8 +415,49 @@ export function ProjectWorkspace(): React.JSX.Element {
     );
   }
 
+  /* Resolve active workspace for terminal view */
+  const activeOpenWorkspace = activeWorkspaceSlug
+    ? workspaces.find((w) => w.slug === activeWorkspaceSlug) ?? null
+    : null;
+
+  const canSummon = taskText.trim().length > 0 && !isSessionActive;
+
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto p-6" data-testid="project-workspace">
+    <div className="flex flex-1 flex-col overflow-hidden" data-testid="project-workspace">
+      {/* Tab bar — only when tabs exist */}
+      {openWorkspaceSlugs.length > 0 && <WorkspaceTabBar />}
+
+      {/* Terminal view for active workspace tab */}
+      {activeOpenWorkspace ? (
+        <WorkspaceTerminalView workspace={activeOpenWorkspace} />
+      ) : (
+      /* Workspace grid with inline task bar */
+      <div className="flex-1 overflow-y-auto">
+      {/* Task bar — only visible on the grid home screen */}
+      <div className="shrink-0 border-b-[2px] border-border/30 bg-surface-elevated px-6 py-3">
+        <div className="mx-auto flex max-w-[800px] items-center gap-2">
+          <span className="shrink-0 text-sm text-text-light/30">{"\u2692"}</span>
+          <Input
+            ref={taskInputRef}
+            value={taskText}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTaskText(e.target.value)}
+            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+              if (e.key === "Enter" && canSummon) {
+                e.preventDefault();
+                void handleSummon();
+              }
+            }}
+            placeholder="What do you want the elves to do?"
+            disabled={isSessionActive}
+          />
+          <span className="shrink-0 border-[2px] border-border bg-[#4D96FF] px-2 py-1 font-mono text-[10px] font-bold uppercase text-white shadow-[2px_2px_0px_0px_#000]">
+            {defaultRuntime === "codex" ? "CX" : "CC"}
+          </span>
+          <DeployButton onClick={() => void handleSummon()} disabled={!canSummon} />
+        </div>
+      </div>
+
+      <div className="p-6">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex flex-col gap-1">
@@ -394,7 +531,7 @@ export function ProjectWorkspace(): React.JSX.Element {
               <div key={mrWorkspace.slug} className="flex flex-col gap-2">
                 <MultiRepoWorkspaceCard
                   workspace={mrWorkspace}
-                  onFocus={handleMultiRepoFocus}
+                  onFocus={handleMultiRepoOpen}
                   onDiff={handleMultiRepoDiff}
                   onShipIt={handleMultiRepoShipItOpen}
                   onRemove={handleMultiRepoRemove}
@@ -430,7 +567,8 @@ export function ProjectWorkspace(): React.JSX.Element {
               <div key={workspace.slug} className="flex flex-col gap-2">
                 <WorkspaceCard
                   workspace={workspace}
-                  onFocus={handleFocus}
+                  lastSession={lastSessions[workspace.slug]}
+                  onOpen={handleOpen}
                   onResume={handleResume}
                   onDiff={handleDiff}
                   onShipIt={handleShipItOpen}
@@ -481,6 +619,9 @@ export function ProjectWorkspace(): React.JSX.Element {
           onConfirm={topology?.kind === "multi_repo" ? handleMultiRepoShipItConfirm : handleShipItConfirm}
           repos={topology?.kind === "multi_repo" ? topology.repos.map((r) => r.name) : undefined}
         />
+      )}
+      </div>
+      </div>
       )}
     </div>
   );

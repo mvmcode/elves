@@ -31,6 +31,10 @@ export function useInitialize(): void {
         ]);
         setRuntimes(runtimes);
         setProjects(projects);
+        const firstProject = projects[0];
+        if (firstProject) {
+          useProjectStore.getState().setActiveProject(firstProject.id);
+        }
         setClaudeDiscovery(claudeWorld);
 
         /* Run memory relevance decay on startup — fades old unused memories */

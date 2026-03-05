@@ -7,14 +7,16 @@ import { useSessionStore } from "@/stores/session";
 import { useProjectStore } from "@/stores/project";
 import { useAppStore } from "@/stores/app";
 import { useSettingsStore } from "@/stores/settings";
+import { useWorkspaceStore } from "@/stores/workspace";
 import {
   analyzeTask as invokeAnalyzeTask,
   startTaskPty as invokeStartTaskPty,
-  startTeamTask as invokeStartTeamTask,
+  startTeamTaskPty as invokeStartTeamTaskPty,
   stopTask as invokeStopTask,
   stopTeamTask as invokeStopTeamTask,
   buildProjectContext,
   createWorkspace,
+  listWorkspaces,
 } from "@/lib/tauri";
 import { generateElf, getStatusMessage } from "@/lib/elf-names";
 import { generateWorkspaceSlug } from "@/lib/slug";
@@ -147,14 +149,40 @@ export function useTeamSession(): {
           /* Solo task — skip plan preview, deploy immediately via PTY-first */
           const runtime = defaultRuntime;
           const spawnOptions = buildSpawnOptions();
+          const wsSlugForBackend = useSessionStore.getState().floors[
+            useSessionStore.getState().activeFloorId ?? ""
+          ]?.worktreeSlug ?? undefined;
           const { sessionId, ptyId } = await invokeStartTaskPty(
-            activeProjectId, augmentedTask, runtime, worktreeWorkingDir, spawnOptions,
+            activeProjectId, augmentedTask, runtime, worktreeWorkingDir, spawnOptions, wsSlugForBackend,
           );
 
-          /* Store ptyId on the floor so SessionSplitView can wire xterm to it */
+          /* Store ptyId on the floor for session tracking */
           const currentFloorId = useSessionStore.getState().activeFloorId;
           if (currentFloorId) {
             setFloorPtyId(currentFloorId, ptyId);
+          }
+
+          /* Wire PTY to workspace store and navigate to terminal view */
+          const wsSlug = useSessionStore.getState().floors[currentFloorId ?? ""]?.worktreeSlug;
+          if (wsSlug) {
+            const wsStore = useWorkspaceStore.getState();
+            /* Add workspace eagerly so the terminal view can find it immediately */
+            wsStore.addWorkspace({
+              slug: wsSlug,
+              path: worktreeWorkingDir ?? "",
+              branch: `worktree-${wsSlug}`,
+              status: "active",
+              filesChanged: 0,
+              lastModified: new Date().toISOString(),
+            });
+            wsStore.setPtyId(wsSlug, ptyId);
+            wsStore.openWorkspace(wsSlug);
+            /* Background refresh for full metadata (branch name, file counts, etc.) */
+            if (activeProjectPath) {
+              listWorkspaces(activeProjectPath)
+                .then((ws) => wsStore.setWorkspaces(ws))
+                .catch(() => { /* workspace list refresh is best-effort */ });
+            }
           }
 
           startSession({
@@ -227,9 +255,13 @@ export function useTeamSession(): {
         /* Use worktree path from the active floor if one was created during analyzeAndDeploy */
         const activeFloor = useSessionStore.getState().floors[useSessionStore.getState().activeFloorId ?? ""];
         const worktreeWorkingDir = activeFloor?.worktreePath ?? undefined;
+        const taskLabel = plan.taskGraph[0]?.label ?? "Team task";
 
         const spawnOptions = buildSpawnOptions();
-        const sessionId = await invokeStartTeamTask(activeProjectId, plan.taskGraph[0]?.label ?? "Team task", plan, spawnOptions, worktreeWorkingDir);
+        const teamWsSlugForBackend = activeFloor?.worktreeSlug ?? undefined;
+        const { sessionId, ptyEntries } = await invokeStartTeamTaskPty(
+          activeProjectId, taskLabel, plan, worktreeWorkingDir, spawnOptions, teamWsSlugForBackend,
+        );
 
         startSession({
           id: sessionId,
@@ -244,22 +276,59 @@ export function useTeamSession(): {
           },
         });
 
-        /* Create only the lead elf — additional elves appear when Claude spawns sub-agents.
-         * This prevents phantom elves: 1 running Claude process = 1 elf. */
-        const leadRole = plan.roles[0];
-        if (leadRole) {
+        /* Wire PTY entries to workspace store → triggers split terminal view */
+        const teamWsSlug = activeFloor?.worktreeSlug;
+        if (teamWsSlug) {
+          const wsStore = useWorkspaceStore.getState();
+          /* Add workspace eagerly so the terminal view can find it immediately */
+          wsStore.addWorkspace({
+            slug: teamWsSlug,
+            path: worktreeWorkingDir ?? "",
+            branch: `worktree-${teamWsSlug}`,
+            status: "active",
+            filesChanged: 0,
+            lastModified: new Date().toISOString(),
+          });
+          wsStore.setTeamPtyEntries(teamWsSlug, ptyEntries.map((e) => ({
+            role: e.role,
+            ptyId: e.ptyId,
+            elfId: e.elfId,
+          })));
+          /* Also set first entry as the primary ptyId for backward compat */
+          if (ptyEntries[0]) {
+            wsStore.setPtyId(teamWsSlug, ptyEntries[0].ptyId);
+          }
+          wsStore.openWorkspace(teamWsSlug);
+          /* Background refresh for full metadata */
+          if (activeProjectPath) {
+            listWorkspaces(activeProjectPath)
+              .then((ws) => wsStore.setWorkspaces(ws))
+              .catch(() => { /* best-effort refresh */ });
+          }
+        }
+
+        /* Store first ptyId on the floor for session tracking */
+        const currentFloorId = useSessionStore.getState().activeFloorId;
+        if (currentFloorId && ptyEntries[0]) {
+          setFloorPtyId(currentFloorId, ptyEntries[0].ptyId);
+        }
+
+        /* Create one elf per role with personality */
+        for (let i = 0; i < plan.roles.length; i++) {
+          const role = plan.roles[i]!;
+          const entry = ptyEntries[i];
           const personality = generateElf();
-          const elfId = `elf-${sessionId}`;
+          const elfId = entry?.elfId ?? `elf-${sessionId}-${i}`;
 
           addElf({
             id: elfId,
             sessionId,
             name: personality.name,
-            role: leadRole.name,
+            role: role.name,
             avatar: personality.avatar,
             color: personality.color,
             quirk: personality.quirk,
-            runtime: (leadRole.runtime as Runtime) || runtime,
+            runtime: (role.runtime as Runtime) || runtime,
             status: "spawning",
             spawnedAt: Date.now(),
             finishedAt: null,
@@ -268,24 +337,25 @@ export function useTeamSession(): {
           });
 
           addEvent({
-            id: `event-spawn-${Date.now()}`,
+            id: `event-spawn-${Date.now()}-${i}`,
             timestamp: Date.now(),
             elfId,
             elfName: personality.name,
-            runtime: (leadRole.runtime as Runtime) || runtime,
+            runtime: (role.runtime as Runtime) || runtime,
             type: "spawn",
-            payload: { role: leadRole.name, focus: leadRole.focus },
+            payload: { role: role.name, focus: role.focus },
             funnyStatus: getStatusMessage(personality.name, "spawning"),
           });
 
-          /* Transition to working after brief spawn animation */
-          setTimeout(() => updateElfStatus(elfId, "working"), 1500);
+          /* Stagger spawn animations */
+          const capturedElfId = elfId;
+          setTimeout(() => updateElfStatus(capturedElfId, "working"), 1500 + i * 300);
         }
       } catch (error) {
         console.error("Failed to deploy team:", error);
       }
     },
-    [activeProjectId, defaultRuntime, buildSpawnOptions, acceptPlan, startSession, addElf, addEvent, updateElfStatus],
+    [activeProjectId, activeProjectPath, defaultRuntime, buildSpawnOptions, acceptPlan, startSession, addElf, addEvent, updateElfStatus, setFloorPtyId],
   );
 
   const updateAllElfStatusOnFloor = useSessionStore((s) => s.updateAllElfStatusOnFloor);

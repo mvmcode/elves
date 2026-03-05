@@ -1,7 +1,7 @@
 /* Elf personality engine — assigns names, avatars, colors, and funny status messages to agents. */
 
 import type { ElfPersonality, ElfStatus, StatusMessageMap } from "@/types/elf";
-import type { AvatarId } from "@/components/theater/ElfAvatar";
+import type { AvatarId } from "@/types/elf";
 
 /** Pool of elf names for the workshop */
 const ELF_NAMES: readonly string[] = [

@@ -123,12 +123,14 @@ pub fn run() {
             commands::sessions::create_session,
             commands::sessions::list_sessions,
             commands::sessions::get_session,
+            commands::sessions::get_last_workspace_session,
             commands::sessions::list_session_events,
             commands::tasks::start_task,
             commands::tasks::start_task_pty,
             commands::tasks::stop_task,
             commands::tasks::analyze_task,
             commands::tasks::start_team_task,
+            commands::tasks::start_team_task_pty,
             commands::tasks::stop_team_task,
             commands::tasks::transition_to_interactive,
             commands::memory::list_memories,
@@ -154,6 +156,7 @@ pub fn run() {
             commands::mcp::toggle_mcp_server,
             commands::mcp::health_check_mcp,
             commands::mcp::delete_mcp_server,
+            commands::mcp::import_mcp_from_claude,
             commands::mcp::list_mcp_tools,
             commands::templates::list_templates,
             commands::templates::save_template,
@@ -203,6 +206,9 @@ pub fn run() {
             commands::workspace::complete_multi_repo_workspace,
             commands::workspace::remove_multi_repo_workspace,
             commands::workspace::push_multi_repo_workspace,
+            commands::search::search_mcp_servers,
+            commands::search::search_skills,
+            commands::search::install_skill_from_url,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");
