@@ -96,8 +96,9 @@ impl CodexTeamParser {
 
 /// Spawn a Codex CLI process for a single-agent task.
 ///
-/// Runs: `codex --approval-mode full-auto "<task>"`
-/// in the given working directory.
+/// Runs: `codex exec --full-auto --json "<task>"`
+/// in the given working directory. Uses `exec` subcommand for non-interactive
+/// (piped stdout) mode, and `--json` for machine-readable JSONL output.
 ///
 /// Returns the child process handle. The caller reads stdout line-by-line
 /// and passes each line to `parse_codex_output` for event extraction.
@@ -106,8 +107,9 @@ pub fn spawn_codex(
     working_dir: &str,
 ) -> Result<std::process::Child, std::io::Error> {
     std::process::Command::new("codex")
-        .arg("--approval-mode")
-        .arg("full-auto")
+        .arg("exec")
+        .arg("--full-auto")
+        .arg("--json")
         .arg(task)
         .current_dir(working_dir)
         .stdout(std::process::Stdio::piped())
@@ -184,7 +186,7 @@ pub fn normalize_codex_event(event: CodexEvent) -> NormalizedEvent {
 /// Spawn a Codex CLI process in team mode.
 ///
 /// Constructs a team prompt from the TaskPlan describing each role and its focus,
-/// then spawns Codex with the composite prompt.
+/// then spawns Codex with `exec --full-auto --json` for non-interactive output.
 ///
 /// Returns the child process handle. The caller manages stdout/stderr.
 pub fn spawn_codex_team(
@@ -195,8 +197,9 @@ pub fn spawn_codex_team(
     let team_prompt = build_codex_team_prompt(task, plan);
 
     std::process::Command::new("codex")
-        .arg("--approval-mode")
-        .arg("full-auto")
+        .arg("exec")
+        .arg("--full-auto")
+        .arg("--json")
         .arg(&team_prompt)
         .current_dir(working_dir)
         .stdout(std::process::Stdio::piped())

@@ -276,10 +276,9 @@ pub async fn start_task_pty(
     let mut args: Vec<String> = Vec::new();
 
     if is_codex {
-        // Codex CLI: `codex --approval-mode full-auto "<task>"`
+        // Codex CLI: `codex --full-auto "<task>"` (interactive PTY mode)
         // Codex has no --append-system-prompt, so prepend memory to the task text
-        args.push("--approval-mode".to_string());
-        args.push("full-auto".to_string());
+        args.push("--full-auto".to_string());
         if memory_context.is_empty() {
             args.push(task.clone());
         } else {
@@ -710,9 +709,9 @@ pub async fn start_team_task_pty(
         let mut args: Vec<String> = Vec::new();
 
         if is_codex {
+            // Codex CLI: `codex --full-auto "<prompt>"` (interactive PTY mode)
             // Codex has no --append-system-prompt, so prepend memory to the prompt
-            args.push("--approval-mode".to_string());
-            args.push("full-auto".to_string());
+            args.push("--full-auto".to_string());
             if memory_context.is_empty() {
                 args.push(role_prompt);
             } else {
