@@ -28,7 +28,7 @@ static FIX_PATH: Once = Once::new();
 /// include /opt/homebrew/bin, nvm paths, cargo bin, etc. This function runs the
 /// user's default shell to resolve their real PATH and sets it on the process.
 /// Called once before runtime detection.
-pub(crate) fn ensure_full_path() {
+pub fn ensure_full_path() {
     FIX_PATH.call_once(|| {
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
         if let Ok(output) = Command::new(&shell)
