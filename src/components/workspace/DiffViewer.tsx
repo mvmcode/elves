@@ -25,7 +25,7 @@ function statusColorClass(status: "added" | "modified" | "deleted"): string {
     case "added":
       return "bg-success text-white";
     case "modified":
-      return "bg-accent-blue text-white";
+      return "bg-info text-white";
     case "deleted":
       return "bg-error text-white";
   }

@@ -107,7 +107,7 @@ export function BranchList({
                 </button>
                 <button
                   onClick={() => handleCreateWorktree(branch.name)}
-                  className="cursor-pointer border-[2px] border-border bg-accent-blue/10 px-2 py-1 font-display text-[10px] font-bold uppercase tracking-wider text-accent-blue shadow-brutal-xs transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+                  className="cursor-pointer border-[2px] border-border bg-info/10 px-2 py-1 font-display text-[10px] font-bold uppercase tracking-wider text-info shadow-brutal-xs transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
                   title={`Create worktree from ${branch.name}`}
                 >
                   Worktree

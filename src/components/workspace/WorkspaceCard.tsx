@@ -37,7 +37,7 @@ function StatusDot({ status }: { readonly status: WorkspaceInfo["status"] }): Re
 function RuntimeBadge({ runtime }: { readonly runtime?: string }): React.JSX.Element | null {
   if (!runtime) return null;
   return (
-    <span className="border-[2px] border-border bg-accent-blue px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-white">
+    <span className="border-[2px] border-border bg-info px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-white">
       {runtime}
     </span>
   );
@@ -133,7 +133,7 @@ export function WorkspaceCard({
         )) && (
           <button
             onClick={handleResume}
-            className="cursor-pointer border-[2px] border-border bg-accent-blue px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+            className="cursor-pointer border-[2px] border-border bg-info px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
             data-testid="workspace-resume-btn"
           >
             Resume

@@ -10,6 +10,8 @@ use std::io::{Read, Write};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
 
+use crate::agents::runtime::ensure_full_path;
+
 /// Holds the writable master handle and child process for a single PTY session.
 struct PtyInstance {
     writer: Box<dyn Write + Send>,
@@ -37,6 +39,8 @@ impl PtyManager {
         cwd: &str,
         app: &AppHandle,
     ) -> Result<String, String> {
+        // Ensure full PATH is available (macOS .app bundles get minimal PATH)
+        ensure_full_path();
         let pty_system = native_pty_system();
         let pair = pty_system
             .openpty(PtySize {
@@ -52,8 +56,16 @@ impl PtyManager {
             cmd.arg(arg);
         }
         cmd.cwd(cwd);
-        // Clear CLAUDECODE env var to allow spawning from within a Claude Code session
+        // Clear Claude Code env vars so the child process doesn't detect nested execution.
+        // Without this, spawning `claude` from within a Claude Code session fails because
+        // CLAUDE_CODE_ENTRYPOINT causes the child to enter a non-interactive nested mode.
         cmd.env("CLAUDECODE", "");
+        cmd.env("CLAUDE_CODE_ENTRYPOINT", "");
+        cmd.env("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "");
+        // Ensure TERM is set for proper TUI rendering in the PTY
+        if std::env::var("TERM").is_err() {
+            cmd.env("TERM", "xterm-256color");
+        }
 
         let child = pair
             .slave

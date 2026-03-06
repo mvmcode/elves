@@ -166,7 +166,7 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
         )}
 
         {workspace.runtime && (
-          <span className="border-[2px] border-border bg-accent-blue px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-white">
+          <span className="border-[2px] border-border bg-info px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-white">
             {workspace.runtime}
           </span>
         )}

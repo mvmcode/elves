@@ -415,9 +415,13 @@ export function ProjectWorkspace(): React.JSX.Element {
     );
   }
 
-  /* Resolve active workspace for terminal view */
+  /* Resolve active workspace for terminal view — check single-repo, then multi-repo fallback */
   const activeOpenWorkspace = activeWorkspaceSlug
-    ? workspaces.find((w) => w.slug === activeWorkspaceSlug) ?? null
+    ? (
+        workspaces.find((w) => w.slug === activeWorkspaceSlug) ??
+        multiRepoWorkspaces.find((m) => m.slug === activeWorkspaceSlug)?.repos[0]?.workspace ??
+        null
+      )
     : null;
 
   const canSummon = taskText.trim().length > 0;
@@ -464,7 +468,7 @@ export function ProjectWorkspace(): React.JSX.Element {
           <div className="flex items-center gap-3">
             <h2 className="font-display text-2xl font-bold tracking-tight">Workspaces</h2>
             {topology?.kind === "multi_repo" && (
-              <span className="border-[2px] border-border bg-accent-blue px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-white">
+              <span className="border-[2px] border-border bg-info px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-white">
                 Multi-repo: {topology.repos.length} repos
               </span>
             )}

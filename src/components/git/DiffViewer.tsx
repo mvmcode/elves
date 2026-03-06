@@ -47,7 +47,7 @@ function parseDiff(diff: string): DiffLine[] {
 
 /** CSS classes for each line kind. */
 const LINE_STYLES: Record<LineKind, string> = {
-  header: "text-accent-blue font-bold",
+  header: "text-info font-bold",
   hunk: "text-accent-purple bg-accent-purple/10",
   addition: "text-success bg-success/10",
   deletion: "text-error bg-error/10",
