@@ -43,7 +43,7 @@ export function RecentlyShipped({ items }: RecentlyShippedProps): React.JSX.Elem
               {formatRelativeTime(item.mergedAt)}
             </span>
             {item.memoriesExtracted > 0 && (
-              <span className="border-[2px] border-border/30 bg-accent-blue/10 px-1.5 py-0.5 font-mono text-[10px] text-accent-blue">
+              <span className="border-[2px] border-border/30 bg-info/10 px-1.5 py-0.5 font-mono text-[10px] text-info">
                 {item.memoriesExtracted} mem
               </span>
             )}

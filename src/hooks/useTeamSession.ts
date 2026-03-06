@@ -17,6 +17,8 @@ import {
   buildProjectContext,
   createWorkspace,
   listWorkspaces,
+  createMultiRepoWorkspace,
+  listMultiRepoWorkspaces,
 } from "@/lib/tauri";
 import { generateElf, getStatusMessage } from "@/lib/elf-names";
 import { generateWorkspaceSlug } from "@/lib/slug";
@@ -124,10 +126,24 @@ export function useTeamSession(): {
         const activeFloorIdNow = useSessionStore.getState().activeFloorId;
         if (activeProjectPath && activeFloorIdNow) {
           try {
+            const { topology } = useWorkspaceStore.getState();
             const slug = generateWorkspaceSlug(augmentedTask);
-            const workspaceInfo = await createWorkspace(activeProjectPath, slug);
-            worktreeWorkingDir = workspaceInfo.path;
-            setFloorWorktree(activeFloorIdNow, slug, workspaceInfo.path);
+
+            if (topology?.kind === "multi_repo") {
+              const repoPaths = topology.repos.map((r) => r.path);
+              const mrWorkspace = await createMultiRepoWorkspace(activeProjectPath, slug, repoPaths);
+              worktreeWorkingDir = activeProjectPath; // agent CWD = project root (accesses all repos)
+              setFloorWorktree(activeFloorIdNow, slug, activeProjectPath);
+              // Eagerly add first repo's workspace so terminal view resolves
+              const firstEntry = mrWorkspace.repos[0];
+              if (firstEntry) {
+                useWorkspaceStore.getState().addWorkspace(firstEntry.workspace);
+              }
+            } else {
+              const workspaceInfo = await createWorkspace(activeProjectPath, slug);
+              worktreeWorkingDir = workspaceInfo.path;
+              setFloorWorktree(activeFloorIdNow, slug, workspaceInfo.path);
+            }
           } catch (worktreeError) {
             console.warn("Auto-worktree creation failed, using project root:", worktreeError);
           }
@@ -179,9 +195,17 @@ export function useTeamSession(): {
             wsStore.openWorkspace(wsSlug);
             /* Background refresh for full metadata (branch name, file counts, etc.) */
             if (activeProjectPath) {
-              listWorkspaces(activeProjectPath)
-                .then((ws) => wsStore.setWorkspaces(ws))
-                .catch(() => { /* workspace list refresh is best-effort */ });
+              const { topology: currentTopology } = useWorkspaceStore.getState();
+              if (currentTopology?.kind === "multi_repo") {
+                const repoPaths = currentTopology.repos.map((r) => r.path);
+                listMultiRepoWorkspaces(activeProjectPath, repoPaths)
+                  .then((ws) => wsStore.setMultiRepoWorkspaces(ws))
+                  .catch(() => { /* workspace list refresh is best-effort */ });
+              } else {
+                listWorkspaces(activeProjectPath)
+                  .then((ws) => wsStore.setWorkspaces(ws))
+                  .catch(() => { /* workspace list refresh is best-effort */ });
+              }
             }
           }
 
@@ -301,9 +325,17 @@ export function useTeamSession(): {
           wsStore.openWorkspace(teamWsSlug);
           /* Background refresh for full metadata */
           if (activeProjectPath) {
-            listWorkspaces(activeProjectPath)
-              .then((ws) => wsStore.setWorkspaces(ws))
-              .catch(() => { /* best-effort refresh */ });
+            const { topology: currentTopology } = useWorkspaceStore.getState();
+            if (currentTopology?.kind === "multi_repo") {
+              const repoPaths = currentTopology.repos.map((r) => r.path);
+              listMultiRepoWorkspaces(activeProjectPath, repoPaths)
+                .then((ws) => wsStore.setMultiRepoWorkspaces(ws))
+                .catch(() => { /* best-effort refresh */ });
+            } else {
+              listWorkspaces(activeProjectPath)
+                .then((ws) => wsStore.setWorkspaces(ws))
+                .catch(() => { /* best-effort refresh */ });
+            }
           }
         }
 

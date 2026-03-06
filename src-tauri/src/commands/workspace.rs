@@ -367,6 +367,10 @@ fn complete_workspace_for_repo(
 }
 
 /// Remove a workspace from a single repo: remove worktree + best-effort branch delete.
+///
+/// If `git worktree remove` fails with "is not a working tree" (stale/corrupt worktree),
+/// falls back to removing the directory from disk and pruning git's worktree metadata.
+/// Also checks up to 2 levels of nested directories for leftover worktree artifacts.
 fn remove_workspace_for_repo(
     repo_path: &str,
     slug: &str,
@@ -378,12 +382,54 @@ fn remove_workspace_for_repo(
         args.push("--force");
     }
 
-    run_git(repo_path, &args)?;
+    if let Err(e) = run_git(repo_path, &args) {
+        if e.contains("is not a working tree") {
+            // Worktree metadata is stale — clean up manually.
+            let wt_path = worktree_dir(repo_path, slug);
+            let wt = Path::new(&wt_path);
+            if wt.exists() {
+                // Check up to 2 levels for nested .git dirs that indicate sub-worktrees
+                remove_nested_worktree_dirs(wt, 2);
+                let _ = fs::remove_dir_all(wt);
+            }
+            // Prune stale worktree references so git forgets about this path
+            let _ = run_git(repo_path, &["worktree", "prune"]);
+        } else {
+            return Err(e);
+        }
+    }
 
     let branch_name = format!("worktree-{slug}");
     let _ = run_git(repo_path, &["branch", "-d", &branch_name]);
 
     Ok(true)
+}
+
+/// Walk up to `max_depth` levels under `dir`, removing any nested directories
+/// that contain a `.git` file (indicating a git worktree checkout). This handles
+/// cases where a worktree was created inside another worktree's directory.
+fn remove_nested_worktree_dirs(dir: &Path, max_depth: u8) {
+    if max_depth == 0 || !dir.is_dir() {
+        return;
+    }
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        // A `.git` file (not directory) inside a folder marks it as a git worktree
+        let dot_git = path.join(".git");
+        if dot_git.exists() {
+            log::info!("Removing nested worktree artifact: {}", path.display());
+            let _ = fs::remove_dir_all(&path);
+        } else {
+            remove_nested_worktree_dirs(&path, max_depth - 1);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

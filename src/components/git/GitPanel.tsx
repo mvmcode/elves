@@ -23,7 +23,7 @@ function statusLabel(code: string): string {
 /** Status code to badge color class. */
 function statusColor(code: string): string {
   switch (code) {
-    case "M": return "bg-accent-blue text-white";
+    case "M": return "bg-info text-white";
     case "A":
     case "?": return "bg-success text-white";
     case "D": return "bg-error text-white";
@@ -206,7 +206,7 @@ export function GitPanel(): React.JSX.Element {
         <div className="flex gap-1">
           <button
             onClick={handlePull}
-            className="cursor-pointer border-[2px] border-border/40 bg-white px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-wider text-text-light/60 transition-all duration-100 hover:border-border hover:bg-accent-blue hover:text-white hover:shadow-brutal-xs"
+            className="cursor-pointer border-[2px] border-border/40 bg-white px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-wider text-text-light/60 transition-all duration-100 hover:border-border hover:bg-info hover:text-white hover:shadow-brutal-xs"
             title="Pull from remote"
           >
             Pull
@@ -223,7 +223,7 @@ export function GitPanel(): React.JSX.Element {
 
       {/* Push/pull status banner */}
       {pushPullStatus && (
-        <div className="border-b-[2px] border-border/30 bg-accent-blue/10 px-3 py-1 font-mono text-[11px] text-accent-blue">
+        <div className="border-b-[2px] border-border/30 bg-info/10 px-3 py-1 font-mono text-[11px] text-info">
           {pushPullStatus}
         </div>
       )}
@@ -361,7 +361,7 @@ export function GitPanel(): React.JSX.Element {
                   className="border-b border-border/5 px-3 py-1.5 hover:bg-elf-gold/5"
                 >
                   <div className="flex items-baseline gap-2">
-                    <span className="shrink-0 font-mono text-[10px] font-bold text-accent-blue">
+                    <span className="shrink-0 font-mono text-[10px] font-bold text-info">
                       {commit.shortHash}
                     </span>
                     <span className="min-w-0 truncate font-body text-[11px] text-text-light/80">
