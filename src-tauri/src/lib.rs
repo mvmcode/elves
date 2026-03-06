@@ -81,6 +81,9 @@ pub fn run() {
         .format_timestamp_secs()
         .init();
 
+    // Resolve full user PATH for macOS .app bundles (Finder/Dock get minimal PATH)
+    agents::runtime::ensure_full_path();
+
     let db_path = db::default_db_path();
     let conn = db::open_database(&db_path).expect("Failed to open ELVES database");
 
