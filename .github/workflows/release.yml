@@ -122,11 +122,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD || '' }}
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         run: |
-          gh release create "$RELEASE_TAG" \
-            --title "ELVES $RELEASE_TAG" \
-            --notes "$(cat <<'NOTES'
+          RELEASE_NOTES="$(cat <<'NOTES'
           See the [CHANGELOG](https://github.com/mvmcode/elves/blob/main/CHANGELOG.md) for details.
 
           ## Install
@@ -143,9 +141,22 @@ jobs:
              - Right-click ELVES.app → **Open** → click **Open** in the dialog
              - Or run: `xattr -cr /Applications/ELVES.app`
           NOTES
-          )" \
-            "$DMG_NAME" \
-            latest.json
+          )"
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists — updating..."
+            gh release edit "$RELEASE_TAG" \
+              --title "ELVES $RELEASE_TAG" \
+              --notes "$RELEASE_NOTES"
+            gh release upload "$RELEASE_TAG" "$DMG_NAME" latest.json --clobber
+          else
+            echo "Creating new release $RELEASE_TAG..."
+            gh release create "$RELEASE_TAG" \
+              --title "ELVES $RELEASE_TAG" \
+              --notes "$RELEASE_NOTES" \
+              "$DMG_NAME" \
+              latest.json
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
