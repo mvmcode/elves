@@ -4,6 +4,19 @@ All notable changes to ELVES are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.4] - 2026-03-05 — Codex Runtime Support & Parallel Sessions
+
+### Fixed
+- **Codex runtime PTY spawning** — selecting Codex as runtime now correctly spawns the `codex` binary instead of always launching `claude`. PTY mode uses `codex --full-auto "<task>"` for interactive terminal sessions.
+- **Codex CLI flags** — replaced invalid `--approval-mode full-auto` with the correct `--full-auto` flag. Non-PTY adapter updated to use `codex exec --full-auto --json` for machine-readable JSONL output.
+- **Codex memory injection** — memory context is now prepended to the task text for Codex sessions (Codex has no `--append-system-prompt` equivalent). Both solo and team paths inject memory.
+- **Task input disabled during sessions** — the task bar and summon button were locked while any session was active, preventing parallel workspace creation. Input is now always enabled; `ensureAvailableFloor` handles creating new floors for concurrent sessions.
+- **Landing page footer** — updated attribution from "Mani & Raghavan" to "ELVES community" linking to GitHub contributors page.
+
+### Changed
+- **Runtime-aware arg building** — `start_task_pty` and `start_team_task_pty` now branch on runtime to build CLI args specific to each binary (Claude Code flags vs Codex flags).
+- **Non-PTY codex adapter** — `spawn_codex` and `spawn_codex_team` updated to use `codex exec --full-auto --json` subcommand for piped stdout mode.
+
 ## [1.0.3] - 2026-03-05 — Terminal View Race Fix & Worktree Cleanup
 
 ### Fixed

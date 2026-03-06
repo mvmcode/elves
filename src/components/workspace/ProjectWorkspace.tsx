@@ -51,7 +51,7 @@ export function ProjectWorkspace(): React.JSX.Element {
   const openWorkspaceAction = useWorkspaceStore((state) => state.openWorkspace);
   const gitState = useGitStore((state) => state.gitState);
   const defaultRuntime = useAppStore((state) => state.defaultRuntime);
-  const { analyzeAndDeploy, isSessionActive } = useTeamSession();
+  const { analyzeAndDeploy } = useTeamSession();
   const setFloorWorktree = useSessionStore((s) => s.setFloorWorktree);
   const setFloorPtyId = useSessionStore((s) => s.setFloorPtyId);
 
@@ -420,7 +420,7 @@ export function ProjectWorkspace(): React.JSX.Element {
     ? workspaces.find((w) => w.slug === activeWorkspaceSlug) ?? null
     : null;
 
-  const canSummon = taskText.trim().length > 0 && !isSessionActive;
+  const canSummon = taskText.trim().length > 0;
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden" data-testid="project-workspace">
@@ -448,7 +448,7 @@ export function ProjectWorkspace(): React.JSX.Element {
               }
             }}
             placeholder="What do you want the elves to do?"
-            disabled={isSessionActive}
+
           />
           <span className="shrink-0 border-[2px] border-border bg-[#4D96FF] px-2 py-1 font-mono text-[10px] font-bold uppercase text-white shadow-[2px_2px_0px_0px_#000]">
             {defaultRuntime === "codex" ? "CX" : "CC"}

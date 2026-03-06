@@ -270,56 +270,68 @@ pub async fn start_task_pty(
             })
     };
 
-    // 5. Build CLI args
+    // 5. Select binary and build CLI args based on runtime
+    let is_codex = runtime == "codex";
+    let binary = if is_codex { "codex" } else { "claude" };
     let mut args: Vec<String> = Vec::new();
 
-    if let Some(ref resume_id) = spawn_options.resume_session_id {
-        // Resume mode: --resume <claudeSessionId> (no positional task arg)
-        args.push("--resume".to_string());
-        args.push(resume_id.clone());
+    if is_codex {
+        // Codex CLI: `codex --full-auto "<task>"` (interactive PTY mode)
+        // Codex has no --append-system-prompt, so prepend memory to the task text
+        args.push("--full-auto".to_string());
+        if memory_context.is_empty() {
+            args.push(task.clone());
+        } else {
+            args.push(format!("{memory_context}\n\n---\n\n{task}"));
+        }
     } else {
-        // New task: task as the first positional argument
-        args.push(task.clone());
-    }
+        // Claude Code CLI
+        if let Some(ref resume_id) = spawn_options.resume_session_id {
+            args.push("--resume".to_string());
+            args.push(resume_id.clone());
+        } else {
+            args.push(task.clone());
+        }
 
-    // Apply spawn options as CLI flags
-    if let Some(ref agent) = spawn_options.agent {
-        args.push("--agent".to_string());
-        args.push(agent.clone());
-    }
-    if let Some(ref model) = spawn_options.model {
-        args.push("--model".to_string());
-        args.push(model.clone());
-    }
-    if let Some(ref mode) = spawn_options.permission_mode {
-        args.push("--permission-mode".to_string());
-        args.push(mode.clone());
-    }
-    if let Some(budget) = spawn_options.max_budget_usd {
-        args.push("--max-budget-usd".to_string());
-        args.push(budget.to_string());
-    }
-    if let Some(ref effort) = spawn_options.effort {
-        args.push("--effort".to_string());
-        args.push(effort.clone());
-    }
+        // Apply spawn options as CLI flags (Claude Code only)
+        if let Some(ref agent) = spawn_options.agent {
+            args.push("--agent".to_string());
+            args.push(agent.clone());
+        }
+        if let Some(ref model) = spawn_options.model {
+            args.push("--model".to_string());
+            args.push(model.clone());
+        }
+        if let Some(ref mode) = spawn_options.permission_mode {
+            args.push("--permission-mode".to_string());
+            args.push(mode.clone());
+        }
+        if let Some(budget) = spawn_options.max_budget_usd {
+            args.push("--max-budget-usd".to_string());
+            args.push(budget.to_string());
+        }
+        if let Some(ref effort) = spawn_options.effort {
+            args.push("--effort".to_string());
+            args.push(effort.clone());
+        }
 
-    // Inject memory context via --append-system-prompt (skip for resume)
-    if !is_resume {
-        let combined_system_prompt = match (&spawn_options.append_system_prompt, memory_context.is_empty()) {
-            (Some(existing), false) => Some(format!("{existing}\n\n{memory_context}")),
-            (Some(existing), true) => Some(existing.clone()),
-            (None, false) => Some(memory_context),
-            (None, true) => None,
-        };
-        if let Some(ref prompt) = combined_system_prompt {
-            args.push("--append-system-prompt".to_string());
-            args.push(prompt.clone());
+        // Inject memory context via --append-system-prompt (skip for resume)
+        if !is_resume {
+            let combined_system_prompt = match (&spawn_options.append_system_prompt, memory_context.is_empty()) {
+                (Some(existing), false) => Some(format!("{existing}\n\n{memory_context}")),
+                (Some(existing), true) => Some(existing.clone()),
+                (None, false) => Some(memory_context),
+                (None, true) => None,
+            };
+            if let Some(ref prompt) = combined_system_prompt {
+                args.push("--append-system-prompt".to_string());
+                args.push(prompt.clone());
+            }
         }
     }
 
     // 6. Spawn via PtyManager — reuses existing PTY infrastructure
-    let pty_id = pty_mgr.spawn_with_app("claude", &args, &working_dir, &app)
+    let pty_id = pty_mgr.spawn_with_app(binary, &args, &working_dir, &app)
         .map_err(|e| format!("Failed to spawn PTY: {e}"))?;
 
     log::info!(
@@ -691,45 +703,59 @@ pub async fn start_team_task_pty(
             role.name, role.focus, task
         );
 
-        // Build CLI args (same pattern as start_task_pty)
+        // Build CLI args — runtime-aware (same pattern as start_task_pty)
+        let is_codex = runtime == "codex";
+        let binary = if is_codex { "codex" } else { "claude" };
         let mut args: Vec<String> = Vec::new();
-        args.push(role_prompt);
 
-        if let Some(ref agent) = spawn_options.agent {
-            args.push("--agent".to_string());
-            args.push(agent.clone());
-        }
-        if let Some(ref model) = spawn_options.model {
-            args.push("--model".to_string());
-            args.push(model.clone());
-        }
-        if let Some(ref mode) = spawn_options.permission_mode {
-            args.push("--permission-mode".to_string());
-            args.push(mode.clone());
-        }
-        if let Some(budget) = per_role_budget {
-            args.push("--max-budget-usd".to_string());
-            args.push(budget.to_string());
-        }
-        if let Some(ref effort) = spawn_options.effort {
-            args.push("--effort".to_string());
-            args.push(effort.clone());
-        }
+        if is_codex {
+            // Codex CLI: `codex --full-auto "<prompt>"` (interactive PTY mode)
+            // Codex has no --append-system-prompt, so prepend memory to the prompt
+            args.push("--full-auto".to_string());
+            if memory_context.is_empty() {
+                args.push(role_prompt);
+            } else {
+                args.push(format!("{memory_context}\n\n---\n\n{role_prompt}"));
+            }
+        } else {
+            args.push(role_prompt);
 
-        // Inject memory context via --append-system-prompt
-        let combined_system_prompt = match (&spawn_options.append_system_prompt, memory_context.is_empty()) {
-            (Some(existing), false) => Some(format!("{existing}\n\n{memory_context}")),
-            (Some(existing), true) => Some(existing.clone()),
-            (None, false) => Some(memory_context.clone()),
-            (None, true) => None,
-        };
-        if let Some(ref prompt) = combined_system_prompt {
-            args.push("--append-system-prompt".to_string());
-            args.push(prompt.clone());
+            if let Some(ref agent) = spawn_options.agent {
+                args.push("--agent".to_string());
+                args.push(agent.clone());
+            }
+            if let Some(ref model) = spawn_options.model {
+                args.push("--model".to_string());
+                args.push(model.clone());
+            }
+            if let Some(ref mode) = spawn_options.permission_mode {
+                args.push("--permission-mode".to_string());
+                args.push(mode.clone());
+            }
+            if let Some(budget) = per_role_budget {
+                args.push("--max-budget-usd".to_string());
+                args.push(budget.to_string());
+            }
+            if let Some(ref effort) = spawn_options.effort {
+                args.push("--effort".to_string());
+                args.push(effort.clone());
+            }
+
+            // Inject memory context via --append-system-prompt
+            let combined_system_prompt = match (&spawn_options.append_system_prompt, memory_context.is_empty()) {
+                (Some(existing), false) => Some(format!("{existing}\n\n{memory_context}")),
+                (Some(existing), true) => Some(existing.clone()),
+                (None, false) => Some(memory_context.clone()),
+                (None, true) => None,
+            };
+            if let Some(ref prompt) = combined_system_prompt {
+                args.push("--append-system-prompt".to_string());
+                args.push(prompt.clone());
+            }
         }
 
         // Spawn PTY for this role
-        let pty_id = pty_mgr.spawn_with_app("claude", &args, &working_dir, &app)
+        let pty_id = pty_mgr.spawn_with_app(binary, &args, &working_dir, &app)
             .map_err(|e| format!("Failed to spawn PTY for role {}: {e}", role.name))?;
 
         log::info!(
