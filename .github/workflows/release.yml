@@ -196,7 +196,7 @@ jobs:
 
       - name: Clone homebrew-tap and update formula
         run: |
-          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/mvmcode/homebrew-tap.git /tmp/homebrew-tap
+          git clone https://x-access-token:${TAP_TOKEN}@github.com/mvmcode/homebrew-tap.git /tmp/homebrew-tap
           cd /tmp/homebrew-tap
 
           VERSION="${{ steps.version.outputs.VERSION }}"
@@ -217,4 +217,4 @@ jobs:
 
           echo "Pushed formula update to homebrew-tap"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
