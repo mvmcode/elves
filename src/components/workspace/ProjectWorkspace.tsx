@@ -45,6 +45,8 @@ export function ProjectWorkspace(): React.JSX.Element {
   const setTopology = useWorkspaceStore((state) => state.setTopology);
   const multiRepoWorkspaces = useWorkspaceStore((state) => state.multiRepoWorkspaces);
   const setMultiRepoWorkspaces = useWorkspaceStore((state) => state.setMultiRepoWorkspaces);
+  const sessionMode = useWorkspaceStore((state) => state.sessionMode);
+  const setSessionMode = useWorkspaceStore((state) => state.setSessionMode);
 
   const activeWorkspaceSlug = useWorkspaceStore((state) => state.activeWorkspaceSlug);
   const openWorkspaceSlugs = useWorkspaceStore((state) => state.openWorkspaceSlugs);
@@ -67,14 +69,25 @@ export function ProjectWorkspace(): React.JSX.Element {
     if (!activeProject?.path) return;
     tauri.discoverGitRepos(activeProject.path)
       .then((topo) => setTopology(topo))
-      .catch(() => setTopology(null));
+      .catch(() => setTopology({ kind: "no_git", repos: [] }));
   }, [activeProject?.path, setTopology]);
 
-  /** Load workspaces when the project or topology changes. */
+  /** Load workspaces when the project or topology changes. Skip git listing in direct mode.
+   * IMPORTANT: Wait for topology discovery to complete (topology !== null) before running any
+   * git commands. On mount, topology starts null and sessionMode defaults to "worktree". Without
+   * this guard, listWorkspaces would run `git worktree list` on a multi-repo root that isn't a
+   * git repo, causing a fatal error. */
   useEffect(() => {
     if (!activeProject?.path) return;
+    if (sessionMode === "direct") {
+      /* Direct mode — workspace list is managed in-memory only, no git queries. */
+      setLoading(false);
+      return;
+    }
+    /* Topology not yet discovered — wait for it before attempting any git operations. */
+    if (!topology) return;
     setLoading(true);
-    if (topology?.kind === "multi_repo") {
+    if (topology.kind === "multi_repo") {
       const repoPaths = topology.repos.map((r) => r.path);
       tauri
         .listMultiRepoWorkspaces(activeProject.path, repoPaths)
@@ -98,7 +111,7 @@ export function ProjectWorkspace(): React.JSX.Element {
           setLoading(false);
         });
     }
-  }, [activeProject?.path, topology, setWorkspaces, setMultiRepoWorkspaces, setLoading, setError]);
+  }, [activeProject?.path, topology, sessionMode, setWorkspaces, setMultiRepoWorkspaces, setLoading, setError]);
 
   /** Fetch last session for each workspace to enable resume buttons. */
   useEffect(() => {
@@ -113,6 +126,7 @@ export function ProjectWorkspace(): React.JSX.Element {
             task: session.task,
             claudeSessionId: session.claudeSessionId ?? null,
             status: session.status,
+            runtime: session.runtime,
           }];
         })
         .catch((): [string, null] => [ws.slug, null]),
@@ -192,7 +206,7 @@ export function ProjectWorkspace(): React.JSX.Element {
       const workingDir = workspace?.path;
 
       try {
-        const runtime = defaultRuntime;
+        const runtime = session.runtime ?? defaultRuntime;
         const spawnOptions: tauri.StartTaskPtyResult = await tauri.startTaskPty(
           activeProject.id,
           "Resuming session...",
@@ -277,9 +291,15 @@ export function ProjectWorkspace(): React.JSX.Element {
     [activeProject?.path, shipItWorkspace, addShipped, removeWorkspaceFromStore, setLoading, setError],
   );
 
-  /** Remove a workspace (worktree + branch). */
+  /** Remove a workspace. Direct-mode workspaces are removed from store only (no git worktree). */
   const handleRemove = useCallback(
     (slug: string): void => {
+      const workspace = workspaces.find((w) => w.slug === slug);
+      if (workspace && !workspace.branch) {
+        /* Direct mode — just remove from in-memory store. */
+        removeWorkspaceFromStore(slug);
+        return;
+      }
       if (!activeProject?.path) return;
       setLoading(true);
       tauri
@@ -293,7 +313,7 @@ export function ProjectWorkspace(): React.JSX.Element {
           setLoading(false);
         });
     },
-    [activeProject?.path, removeWorkspaceFromStore, setLoading, setError],
+    [activeProject?.path, workspaces, removeWorkspaceFromStore, setLoading, setError],
   );
 
   /** Load and display diff for a multi-repo workspace. */
@@ -415,15 +435,6 @@ export function ProjectWorkspace(): React.JSX.Element {
     );
   }
 
-  /* Resolve active workspace for terminal view — check single-repo, then multi-repo fallback */
-  const activeOpenWorkspace = activeWorkspaceSlug
-    ? (
-        workspaces.find((w) => w.slug === activeWorkspaceSlug) ??
-        multiRepoWorkspaces.find((m) => m.slug === activeWorkspaceSlug)?.repos[0]?.workspace ??
-        null
-      )
-    : null;
-
   const canSummon = taskText.trim().length > 0;
 
   return (
@@ -431,11 +442,26 @@ export function ProjectWorkspace(): React.JSX.Element {
       {/* Tab bar — only when tabs exist */}
       {openWorkspaceSlugs.length > 0 && <WorkspaceTabBar />}
 
-      {/* Terminal view for active workspace tab */}
-      {activeOpenWorkspace ? (
-        <WorkspaceTerminalView workspace={activeOpenWorkspace} />
-      ) : (
-      /* Workspace grid with inline task bar */
+      {/* Terminal views for ALL open workspaces — hidden via display:none to preserve xterm buffers */}
+      {openWorkspaceSlugs.map((slug) => {
+        const ws =
+          workspaces.find((w) => w.slug === slug) ??
+          multiRepoWorkspaces.find((m) => m.slug === slug)?.repos[0]?.workspace ??
+          null;
+        if (!ws) return null;
+        return (
+          <div
+            key={slug}
+            className="flex flex-1 flex-col overflow-hidden"
+            style={{ display: slug === activeWorkspaceSlug ? "flex" : "none" }}
+          >
+            <WorkspaceTerminalView workspace={ws} />
+          </div>
+        );
+      })}
+
+      {/* Workspace grid with inline task bar — visible when no tab is active */}
+      {!activeWorkspaceSlug && (
       <div className="flex-1 overflow-y-auto">
       {/* Task bar — only visible on the grid home screen */}
       <div className="shrink-0 border-b-[2px] border-border/30 bg-surface-elevated px-6 py-3">
@@ -477,21 +503,55 @@ export function ProjectWorkspace(): React.JSX.Element {
             Workspaces are created automatically when you deploy a task.
           </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleRefreshGit}
-            className="cursor-pointer border-[2px] border-border bg-surface-elevated px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-text-muted shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
-          >
-            Git Status
-          </button>
-          <button
-            onClick={() => setNewDialogOpen(true)}
-            className="cursor-pointer border-[2px] border-border/50 bg-surface-elevated px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-text-muted shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
-            data-testid="new-workspace-btn"
-            title="Manually create a workspace (optional)"
-          >
-            +
-          </button>
+        <div className="flex items-center gap-2">
+          {/* Session mode toggle */}
+          <div className="flex border-[2px] border-border">
+            <button
+              onClick={() => setSessionMode("worktree")}
+              disabled={topology?.kind === "no_git"}
+              className={[
+                "cursor-pointer px-2.5 py-1 font-display text-[10px] font-bold uppercase tracking-wider transition-all duration-100",
+                sessionMode === "worktree"
+                  ? "bg-info text-white"
+                  : "bg-surface-elevated text-text-muted hover:bg-surface-elevated/80",
+                topology?.kind === "no_git" ? "cursor-not-allowed opacity-40" : "",
+              ].join(" ")}
+              title={topology?.kind === "no_git" ? "No git repository — worktree mode unavailable" : "Create isolated git worktrees for each task"}
+            >
+              Worktree
+            </button>
+            <button
+              onClick={() => setSessionMode("direct")}
+              className={[
+                "cursor-pointer border-l-[2px] border-border px-2.5 py-1 font-display text-[10px] font-bold uppercase tracking-wider transition-all duration-100",
+                sessionMode === "direct"
+                  ? "bg-info text-white"
+                  : "bg-surface-elevated text-text-muted hover:bg-surface-elevated/80",
+              ].join(" ")}
+              title="Run agents directly in the project folder"
+            >
+              Direct
+            </button>
+          </div>
+
+          {sessionMode !== "direct" && (
+            <>
+              <button
+                onClick={handleRefreshGit}
+                className="cursor-pointer border-[2px] border-border bg-surface-elevated px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-text-muted shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+              >
+                Git Status
+              </button>
+              <button
+                onClick={() => setNewDialogOpen(true)}
+                className="cursor-pointer border-[2px] border-border/50 bg-surface-elevated px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-text-muted shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                data-testid="new-workspace-btn"
+                title="Manually create a workspace (optional)"
+              >
+                +
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -515,14 +575,14 @@ export function ProjectWorkspace(): React.JSX.Element {
         </div>
       )}
 
-      {/* No-git message */}
-      {topology?.kind === "no_git" && (
+      {/* No-git info — sessions run directly in the project folder */}
+      {topology?.kind === "no_git" && workspaces.length === 0 && (
         <div className="mb-8 border-[2px] border-border/30 bg-surface-elevated p-8 text-center">
           <p className="font-display text-lg font-bold text-text-muted">
-            This project directory has no git repositories.
+            No git detected — sessions run directly in the project folder.
           </p>
           <p className="mt-1 font-body text-sm text-text-muted">
-            Initialize a git repository to use workspaces.
+            Deploy a task from the bar above and an elf will work right here.
           </p>
         </div>
       )}
@@ -563,8 +623,8 @@ export function ProjectWorkspace(): React.JSX.Element {
         )
       )}
 
-      {/* Single-repo workspace grid (existing flow) */}
-      {(topology?.kind === "single_repo" || !topology) && (
+      {/* Single-repo workspace grid (worktree mode) */}
+      {sessionMode === "worktree" && (topology?.kind === "single_repo" || !topology) && (
         workspaces.length > 0 ? (
           <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
             {workspaces.map((workspace) => (
@@ -595,6 +655,39 @@ export function ProjectWorkspace(): React.JSX.Element {
               </p>
               <p className="mt-1 font-body text-sm text-text-muted">
                 Deploy a task from the chat bar and a workspace will be created automatically.
+              </p>
+            </div>
+          )
+        )
+      )}
+
+      {/* Direct-mode workspace grid */}
+      {sessionMode === "direct" && (
+        workspaces.length > 0 ? (
+          <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {workspaces.map((workspace) => (
+              <div key={workspace.slug} className="flex flex-col gap-2">
+                <WorkspaceCard
+                  workspace={workspace}
+                  lastSession={lastSessions[workspace.slug]}
+                  hideGitActions
+                  onOpen={handleOpen}
+                  onResume={handleResume}
+                  onDiff={handleDiff}
+                  onShipIt={handleShipItOpen}
+                  onRemove={handleRemove}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          !isLoading && topology?.kind !== "no_git" && (
+            <div className="mb-8 border-[2px] border-border/30 bg-surface-elevated p-8 text-center">
+              <p className="font-display text-lg font-bold text-text-muted">
+                No sessions yet.
+              </p>
+              <p className="mt-1 font-body text-sm text-text-muted">
+                Deploy a task from the bar above — agents run directly in the project folder.
               </p>
             </div>
           )

@@ -15,7 +15,7 @@ import { PtyAgentDetector } from "@/lib/pty-agent-detector";
 import type { DetectedAgent, DetectedPermission } from "@/lib/pty-agent-detector";
 import { generateElf } from "@/lib/elf-names";
 import { playSound } from "@/lib/sounds";
-import { removeWorkspace as invokeRemoveWorkspace } from "@/lib/tauri";
+import { removeWorkspace as invokeRemoveWorkspace, completeSession, updateClaudeSessionId } from "@/lib/tauri";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { WorkspaceInfo } from "@/types/workspace";
@@ -40,6 +40,10 @@ interface WorkspaceTerminalViewProps {
  * Header: back link, workspace slug, elf name, runtime badge, diff summary.
  * Body: XTerminal wired to the workspace's PTY.
  * Footer: STOP, SHIP IT buttons, branch name.
+ *
+ * When a workspace has no PTY (opened without deploying), auto-spawns an
+ * interactive Claude session in the workspace directory so the user always
+ * gets a working terminal.
  */
 export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps): React.JSX.Element {
   const teamEntries = useWorkspaceStore((s) => s.teamPtyEntries[workspace.slug]);
@@ -54,6 +58,53 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
   const detectorRef = useRef<PtyAgentDetector>(new PtyAgentDetector());
   const [hasExited, setHasExited] = useState(false);
   const [pendingPermission, setPendingPermission] = useState<DetectedPermission | null>(null);
+  const [spawnError, setSpawnError] = useState<string | null>(null);
+  /** Guard against double-spawning during auto-spawn. */
+  const autoSpawnAttempted = useRef(false);
+
+  /** Auto-spawn a Claude interactive PTY when workspace has no terminal.
+   * This covers the case where a workspace tab is opened on an existing worktree
+   * (e.g., from the card grid or after an app restart).
+   *
+   * If a ptyId exists in the store, verifies it's still alive in the Rust backend.
+   * Stale ptyIds (from killed processes where the exit event was missed) are cleaned
+   * up, which triggers a re-run that spawns a fresh session. */
+  useEffect(() => {
+    if (hasExited || autoSpawnAttempted.current) return;
+    if (!workspace.path) return;
+
+    /* If a ptyId exists, verify it's still alive in the backend. If stale, remove it
+     * so the next effect run (ptyId → null) triggers the spawn branch below. */
+    if (ptyId) {
+      invoke<boolean>("check_pty_exists", { ptyId }).then((exists) => {
+        if (!exists) {
+          useWorkspaceStore.getState().removePtyId(workspace.slug);
+        }
+      }).catch(() => {
+        useWorkspaceStore.getState().removePtyId(workspace.slug);
+      });
+      return;
+    }
+
+    autoSpawnAttempted.current = true;
+
+    async function autoSpawn(): Promise<void> {
+      try {
+        const newPtyId = await invoke<string>("spawn_pty", {
+          command: "claude",
+          args: [],
+          cwd: workspace.path,
+        });
+        useWorkspaceStore.getState().setPtyId(workspace.slug, newPtyId);
+        useWorkspaceStore.getState().updateWorkspaceStatus(workspace.slug, "active");
+      } catch (error: unknown) {
+        console.error("Failed to auto-spawn Claude session:", error);
+        setSpawnError(String(error));
+      }
+    }
+
+    void autoSpawn();
+  }, [ptyId, hasExited, workspace.path, workspace.slug]);
 
   /** Handle permission response — write y/n to PTY stdin. */
   const handlePermissionResponse = useCallback((response: "y" | "n"): void => {
@@ -80,12 +131,27 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
           if (!mounted) return;
           terminalRef.current?.write(event.payload);
 
-          const { agents, permissions } = detectorRef.current.feed(event.payload);
+          const { agents, permissions, claudeSessionId } = detectorRef.current.feed(event.payload);
           for (const agent of agents) {
             handleAgentDetected(agent, workspace.slug);
           }
           for (const perm of permissions) {
             setPendingPermission(perm);
+          }
+
+          /* Save Claude session ID to DB when first detected — enables Resume in History. */
+          if (claudeSessionId) {
+            const sessionState = useSessionStore.getState();
+            const floorId = sessionState.activeFloorId;
+            if (floorId) {
+              const floor = sessionState.floors[floorId];
+              const dbSessionId = floor?.session?.id;
+              if (dbSessionId) {
+                updateClaudeSessionId(dbSessionId, claudeSessionId).catch((error: unknown) => {
+                  console.error("Failed to save Claude session ID:", error);
+                });
+              }
+            }
           }
         });
 
@@ -96,7 +162,32 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
             `\x1b[33m--- Session ended (exit code: ${event.payload}) ---\x1b[0m`,
           );
           setHasExited(true);
-          useWorkspaceStore.getState().updateWorkspaceStatus(workspace.slug, "idle");
+          const wsStore = useWorkspaceStore.getState();
+          wsStore.updateWorkspaceStatus(workspace.slug, "idle");
+          /* Remove stale PTY ID so reopening the tab triggers a fresh auto-spawn
+           * instead of subscribing to a dead channel (blank black screen). */
+          wsStore.removePtyId(workspace.slug);
+
+          /* Transition session store so RuntimePicker reappears in TopBar. */
+          const sessionState = useSessionStore.getState();
+          const floorId = sessionState.activeFloorId;
+          if (floorId) {
+            const floor = sessionState.floors[floorId];
+            if (floor?.session?.status === "active") {
+              sessionState.updateAllElfStatusOnFloor(floorId, "done");
+              sessionState.endSessionOnFloor(floorId, "completed");
+
+              /* Persist session completion to DB so History view shows correct status. */
+              const dbSessionId = floor.session.id;
+              if (dbSessionId) {
+                const exitCode = event.payload;
+                const status = exitCode === 0 ? "completed" : "failed";
+                completeSession(dbSessionId, status).catch((error: unknown) => {
+                  console.error("Failed to persist session completion to DB:", error);
+                });
+              }
+            }
+          }
         });
       } catch (error) {
         console.error("Failed to subscribe to PTY events:", error);
@@ -129,13 +220,19 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
     });
   }, [ptyId]);
 
-  /** Stop the running PTY process. */
+  /** Stop the running PTY process.
+   * Immediately cleans up state — does NOT rely on the async exit event, which
+   * may fire after the user closes the tab (causing a stale ptyId on reopen). */
   const handleStop = useCallback((): void => {
     if (!ptyId) return;
     invoke<void>("kill_pty", { ptyId }).catch((error: unknown) => {
       console.error("Failed to kill PTY:", error);
     });
-  }, [ptyId]);
+    setHasExited(true);
+    const wsStore = useWorkspaceStore.getState();
+    wsStore.updateWorkspaceStatus(workspace.slug, "idle");
+    wsStore.removePtyId(workspace.slug);
+  }, [ptyId, workspace.slug]);
 
   /** Remove workspace — deletes the worktree from disk and closes the tab. */
   const handleRemoveWorkspace = useCallback((): void => {
@@ -150,7 +247,10 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
     useWorkspaceStore.getState().removeWorkspace(workspace.slug);
   }, [workspace.slug]);
 
-  const isActive = workspace.status === "active";
+  const isDirectMode = !workspace.branch;
+  /** Only treat as "active" when a PTY is actually connected — avoids showing
+   * STOP/LIVE controls for workspaces that are open but have no running process. */
+  const isActive = workspace.status === "active" && !!ptyId;
   const diffSummary = workspace.filesChanged > 0
     ? `${workspace.filesChanged} file${workspace.filesChanged !== 1 ? "s" : ""} changed`
     : null;
@@ -175,12 +275,16 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
           <span className="font-mono text-xs text-text-muted">{diffSummary}</span>
         )}
 
-        <span className="ml-auto font-mono text-xs text-text-muted">{workspace.branch}</span>
+        {!isDirectMode && (
+          <span className="ml-auto font-mono text-xs text-text-muted">{workspace.branch}</span>
+        )}
       </div>
 
-      {/* Terminal body */}
+      {/* Terminal body — keep XTerminal mounted after exit so the "session ended" message
+       * remains visible. The ptyId is removed from the store on exit, but hasExited keeps
+       * the terminal rendered. On tab close + reopen, both reset and auto-spawn kicks in. */}
       <div className="relative flex flex-1 overflow-hidden">
-        {ptyId ? (
+        {(ptyId || hasExited) ? (
           <div className="flex flex-1 flex-col overflow-hidden p-1">
             <XTerminal
               ref={terminalRef}
@@ -189,10 +293,30 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
             />
           </div>
         ) : (
-          <div className="flex flex-1 items-center justify-center">
-            <p className="font-mono text-sm text-gray-500">
-              No terminal attached to this workspace.
-            </p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-3">
+            {spawnError ? (
+              <>
+                <p className="font-display text-sm font-bold text-error">
+                  Failed to start Claude session
+                </p>
+                <p className="max-w-md text-center font-mono text-xs text-gray-400">
+                  {spawnError}
+                </p>
+                <button
+                  onClick={() => {
+                    setSpawnError(null);
+                    autoSpawnAttempted.current = false;
+                  }}
+                  className="cursor-pointer border-[2px] border-border bg-info px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                >
+                  Retry
+                </button>
+              </>
+            ) : (
+              <p className="font-mono text-sm text-gray-500">
+                Starting Claude session...
+              </p>
+            )}
           </div>
         )}
 
@@ -221,22 +345,26 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
 
         {(workspace.status === "idle" || hasExited) && (
           <>
+            {!isDirectMode && (
+              <button
+                onClick={() => {
+                  /* Ship It is handled by the grid — switch to grid view where ShipItDialog lives */
+                  useWorkspaceStore.getState().setActiveWorkspace(null);
+                }}
+                className="cursor-pointer border-[2px] border-border bg-success px-3 py-1 font-display text-[10px] font-bold uppercase tracking-widest text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+                data-testid="workspace-shipit-btn"
+              >
+                Ship It
+              </button>
+            )}
             <button
-              onClick={() => {
-                /* Ship It is handled by the grid — switch to grid view where ShipItDialog lives */
-                useWorkspaceStore.getState().setActiveWorkspace(null);
-              }}
-              className="cursor-pointer border-[2px] border-border bg-success px-3 py-1 font-display text-[10px] font-bold uppercase tracking-widest text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
-              data-testid="workspace-shipit-btn"
-            >
-              Ship It
-            </button>
-            <button
-              onClick={handleRemoveWorkspace}
+              onClick={isDirectMode
+                ? () => useWorkspaceStore.getState().closeWorkspaceTab(workspace.slug)
+                : handleRemoveWorkspace}
               className="cursor-pointer border-[2px] border-border bg-gray-600 px-3 py-1 font-display text-[10px] font-bold uppercase tracking-widest text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
               data-testid="workspace-remove-btn"
             >
-              Remove
+              {isDirectMode ? "Close" : "Remove"}
             </button>
           </>
         )}
@@ -248,7 +376,9 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
           ].join(" ")}>
             {hasExited ? "ENDED" : isActive ? "LIVE" : "IDLE"}
           </span>
-          <span className="font-mono text-[10px] text-text-muted">{workspace.branch}</span>
+          {!isDirectMode && (
+            <span className="font-mono text-[10px] text-text-muted">{workspace.branch}</span>
+          )}
         </div>
       </div>
     </div>

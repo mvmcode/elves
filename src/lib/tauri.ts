@@ -59,6 +59,29 @@ export async function listSessionEvents(sessionId: string): Promise<SessionEvent
   return invoke<SessionEvent[]>("list_session_events", { sessionId });
 }
 
+/** Mark a session as completed (or failed/cancelled) in the DB.
+ * Called from the frontend when a PTY exits so the session status persists beyond in-memory state. */
+export async function completeSession(
+  sessionId: string,
+  status?: string,
+  summary?: string,
+): Promise<boolean> {
+  return invoke<boolean>("complete_session", {
+    sessionId,
+    status: status ?? null,
+    summary: summary ?? null,
+  });
+}
+
+/** Store the Claude Code session ID for a session. Enables `claude --resume` support.
+ * Called from the frontend when a Claude session ID is detected in PTY output. */
+export async function updateClaudeSessionId(
+  sessionId: string,
+  claudeSessionId: string,
+): Promise<boolean> {
+  return invoke<boolean>("update_claude_session_id", { sessionId, claudeSessionId });
+}
+
 /** Get the most recent session for a project + workspace slug. Used for session resume on workspace cards. */
 export async function getLastWorkspaceSession(
   projectId: string,
@@ -664,6 +687,13 @@ export async function searchSkills(query: string): Promise<SkillSearchResult[]> 
 /** Install a skill from a git URL into ~/.claude/commands/. */
 export async function installSkillFromUrl(url: string, projectPath?: string): Promise<boolean> {
   return invoke<boolean>("install_skill_from_url", { url, projectPath: projectPath ?? null });
+}
+
+/* ── Update commands ──────────────────────────────────────────── */
+
+/** Check the Homebrew tap for a newer version. Returns the version string or null on failure. */
+export async function checkHomebrewUpdate(): Promise<string | null> {
+  return invoke<string | null>("check_homebrew_update");
 }
 
 /* ── Event subscription ──────────────────────────────────────── */

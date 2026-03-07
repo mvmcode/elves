@@ -4,6 +4,32 @@ All notable changes to ELVES are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.6] - 2026-03-06 — Homebrew Update Check
+
+### Added
+- **Homebrew update check on launch** — non-blocking startup check fetches the Homebrew tap formula and compares versions. If a newer version is available, shows a persistent toast with a "COPY COMMAND" button that copies `brew upgrade --cask elves` to the clipboard.
+
+## [1.0.5] - 2026-03-06 — Multi-Repo PTY Fixes & Session Resume
+
+### Fixed
+- **Blank screen on workspace reopen** — stopping a session and reopening the tab no longer shows a blank black terminal. Stale PTY IDs are now cleaned up immediately on stop, on tab close, and via backend liveness checks (`check_pty_exists`).
+- **Multi-repo topology race condition** — workspace loading no longer runs `git worktree list` before topology discovery completes. Previously, the default "worktree" session mode caused git errors on multi-repo project roots that aren't git repositories.
+- **Topology discovery error handling** — failed discovery now falls back to `{kind: "no_git"}` instead of `null`, correctly triggering direct mode and unblocking the workspace loading effect.
+- **Deploy error visibility** — `analyzeAndDeploy` catch block now propagates errors to the workspace store so users see failure messages instead of silent swallowing.
+
+### Added
+- **Auto-spawn Claude PTY** — opening a workspace tab without a running terminal automatically spawns a fresh `claude` session in the workspace directory. Includes error display with Retry button.
+- **Stale PTY detection** — new `check_pty_exists` Rust command lets the frontend verify a PTY ID is still alive in the backend `PtyManager`. The auto-spawn effect checks liveness before skipping, preventing subscription to dead channels.
+- **Claude session ID detection** — `PtyAgentDetector` now scans terminal output for Claude session IDs (from `session:` lines), saving them to the database for Resume support.
+- **Session Resume from history** — `SessionHistory` shows a "Resume" button for sessions with a saved `claudeSessionId`, spawning `claude --resume <id>` in an embedded terminal.
+- **`update_claude_session_id` IPC** — new Tauri command and frontend wrapper to persist detected Claude session IDs to the sessions table.
+
+### Changed
+- **`handleStop` immediate cleanup** — clicking STOP now immediately sets `hasExited` and removes the PTY ID from the store instead of relying on the async exit event (which could fire after the tab is closed).
+- **`closeWorkspaceTab` PTY cleanup** — closing a workspace tab also removes its PTY ID entry, preventing stale references on reopen.
+- **`setWorkspaces` preserves active status** — background workspace list refreshes no longer overwrite "active" status for workspaces with running PTYs.
+- **Terminal render condition** — XTerminal stays mounted after exit via `(ptyId || hasExited)` so the "session ended" message remains visible instead of flashing to a loading state.
+
 ## [1.0.4] - 2026-03-05 — Codex Runtime Support & Parallel Sessions
 
 ### Fixed

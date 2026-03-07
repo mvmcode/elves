@@ -26,6 +26,8 @@ interface WorkspaceState {
   readonly ptyIds: Readonly<Record<string, string>>;
   /** Maps workspace slug to team PTY entries (one per role). Presence signals split view. */
   readonly teamPtyEntries: Readonly<Record<string, readonly TeamPtyEntry[]>>;
+  /** Session launch mode — "worktree" creates git worktrees, "direct" runs in the project folder. */
+  readonly sessionMode: "worktree" | "direct";
 
   setWorkspaces: (workspaces: WorkspaceInfo[]) => void;
   setActiveWorkspace: (slug: string | null) => void;
@@ -53,6 +55,8 @@ interface WorkspaceState {
   setTeamPtyEntries: (slug: string, entries: TeamPtyEntry[]) => void;
   /** Clear team PTY entries for a workspace. */
   clearTeamPtyEntries: (slug: string) => void;
+  /** Set the session launch mode. */
+  setSessionMode: (mode: "worktree" | "direct") => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
@@ -67,8 +71,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   multiRepoWorkspaces: [],
   ptyIds: {},
   teamPtyEntries: {},
+  sessionMode: "worktree",
 
-  setWorkspaces: (workspaces: WorkspaceInfo[]) => set({ workspaces, error: null }),
+  setWorkspaces: (workspaces: WorkspaceInfo[]) =>
+    set((state) => {
+      /* Preserve "active" status for workspaces that have a running PTY — the
+       * backend doesn't know about PTY state, so it returns all workspaces as
+       * "idle". Without this merge, a background list refresh would overwrite
+       * the "active" status set by the deploy flow, causing LIVE/STOP to vanish. */
+      const merged = workspaces.map((ws) =>
+        state.ptyIds[ws.slug]
+          ? { ...ws, status: "active" as WorkspaceInfo["status"] }
+          : ws,
+      );
+      return { workspaces: merged, error: null };
+    }),
   setActiveWorkspace: (slug: string | null) => set({ activeWorkspaceSlug: slug }),
   openWorkspace: (slug: string) =>
     set((state) => ({
@@ -87,13 +104,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       } else {
         nextActive = state.activeWorkspaceSlug;
       }
-      return { openWorkspaceSlugs: tabs, activeWorkspaceSlug: nextActive };
+      /* Also remove any ptyId for this slug — prevents stale references when
+       * the tab is closed before the PTY exit event fires. */
+      const { [slug]: _removedPty, ...remainingPtyIds } = state.ptyIds;
+      return { openWorkspaceSlugs: tabs, activeWorkspaceSlug: nextActive, ptyIds: remainingPtyIds };
     }),
   setDiff: (slug: string, diff: WorkspaceDiff) =>
     set((state) => ({ diffs: { ...state.diffs, [slug]: diff } })),
   addShipped: (shipped: ShippedWorkspace) =>
     set((state) => ({ recentlyShipped: [shipped, ...state.recentlyShipped].slice(0, 10) })),
-  setTopology: (topology: ProjectTopology | null) => set({ topology }),
+  setTopology: (topology: ProjectTopology | null) => set({
+    topology,
+    sessionMode:
+      topology === null ? "worktree"
+        : topology.kind === "multi_repo" || topology.kind === "no_git" ? "direct"
+        : "worktree",
+  }),
   setMultiRepoWorkspaces: (workspaces: MultiRepoWorkspace[]) => set({ multiRepoWorkspaces: workspaces }),
   setPtyId: (slug: string, ptyId: string) =>
     set((state) => ({ ptyIds: { ...state.ptyIds, [slug]: ptyId } })),
@@ -137,4 +163,5 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       const { [slug]: _, ...rest } = state.teamPtyEntries;
       return { teamPtyEntries: rest };
     }),
+  setSessionMode: (mode: "worktree" | "direct") => set({ sessionMode: mode }),
 }));

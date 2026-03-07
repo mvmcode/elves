@@ -121,31 +121,41 @@ export function useTeamSession(): {
           console.error("Failed to build project context:", error);
         });
 
-        /* Auto-create a worktree for task isolation (silently falls back to project root) */
+        /* Create workspace — worktree mode isolates via git worktree, direct mode skips git entirely. */
         let worktreeWorkingDir: string | undefined;
+        let worktreeCreated = false;
         const activeFloorIdNow = useSessionStore.getState().activeFloorId;
         if (activeProjectPath && activeFloorIdNow) {
-          try {
-            const { topology } = useWorkspaceStore.getState();
-            const slug = generateWorkspaceSlug(augmentedTask);
+          const { sessionMode, topology } = useWorkspaceStore.getState();
+          const slug = generateWorkspaceSlug(augmentedTask);
 
-            if (topology?.kind === "multi_repo") {
-              const repoPaths = topology.repos.map((r) => r.path);
-              const mrWorkspace = await createMultiRepoWorkspace(activeProjectPath, slug, repoPaths);
-              worktreeWorkingDir = activeProjectPath; // agent CWD = project root (accesses all repos)
-              setFloorWorktree(activeFloorIdNow, slug, activeProjectPath);
-              // Eagerly add first repo's workspace so terminal view resolves
-              const firstEntry = mrWorkspace.repos[0];
-              if (firstEntry) {
-                useWorkspaceStore.getState().addWorkspace(firstEntry.workspace);
+          if (sessionMode === "direct") {
+            /* Direct mode — skip worktree creation, run agent in the project folder. */
+            worktreeWorkingDir = activeProjectPath;
+            setFloorWorktree(activeFloorIdNow, slug, activeProjectPath);
+          } else {
+            try {
+              if (topology?.kind === "multi_repo") {
+                const repoPaths = topology.repos.map((r) => r.path);
+                const mrWorkspace = await createMultiRepoWorkspace(activeProjectPath, slug, repoPaths);
+                worktreeWorkingDir = activeProjectPath;
+                setFloorWorktree(activeFloorIdNow, slug, activeProjectPath);
+                worktreeCreated = true;
+                const firstEntry = mrWorkspace.repos[0];
+                if (firstEntry) {
+                  useWorkspaceStore.getState().addWorkspace(firstEntry.workspace);
+                }
+              } else {
+                const workspaceInfo = await createWorkspace(activeProjectPath, slug);
+                worktreeWorkingDir = workspaceInfo.path;
+                setFloorWorktree(activeFloorIdNow, slug, workspaceInfo.path);
+                worktreeCreated = true;
               }
-            } else {
-              const workspaceInfo = await createWorkspace(activeProjectPath, slug);
-              worktreeWorkingDir = workspaceInfo.path;
-              setFloorWorktree(activeFloorIdNow, slug, workspaceInfo.path);
+            } catch (worktreeError) {
+              console.warn("Auto-worktree creation failed, falling back to project root:", worktreeError);
+              worktreeWorkingDir = activeProjectPath;
+              setFloorWorktree(activeFloorIdNow, slug, activeProjectPath);
             }
-          } catch (worktreeError) {
-            console.warn("Auto-worktree creation failed, using project root:", worktreeError);
           }
           /* Rename the floor tab to reflect the task */
           renameFloor(activeFloorIdNow, augmentedTask.slice(0, 30) || "Task");
@@ -182,19 +192,21 @@ export function useTeamSession(): {
           const wsSlug = useSessionStore.getState().floors[currentFloorId ?? ""]?.worktreeSlug;
           if (wsSlug) {
             const wsStore = useWorkspaceStore.getState();
-            /* Add workspace eagerly so the terminal view can find it immediately */
+            /* Add workspace eagerly so the terminal view can find it immediately.
+             * Use branch="" when no real worktree was created (direct mode or fallback). */
             wsStore.addWorkspace({
               slug: wsSlug,
               path: worktreeWorkingDir ?? "",
-              branch: `worktree-${wsSlug}`,
+              branch: worktreeCreated ? `worktree-${wsSlug}` : "",
               status: "active",
               filesChanged: 0,
               lastModified: new Date().toISOString(),
             });
             wsStore.setPtyId(wsSlug, ptyId);
             wsStore.openWorkspace(wsSlug);
-            /* Background refresh for full metadata (branch name, file counts, etc.) */
-            if (activeProjectPath) {
+            /* Background refresh for full metadata — only when a real worktree was created.
+             * Skipped for direct mode and worktree-fallback to avoid overwriting the eager entry. */
+            if (activeProjectPath && worktreeCreated) {
               const { topology: currentTopology } = useWorkspaceStore.getState();
               if (currentTopology?.kind === "multi_repo") {
                 const repoPaths = currentTopology.repos.map((r) => r.path);
@@ -259,7 +271,10 @@ export function useTeamSession(): {
           showPlanPreview(plan);
         }
       } catch (error) {
-        console.error("Failed to analyze task:", error);
+        console.error("Failed to analyze/deploy task:", error);
+        useWorkspaceStore.getState().setError(
+          `Deploy failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     },
     [activeProjectId, activeProjectPath, defaultRuntime, buildSpawnOptions, ensureAvailableFloor, startSession, addElf, addEvent, updateElfStatus, showPlanPreview, setFloorWorktree, setFloorPtyId, renameFloor],
@@ -304,11 +319,12 @@ export function useTeamSession(): {
         const teamWsSlug = activeFloor?.worktreeSlug;
         if (teamWsSlug) {
           const wsStore = useWorkspaceStore.getState();
-          /* Add workspace eagerly so the terminal view can find it immediately */
+          /* Check if a real worktree was created (worktreePath !== activeProjectPath for single-repo). */
+          const hasRealWorktree = worktreeWorkingDir !== undefined && worktreeWorkingDir !== activeProjectPath;
           wsStore.addWorkspace({
             slug: teamWsSlug,
             path: worktreeWorkingDir ?? "",
-            branch: `worktree-${teamWsSlug}`,
+            branch: hasRealWorktree ? `worktree-${teamWsSlug}` : "",
             status: "active",
             filesChanged: 0,
             lastModified: new Date().toISOString(),
@@ -318,13 +334,12 @@ export function useTeamSession(): {
             ptyId: e.ptyId,
             elfId: e.elfId,
           })));
-          /* Also set first entry as the primary ptyId for backward compat */
           if (ptyEntries[0]) {
             wsStore.setPtyId(teamWsSlug, ptyEntries[0].ptyId);
           }
           wsStore.openWorkspace(teamWsSlug);
-          /* Background refresh for full metadata */
-          if (activeProjectPath) {
+          /* Background refresh — only when a real worktree exists. */
+          if (activeProjectPath && hasRealWorktree) {
             const { topology: currentTopology } = useWorkspaceStore.getState();
             if (currentTopology?.kind === "multi_repo") {
               const repoPaths = currentTopology.repos.map((r) => r.path);
@@ -413,7 +428,7 @@ export function useTeamSession(): {
     }
 
     try {
-      const runtime = defaultRuntime;
+      const runtime = floor.session?.runtime ?? defaultRuntime;
       const worktreeWorkingDir = floor.worktreePath ?? undefined;
       const spawnOptions = buildSpawnOptions();
 

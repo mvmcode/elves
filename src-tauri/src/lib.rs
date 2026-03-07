@@ -128,6 +128,8 @@ pub fn run() {
             commands::sessions::get_session,
             commands::sessions::get_last_workspace_session,
             commands::sessions::list_session_events,
+            commands::sessions::complete_session,
+            commands::sessions::update_claude_session_id,
             commands::tasks::start_task,
             commands::tasks::start_task_pty,
             commands::tasks::stop_task,
@@ -172,6 +174,7 @@ pub fn run() {
             commands::pty::write_pty,
             commands::pty::resize_pty,
             commands::pty::kill_pty,
+            commands::pty::check_pty_exists,
             commands::filesystem::list_directory,
             commands::filesystem::git_status,
             commands::git::git_branch,
@@ -212,6 +215,7 @@ pub fn run() {
             commands::search::search_mcp_servers,
             commands::search::search_skills,
             commands::search::install_skill_from_url,
+            commands::updates::check_homebrew_update,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");
