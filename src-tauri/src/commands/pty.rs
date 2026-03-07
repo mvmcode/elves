@@ -59,9 +59,9 @@ impl PtyManager {
         // Clear Claude Code env vars so the child process doesn't detect nested execution.
         // Without this, spawning `claude` from within a Claude Code session fails because
         // CLAUDE_CODE_ENTRYPOINT causes the child to enter a non-interactive nested mode.
-        cmd.env("CLAUDECODE", "");
-        cmd.env("CLAUDE_CODE_ENTRYPOINT", "");
-        cmd.env("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "");
+        cmd.env_remove("CLAUDECODE");
+        cmd.env_remove("CLAUDE_CODE_ENTRYPOINT");
+        cmd.env_remove("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS");
         // Ensure TERM is set for proper TUI rendering in the PTY
         if std::env::var("TERM").is_err() {
             cmd.env("TERM", "xterm-256color");
@@ -143,6 +143,14 @@ pub fn spawn_pty(
         cmd.arg(arg);
     }
     cmd.cwd(&cwd);
+    // Clear Claude Code env vars so the child process doesn't detect nested execution.
+    cmd.env_remove("CLAUDECODE");
+    cmd.env_remove("CLAUDE_CODE_ENTRYPOINT");
+    cmd.env_remove("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS");
+    // Ensure TERM is set for proper TUI rendering in the PTY
+    if std::env::var("TERM").is_err() {
+        cmd.env("TERM", "xterm-256color");
+    }
 
     let child = pair
         .slave
@@ -253,6 +261,17 @@ pub fn resize_pty(
         .map_err(|e| format!("Failed to resize PTY: {e}"))?;
 
     Ok(())
+}
+
+/// Check whether a PTY ID is still alive in the manager.
+/// Used by the frontend to detect stale references after tab close or app restart.
+#[tauri::command]
+pub fn check_pty_exists(pty_id: String, state: State<'_, PtyManager>) -> bool {
+    state
+        .0
+        .lock()
+        .map(|map| map.contains_key(&pty_id))
+        .unwrap_or(false)
 }
 
 /// Kill a PTY process and remove it from the manager.

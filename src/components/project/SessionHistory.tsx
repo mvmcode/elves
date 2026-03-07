@@ -4,14 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSessionHistory } from "@/hooks/useSessionHistory";
 import { useUiStore } from "@/stores/ui";
 import { useSessionStore } from "@/stores/session";
+import { useWorkspaceStore } from "@/stores/workspace";
 import { useComparisonStore } from "@/stores/comparison";
 import type { ActiveSession } from "@/stores/session";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ShareButton } from "@/components/project/ShareButton";
 import { getEmptyState } from "@/lib/funny-copy";
-import { listSessionEvents } from "@/lib/tauri";
+import { listSessionEvents, startTaskPty } from "@/lib/tauri";
 import type { SessionEvent } from "@/lib/tauri";
 import { EVENT_TYPE_COLOR, summarizeEventPayload } from "@/lib/event-summary";
+import { generateElf, getStatusMessage } from "@/lib/elf-names";
 import type { ElfEvent } from "@/types/elf";
 import type { Session, SessionStatus } from "@/types/session";
 
@@ -194,6 +196,90 @@ export function SessionHistory(): React.JSX.Element {
     [openHistoricalFloor, setActiveView],
   );
 
+  const createFloor = useSessionStore((state) => state.createFloor);
+  const startSessionOnStore = useSessionStore((state) => state.startSession);
+  const addElf = useSessionStore((state) => state.addElf);
+  const addEvent = useSessionStore((state) => state.addEvent);
+  const setFloorPtyId = useSessionStore((state) => state.setFloorPtyId);
+
+  /** Resume a completed session — spawn a new PTY with `--resume <claudeSessionId>`. */
+  const handleResume = useCallback(
+    async (session: Session): Promise<void> => {
+      if (!session.claudeSessionId) return;
+
+      try {
+        /* Create a fresh floor for the resumed session */
+        const floorId = createFloor(session.task.slice(0, 30) || "Resume");
+
+        const { sessionId, ptyId } = await startTaskPty(
+          session.projectId,
+          "Resuming session...",
+          session.runtime,
+          undefined,
+          { resumeSessionId: session.claudeSessionId },
+        );
+
+        setFloorPtyId(floorId, ptyId);
+
+        /* Wire PTY to workspace store so WorkspaceTerminalView can render it */
+        const wsSlug = `resume-${sessionId.slice(0, 8)}`;
+        const wsStore = useWorkspaceStore.getState();
+        wsStore.addWorkspace({
+          slug: wsSlug,
+          path: "",
+          branch: "",
+          status: "active",
+          filesChanged: 0,
+          lastModified: new Date().toISOString(),
+        });
+        wsStore.setPtyId(wsSlug, ptyId);
+        wsStore.openWorkspace(wsSlug);
+
+        /* Start session on the new floor */
+        startSessionOnStore({
+          id: sessionId,
+          projectId: session.projectId,
+          task: session.task,
+          runtime: session.runtime,
+          plan: session.plan ?? undefined,
+        });
+
+        const personality = generateElf();
+        addElf({
+          id: `elf-${sessionId}`,
+          sessionId,
+          name: personality.name,
+          role: "Worker",
+          avatar: personality.avatar,
+          color: personality.color,
+          quirk: personality.quirk,
+          runtime: session.runtime,
+          status: "working",
+          spawnedAt: Date.now(),
+          finishedAt: null,
+          parentElfId: null,
+          toolsUsed: [],
+        });
+
+        addEvent({
+          id: `event-resume-${Date.now()}`,
+          timestamp: Date.now(),
+          elfId: `elf-${sessionId}`,
+          elfName: personality.name,
+          runtime: session.runtime,
+          type: "spawn",
+          payload: { role: "Worker" },
+          funnyStatus: getStatusMessage(personality.name, "working"),
+        });
+
+        setActiveView("workspace");
+      } catch (error) {
+        console.error("Failed to resume session:", error);
+      }
+    },
+    [createFloor, startSessionOnStore, addElf, addEvent, setFloorPtyId, setActiveView],
+  );
+
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
@@ -311,6 +397,18 @@ export function SessionHistory(): React.JSX.Element {
 
                   {/* Action buttons row */}
                   <div className="flex items-center gap-2">
+                    {session.claudeSessionId && session.status !== "active" && (
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleResume(session);
+                        }}
+                        className="cursor-pointer border-token-normal border-border bg-success/20 rounded-token-sm px-3 py-1 font-display text-xs font-bold text-label shadow-brutal-sm transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                        data-testid="resume-session-button"
+                      >
+                        Resume
+                      </button>
+                    )}
                     <ShareButton sessionId={session.id} sessionTask={session.task} />
                     <button
                       onClick={(event) => {

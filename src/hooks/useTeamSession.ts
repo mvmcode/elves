@@ -271,7 +271,10 @@ export function useTeamSession(): {
           showPlanPreview(plan);
         }
       } catch (error) {
-        console.error("Failed to analyze task:", error);
+        console.error("Failed to analyze/deploy task:", error);
+        useWorkspaceStore.getState().setError(
+          `Deploy failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     },
     [activeProjectId, activeProjectPath, defaultRuntime, buildSpawnOptions, ensureAvailableFloor, startSession, addElf, addEvent, updateElfStatus, showPlanPreview, setFloorWorktree, setFloorPtyId, renameFloor],
@@ -425,7 +428,7 @@ export function useTeamSession(): {
     }
 
     try {
-      const runtime = defaultRuntime;
+      const runtime = floor.session?.runtime ?? defaultRuntime;
       const worktreeWorkingDir = floor.worktreePath ?? undefined;
       const spawnOptions = buildSpawnOptions();
 

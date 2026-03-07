@@ -22,10 +22,30 @@ export interface DetectedPermission {
   readonly description: string;
 }
 
-/** Result from feeding a PTY chunk — may contain agents and/or permission requests. */
+/** Result from feeding a PTY chunk — may contain agents, permission requests, and/or a Claude session ID. */
 export interface FeedResult {
   readonly agents: readonly DetectedAgent[];
   readonly permissions: readonly DetectedPermission[];
+  /** Claude Code's internal session ID, detected from terminal output (OSC title or visible text). */
+  readonly claudeSessionId: string | null;
+}
+
+/** UUID v4 pattern for detecting Claude session IDs. */
+const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+/**
+ * Extract Claude session IDs from OSC title sequences before they are stripped.
+ * Claude Code may set the terminal title to include the session ID.
+ * OSC sequences: \x1b]0;...\x07 or \x1b]2;...\x07 (set title).
+ */
+function extractSessionIdFromOsc(rawText: string): string | null {
+  const oscMatches = rawText.matchAll(/\x1b\](?:0|2);([^\x07\x1b]*?)(?:\x07|\x1b\\)/g);
+  for (const match of oscMatches) {
+    const title = match[1] ?? "";
+    const uuidMatch = UUID_PATTERN.exec(title);
+    if (uuidMatch) return uuidMatch[0];
+  }
+  return null;
 }
 
 /**
@@ -92,6 +112,19 @@ const DESC_EXTRACTION_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
+ * Patterns to detect the Claude Code session ID from visible terminal text.
+ * Capture group 1 contains the session UUID.
+ */
+const SESSION_ID_PATTERNS: readonly RegExp[] = [
+  /* "Session: <uuid>" or "session: <uuid>" */
+  /[Ss]ession[:\s]+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i,
+  /* "session_id": "<uuid>" (JSONL fragment) */
+  /["']?session_id["']?\s*:\s*["']?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})["']?/i,
+  /* --resume <uuid> (echoed command) */
+  /--resume\s+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i,
+];
+
+/**
  * Patterns that match Claude Code permission prompts in PTY output.
  * Claude renders these as: "Allow <ToolName>? (Y)es/(N)o/..." or
  * "Allow Bash("npm test")? (Y)es/(N)o/(A)lways/(D)eny always"
@@ -125,12 +158,24 @@ export class PtyAgentDetector {
   private recentLines: string[] = [];
   /** Maximum recent lines to keep for context extraction. */
   private static readonly CONTEXT_WINDOW = 5;
+  /** Detected Claude session ID (set once, immutable after first detection). */
+  private detectedClaudeSessionId: string | null = null;
 
   /**
-   * Feed a raw PTY output chunk. Returns detected agents and permission requests
-   * found in this chunk (empty arrays if nothing detected).
+   * Feed a raw PTY output chunk. Returns detected agents, permission requests,
+   * and an optional Claude session ID found in this chunk.
    */
   feed(rawChunk: string): FeedResult {
+    /* Check for session ID in OSC sequences before stripping them. */
+    let claudeSessionId: string | null = null;
+    if (!this.detectedClaudeSessionId) {
+      const oscSessionId = extractSessionIdFromOsc(rawChunk);
+      if (oscSessionId) {
+        this.detectedClaudeSessionId = oscSessionId;
+        claudeSessionId = oscSessionId;
+      }
+    }
+
     const stripped = stripAnsi(rawChunk);
     this.lineBuffer += stripped;
 
@@ -148,6 +193,18 @@ export class PtyAgentDetector {
       this.recentLines.push(line);
       if (this.recentLines.length > PtyAgentDetector.CONTEXT_WINDOW) {
         this.recentLines.shift();
+      }
+
+      /* Check for Claude session ID in visible text (only until first detection). */
+      if (!this.detectedClaudeSessionId) {
+        for (const pattern of SESSION_ID_PATTERNS) {
+          const match = pattern.exec(line);
+          if (match?.[1]) {
+            this.detectedClaudeSessionId = match[1];
+            claudeSessionId = match[1];
+            break;
+          }
+        }
       }
 
       /* Check for agent spawns */
@@ -176,7 +233,7 @@ export class PtyAgentDetector {
       }
     }
 
-    return { agents, permissions };
+    return { agents, permissions, claudeSessionId };
   }
 
   /** Reset all internal state. Call when switching PTY sessions. */
@@ -185,6 +242,12 @@ export class PtyAgentDetector {
     this.agentCount = 0;
     this.permissionCount = 0;
     this.recentLines = [];
+    this.detectedClaudeSessionId = null;
+  }
+
+  /** Returns the detected Claude session ID, or null if not yet detected. */
+  get claudeSessionId(): string | null {
+    return this.detectedClaudeSessionId;
   }
 
   /** Returns the total number of agents detected so far. */

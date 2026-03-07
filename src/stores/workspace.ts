@@ -73,7 +73,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   teamPtyEntries: {},
   sessionMode: "worktree",
 
-  setWorkspaces: (workspaces: WorkspaceInfo[]) => set({ workspaces, error: null }),
+  setWorkspaces: (workspaces: WorkspaceInfo[]) =>
+    set((state) => {
+      /* Preserve "active" status for workspaces that have a running PTY — the
+       * backend doesn't know about PTY state, so it returns all workspaces as
+       * "idle". Without this merge, a background list refresh would overwrite
+       * the "active" status set by the deploy flow, causing LIVE/STOP to vanish. */
+      const merged = workspaces.map((ws) =>
+        state.ptyIds[ws.slug]
+          ? { ...ws, status: "active" as WorkspaceInfo["status"] }
+          : ws,
+      );
+      return { workspaces: merged, error: null };
+    }),
   setActiveWorkspace: (slug: string | null) => set({ activeWorkspaceSlug: slug }),
   openWorkspace: (slug: string) =>
     set((state) => ({
@@ -92,7 +104,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       } else {
         nextActive = state.activeWorkspaceSlug;
       }
-      return { openWorkspaceSlugs: tabs, activeWorkspaceSlug: nextActive };
+      /* Also remove any ptyId for this slug — prevents stale references when
+       * the tab is closed before the PTY exit event fires. */
+      const { [slug]: _removedPty, ...remainingPtyIds } = state.ptyIds;
+      return { openWorkspaceSlugs: tabs, activeWorkspaceSlug: nextActive, ptyIds: remainingPtyIds };
     }),
   setDiff: (slug: string, diff: WorkspaceDiff) =>
     set((state) => ({ diffs: { ...state.diffs, [slug]: diff } })),

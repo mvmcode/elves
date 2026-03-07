@@ -9,6 +9,7 @@ export interface LastSessionInfo {
   readonly task: string;
   readonly claudeSessionId: string | null;
   readonly status: string;
+  readonly runtime: string;
 }
 
 interface WorkspaceCardProps {

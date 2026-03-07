@@ -69,10 +69,14 @@ export function ProjectWorkspace(): React.JSX.Element {
     if (!activeProject?.path) return;
     tauri.discoverGitRepos(activeProject.path)
       .then((topo) => setTopology(topo))
-      .catch(() => setTopology(null));
+      .catch(() => setTopology({ kind: "no_git", repos: [] }));
   }, [activeProject?.path, setTopology]);
 
-  /** Load workspaces when the project or topology changes. Skip git listing in direct mode. */
+  /** Load workspaces when the project or topology changes. Skip git listing in direct mode.
+   * IMPORTANT: Wait for topology discovery to complete (topology !== null) before running any
+   * git commands. On mount, topology starts null and sessionMode defaults to "worktree". Without
+   * this guard, listWorkspaces would run `git worktree list` on a multi-repo root that isn't a
+   * git repo, causing a fatal error. */
   useEffect(() => {
     if (!activeProject?.path) return;
     if (sessionMode === "direct") {
@@ -80,8 +84,10 @@ export function ProjectWorkspace(): React.JSX.Element {
       setLoading(false);
       return;
     }
+    /* Topology not yet discovered — wait for it before attempting any git operations. */
+    if (!topology) return;
     setLoading(true);
-    if (topology?.kind === "multi_repo") {
+    if (topology.kind === "multi_repo") {
       const repoPaths = topology.repos.map((r) => r.path);
       tauri
         .listMultiRepoWorkspaces(activeProject.path, repoPaths)
@@ -120,6 +126,7 @@ export function ProjectWorkspace(): React.JSX.Element {
             task: session.task,
             claudeSessionId: session.claudeSessionId ?? null,
             status: session.status,
+            runtime: session.runtime,
           }];
         })
         .catch((): [string, null] => [ws.slug, null]),
@@ -199,7 +206,7 @@ export function ProjectWorkspace(): React.JSX.Element {
       const workingDir = workspace?.path;
 
       try {
-        const runtime = defaultRuntime;
+        const runtime = session.runtime ?? defaultRuntime;
         const spawnOptions: tauri.StartTaskPtyResult = await tauri.startTaskPty(
           activeProject.id,
           "Resuming session...",
@@ -428,15 +435,6 @@ export function ProjectWorkspace(): React.JSX.Element {
     );
   }
 
-  /* Resolve active workspace for terminal view — check single-repo, then multi-repo fallback */
-  const activeOpenWorkspace = activeWorkspaceSlug
-    ? (
-        workspaces.find((w) => w.slug === activeWorkspaceSlug) ??
-        multiRepoWorkspaces.find((m) => m.slug === activeWorkspaceSlug)?.repos[0]?.workspace ??
-        null
-      )
-    : null;
-
   const canSummon = taskText.trim().length > 0;
 
   return (
@@ -444,11 +442,26 @@ export function ProjectWorkspace(): React.JSX.Element {
       {/* Tab bar — only when tabs exist */}
       {openWorkspaceSlugs.length > 0 && <WorkspaceTabBar />}
 
-      {/* Terminal view for active workspace tab */}
-      {activeOpenWorkspace ? (
-        <WorkspaceTerminalView workspace={activeOpenWorkspace} />
-      ) : (
-      /* Workspace grid with inline task bar */
+      {/* Terminal views for ALL open workspaces — hidden via display:none to preserve xterm buffers */}
+      {openWorkspaceSlugs.map((slug) => {
+        const ws =
+          workspaces.find((w) => w.slug === slug) ??
+          multiRepoWorkspaces.find((m) => m.slug === slug)?.repos[0]?.workspace ??
+          null;
+        if (!ws) return null;
+        return (
+          <div
+            key={slug}
+            className="flex flex-1 flex-col overflow-hidden"
+            style={{ display: slug === activeWorkspaceSlug ? "flex" : "none" }}
+          >
+            <WorkspaceTerminalView workspace={ws} />
+          </div>
+        );
+      })}
+
+      {/* Workspace grid with inline task bar — visible when no tab is active */}
+      {!activeWorkspaceSlug && (
       <div className="flex-1 overflow-y-auto">
       {/* Task bar — only visible on the grid home screen */}
       <div className="shrink-0 border-b-[2px] border-border/30 bg-surface-elevated px-6 py-3">
