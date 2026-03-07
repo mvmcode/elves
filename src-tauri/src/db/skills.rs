@@ -46,6 +46,7 @@ pub fn insert_skill(
 }
 
 /// Insert a new skill with full source tracking fields. Used when installing from the catalog.
+#[allow(clippy::too_many_arguments)]
 pub fn insert_skill_full(
     conn: &Connection,
     id: &str,

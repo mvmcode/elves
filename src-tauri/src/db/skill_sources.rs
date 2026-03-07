@@ -6,6 +6,7 @@ use super::DbError;
 use crate::registry::types::{CatalogSkillItem, SkillSource, SkillSourceItem};
 
 /// Insert or update a skill source (upsert on repo_name).
+#[allow(clippy::too_many_arguments)]
 pub fn upsert_source(
     conn: &Connection,
     id: &str,
