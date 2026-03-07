@@ -1,33 +1,27 @@
-/* Skill actions hook — connects SkillEditor to Tauri IPC for skill CRUD. */
+/* Skill actions hook — connects skill UI to Tauri IPC for skill CRUD and catalog operations. */
 
-import { useCallback, useEffect } from "react";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { useCallback } from "react";
 import { useProjectStore } from "@/stores/project";
 import { useSkillStore } from "@/stores/skills";
-import type { SearchPhase } from "@/stores/skills";
 import {
   listSkills,
   createSkill as invokeCreateSkill,
   updateSkill as invokeUpdateSkill,
   deleteSkill as invokeDeleteSkill,
   discoverSkillsFromClaude,
-  searchSkills as invokeSearchSkills,
-  installSkillFromUrl as invokeInstallSkillFromUrl,
+  refreshSkillCatalog,
+  listSkillSources,
+  previewSkillContent,
+  toggleSkill,
+  checkSkillUpdates,
+  searchSkillsV2,
+  listAllCatalogSkills,
+  installSkill,
 } from "@/lib/tauri";
-import type { SkillSearchResult } from "@/types/search";
-
-/** Payload shape emitted by the Rust backend for search progress. */
-interface SearchProgressPayload {
-  readonly searchId: string;
-  readonly phase: string;
-  readonly resultCount?: number;
-  readonly error?: string;
-}
 
 /**
- * Provides IPC-connected callbacks for the SkillEditor.
+ * Provides IPC-connected callbacks for skill management.
  * Handles loading, creating, updating, deleting, searching, and installing skills.
- * Automatically loads skills when the active project changes.
  */
 export function useSkillActions(): {
   loadSkills: () => Promise<void>;
@@ -35,8 +29,13 @@ export function useSkillActions(): {
   handleUpdateSkill: (id: string, name: string, content: string, description?: string, triggerPattern?: string) => Promise<void>;
   handleDeleteSkill: (id: string) => void;
   handleImportFromClaude: () => Promise<number>;
-  handleSearch: (query: string) => Promise<void>;
-  handleInstallFromSearch: (result: SkillSearchResult) => Promise<void>;
+  handleRefreshCatalog: () => Promise<void>;
+  handleLoadCatalog: () => Promise<void>;
+  handlePreviewSkill: (repoName: string, filePath: string) => Promise<void>;
+  handleInstallSkill: (itemId: string) => Promise<void>;
+  handleToggleSkill: (id: string, enabled: boolean) => Promise<void>;
+  handleCheckUpdates: () => Promise<void>;
+  handleSearchV2: (query: string) => Promise<void>;
 } {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const setSkills = useSkillStore((s) => s.setSkills);
@@ -44,12 +43,9 @@ export function useSkillActions(): {
   const updateSkill = useSkillStore((s) => s.updateSkill);
   const removeSkill = useSkillStore((s) => s.removeSkill);
   const setLoading = useSkillStore((s) => s.setLoading);
-  const setSearchResults = useSkillStore((s) => s.setSearchResults);
   const setSearching = useSkillStore((s) => s.setSearching);
-  const setSearchPhase = useSkillStore((s) => s.setSearchPhase);
   const setSearchError = useSkillStore((s) => s.setSearchError);
 
-  /** Fetch all skills (global + project-scoped) from the backend. */
   const loadSkills = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
@@ -62,12 +58,6 @@ export function useSkillActions(): {
     }
   }, [activeProjectId, setSkills, setLoading]);
 
-  /** Reload skills when the active project changes. */
-  useEffect(() => {
-    void loadSkills();
-  }, [loadSkills]);
-
-  /** Create a new skill. */
   const handleCreateSkill = useCallback(
     async (name: string, content: string, description?: string, triggerPattern?: string): Promise<void> => {
       try {
@@ -80,7 +70,6 @@ export function useSkillActions(): {
     [activeProjectId, addSkill],
   );
 
-  /** Update an existing skill. */
   const handleUpdateSkill = useCallback(
     async (id: string, name: string, content: string, description?: string, triggerPattern?: string): Promise<void> => {
       try {
@@ -104,7 +93,6 @@ export function useSkillActions(): {
     [updateSkill],
   );
 
-  /** Delete a skill by ID. */
   const handleDeleteSkill = useCallback(
     (id: string): void => {
       void (async () => {
@@ -119,10 +107,6 @@ export function useSkillActions(): {
     [removeSkill],
   );
 
-  /**
-   * Import skills from Claude Code command files (~/.claude/commands/ and project-level).
-   * Skips skills that already exist (matched by trigger pattern). Returns imported count.
-   */
   const handleImportFromClaude = useCallback(async (): Promise<number> => {
     const projects = useProjectStore.getState().projects;
     const projectId = useProjectStore.getState().activeProjectId;
@@ -162,86 +146,95 @@ export function useSkillActions(): {
     }
   }, [addSkill]);
 
-  /** Search for skills via Claude CLI with progress event listening. */
-  const handleSearch = useCallback(
-    async (query: string): Promise<void> => {
-      if (!query.trim()) {
-        setSearchResults([]);
-        return;
-      }
+  const handleRefreshCatalog = useCallback(async (): Promise<void> => {
+    const store = useSkillStore.getState();
+    store.setRefreshingCatalog(true);
+    try {
+      await refreshSkillCatalog();
+      const [sources, items] = await Promise.all([
+        listSkillSources(),
+        listAllCatalogSkills(),
+      ]);
+      store.setSources(sources);
+      store.setCatalogItems(items);
+    } catch (err) {
+      console.error("Failed to refresh catalog:", err);
+    } finally {
+      useSkillStore.getState().setRefreshingCatalog(false);
+    }
+  }, []);
 
-      setSearching(true);
-      setSearchError(null);
-      setSearchPhase("fetching");
+  const handleLoadCatalog = useCallback(async (): Promise<void> => {
+    try {
+      const items = await listAllCatalogSkills();
+      useSkillStore.getState().setCatalogItems(items);
+    } catch (err) {
+      console.error("Failed to load catalog:", err);
+    }
+  }, []);
 
-      let unlisten: UnlistenFn | null = null;
-      try {
-        unlisten = await listen<SearchProgressPayload>("search:progress", (event) => {
-          const phase = event.payload.phase as SearchPhase;
-          setSearchPhase(phase);
-        });
+  const handlePreviewSkill = useCallback(async (repoName: string, filePath: string): Promise<void> => {
+    try {
+      const content = await previewSkillContent(repoName, filePath);
+      useSkillStore.getState().setPreviewContent(content);
+    } catch (err) {
+      console.error("Failed to preview skill:", err);
+    }
+  }, []);
 
-        const results = await invokeSearchSkills(query);
-        setSearchResults(results);
-      } catch (error) {
-        console.error("Skill search failed:", error);
-        const message = error instanceof Error ? error.message : String(error);
-        setSearchError(message);
-        setSearchResults([]);
-      } finally {
-        if (unlisten) unlisten();
-        setSearching(false);
-        setSearchPhase(null);
-      }
-    },
-    [setSearchResults, setSearching, setSearchPhase, setSearchError],
-  );
+  const handleInstallSkill = useCallback(async (itemId: string): Promise<void> => {
+    const projects = useProjectStore.getState().projects;
+    const projectId = useProjectStore.getState().activeProjectId;
+    const activeProject = projects.find((p) => p.id === projectId);
 
-  /** Install a skill from a search result — creates it locally or clones from URL.
-   * After a successful URL install, re-discovers skills so the new one appears in the list. */
-  const handleInstallFromSearch = useCallback(
-    async (result: SkillSearchResult): Promise<void> => {
-      if (result.content) {
-        await handleCreateSkill(
-          result.name,
-          result.content,
-          result.description || undefined,
-        );
-      } else if (result.installUrl) {
-        const projects = useProjectStore.getState().projects;
-        const projectId = useProjectStore.getState().activeProjectId;
-        const activeProject = projects.find((p) => p.id === projectId);
-        try {
-          await invokeInstallSkillFromUrl(result.installUrl, activeProject?.path);
-          /* Re-discover skills from disk so the newly cloned skill appears in the list */
-          const discovered = await discoverSkillsFromClaude(activeProject?.path);
-          const existingSkills = useSkillStore.getState().skills;
-          const existingTriggers = new Set(
-            existingSkills.map((s) => s.triggerPattern).filter((t): t is string => t !== null),
-          );
-          for (const skill of discovered) {
-            if (existingTriggers.has(skill.triggerPattern)) continue;
-            try {
-              const created = await invokeCreateSkill(
-                skill.name,
-                skill.content,
-                skill.scope === "project" ? (projectId ?? undefined) : undefined,
-                skill.description || undefined,
-                skill.triggerPattern,
-              );
-              addSkill(created);
-            } catch {
-              /* skip individual import failures */
-            }
-          }
-        } catch (error) {
-          console.error("Failed to install skill from URL:", error);
-          setSearchError(error instanceof Error ? error.message : String(error));
-        }
-      }
-    },
-    [handleCreateSkill, addSkill, setSearchError],
-  );
+    try {
+      await installSkill(itemId, activeProject?.path);
+      await loadSkills();
+    } catch (err) {
+      console.error("Failed to install skill:", err);
+    }
+  }, [loadSkills]);
+
+  const handleToggleSkill = useCallback(async (id: string, enabled: boolean): Promise<void> => {
+    try {
+      await toggleSkill(id, enabled);
+      const skills = useSkillStore.getState().skills;
+      const updated = skills.map((s) => (s.id === id ? { ...s, enabled } : s));
+      useSkillStore.getState().setSkills(updated);
+    } catch (err) {
+      console.error("Failed to toggle skill:", err);
+    }
+  }, []);
+
+  const handleCheckUpdates = useCallback(async (): Promise<void> => {
+    try {
+      const updates = await checkSkillUpdates();
+      useSkillStore.getState().setAvailableUpdates(updates);
+    } catch (err) {
+      console.error("Failed to check updates:", err);
+    }
+  }, []);
+
+  const handleSearchV2 = useCallback(async (query: string): Promise<void> => {
+    if (!query.trim()) {
+      useSkillStore.getState().setSearchResultsV2(null);
+      return;
+    }
+
+    setSearching(true);
+    setSearchError(null);
+    try {
+      const results = await searchSkillsV2(query);
+      useSkillStore.getState().setSearchResultsV2(results);
+    } catch (err) {
+      console.error("V2 skill search failed:", err);
+      const message = err instanceof Error ? err.message : String(err);
+      setSearchError(message);
+      useSkillStore.getState().setSearchResultsV2(null);
+    } finally {
+      setSearching(false);
+    }
+  }, [setSearching, setSearchError]);
 
   return {
     loadSkills,
@@ -249,7 +242,12 @@ export function useSkillActions(): {
     handleUpdateSkill,
     handleDeleteSkill,
     handleImportFromClaude,
-    handleSearch,
-    handleInstallFromSearch,
+    handleRefreshCatalog,
+    handleLoadCatalog,
+    handlePreviewSkill,
+    handleInstallSkill,
+    handleToggleSkill,
+    handleCheckUpdates,
+    handleSearchV2,
   };
 }

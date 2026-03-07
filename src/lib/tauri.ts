@@ -11,6 +11,7 @@ import type { McpServer } from "@/types/mcp";
 import type { Template } from "@/types/template";
 import type { ClaudeDiscovery, ClaudeSpawnOptions } from "@/types/claude";
 import type { FileEntry } from "@/types/filesystem";
+import type { SkillSource, SkillUpdateInfo, SkillSearchResultV2, CatalogSkillItem, RemoteSkillResult } from "@/types/skill-registry";
 import type { GitBranchInfo, GitCommit } from "@/types/git";
 import type { GitState, WorktreeInfo } from "@/types/git-state";
 import type { WorkspaceInfo, WorkspaceDiff, ProjectConfig, ProjectTopology, MultiRepoWorkspace } from "@/types/workspace";
@@ -322,6 +323,51 @@ export interface DiscoveredSkill {
 /** Discover skills from ~/.claude/commands/ and optionally project-level commands. */
 export async function discoverSkillsFromClaude(projectPath?: string): Promise<DiscoveredSkill[]> {
   return invoke<DiscoveredSkill[]>("discover_skills_from_claude", { projectPath: projectPath ?? null });
+}
+
+/** Toggle a skill's enabled/disabled state. */
+export async function toggleSkill(id: string, enabled: boolean): Promise<boolean> {
+  return invoke<boolean>("toggle_skill", { id, enabled });
+}
+
+/** List all curated skill sources (repos). */
+export async function listSkillSources(): Promise<SkillSource[]> {
+  return invoke<SkillSource[]>("list_skill_sources");
+}
+
+/** Refresh the skill catalog — re-fetches all curated sources. */
+export async function refreshSkillCatalog(): Promise<boolean> {
+  return invoke<boolean>("refresh_skill_catalog");
+}
+
+/** Preview a single skill file's content from a catalog source. */
+export async function previewSkillContent(repoName: string, filePath: string): Promise<string> {
+  return invoke<string>("preview_skill_content", { repoName, filePath });
+}
+
+/** Check for available upstream updates for installed skills. */
+export async function checkSkillUpdates(): Promise<SkillUpdateInfo[]> {
+  return invoke<SkillUpdateInfo[]>("check_skill_updates");
+}
+
+/** Unified V2 search across local skills, catalog, and remote. */
+export async function searchSkillsV2(query: string): Promise<SkillSearchResultV2> {
+  return invoke<SkillSearchResultV2>("search_skills_v2", { query });
+}
+
+/** List all catalog skills as a flat list from all curated sources. */
+export async function listAllCatalogSkills(): Promise<CatalogSkillItem[]> {
+  return invoke<CatalogSkillItem[]>("list_all_catalog_skills");
+}
+
+/** Install a single skill from the catalog by its source item ID. */
+export async function installSkill(itemId: string, projectPath?: string): Promise<boolean> {
+  return invoke<boolean>("install_skill", { itemId, projectPath: projectPath ?? null });
+}
+
+/** Search GitHub for skill repositories matching a query. */
+export async function searchGithubCatalog(query: string): Promise<RemoteSkillResult[]> {
+  return invoke<RemoteSkillResult[]>("search_github_catalog", { query });
 }
 
 /* ── MCP commands ────────────────────────────────────────────── */

@@ -32,6 +32,7 @@ pub struct McpSearchResult {
 }
 
 /// A single skill search result, sourced from GitHub repository search.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillSearchResult {
@@ -113,11 +114,13 @@ struct NpmAuthor {
 // GitHub search response types (for skill search)
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct GitHubSearchResponse {
     items: Vec<GitHubRepo>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct GitHubRepo {
     #[serde(default)]
@@ -136,6 +139,7 @@ struct GitHubRepo {
     topics: Vec<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct GitHubOwner {
     #[serde(default)]
@@ -277,7 +281,7 @@ pub async fn search_mcp_servers(
 
 /// Search for Claude Code skills/commands on GitHub.
 /// Queries for repos related to "claude code" + the user query, sorted by stars.
-#[tauri::command]
+#[allow(dead_code)]
 pub async fn search_skills(
     query: String,
     app: tauri::AppHandle,
@@ -378,7 +382,7 @@ pub async fn search_skills(
 // ---------------------------------------------------------------------------
 
 /// Install a skill from a git URL by cloning into ~/.claude/commands/.
-#[tauri::command]
+#[allow(dead_code)]
 pub async fn install_skill_from_url(
     url: String,
     project_path: Option<String>,

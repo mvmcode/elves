@@ -8,6 +8,7 @@ pub mod mcp;
 pub mod memory;
 pub mod projects;
 pub mod pty;
+pub mod registry;
 pub mod search;
 pub mod sessions;
 pub mod skills;
