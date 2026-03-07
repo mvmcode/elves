@@ -689,6 +689,13 @@ export async function installSkillFromUrl(url: string, projectPath?: string): Pr
   return invoke<boolean>("install_skill_from_url", { url, projectPath: projectPath ?? null });
 }
 
+/* ── Update commands ──────────────────────────────────────────── */
+
+/** Check the Homebrew tap for a newer version. Returns the version string or null on failure. */
+export async function checkHomebrewUpdate(): Promise<string | null> {
+  return invoke<string | null>("check_homebrew_update");
+}
+
 /* ── Event subscription ──────────────────────────────────────── */
 
 /** Subscribe to a Tauri event. Returns an unsubscribe function. */

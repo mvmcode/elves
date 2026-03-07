@@ -215,6 +215,7 @@ pub fn run() {
             commands::search::search_mcp_servers,
             commands::search::search_skills,
             commands::search::install_skill_from_url,
+            commands::updates::check_homebrew_update,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");

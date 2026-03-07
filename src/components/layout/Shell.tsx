@@ -21,6 +21,7 @@ import { useMemoryActions } from "@/hooks/useMemoryActions";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useSessionEvents } from "@/hooks/useSessionEvents";
 import { useProjectContext } from "@/hooks/useProjectContext";
+import { useCheckForUpdate } from "@/hooks/useCheckForUpdate";
 import { onEvent } from "@/lib/tauri";
 
 /**
@@ -60,6 +61,9 @@ export function Shell(): React.JSX.Element {
 
   /* Load project-scoped context (git state, etc.) when active project changes */
   useProjectContext();
+
+  /* Non-blocking Homebrew update check on launch */
+  useCheckForUpdate();
 
   /* Listen for native menu events from Tauri backend */
   useEffect(() => {
