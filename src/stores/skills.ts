@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import type { Skill } from "@/types/skill";
 import type { SkillSearchResult } from "@/types/search";
+import type { SkillSource, SkillUpdateInfo, SkillSearchResultV2, CatalogSkillItem } from "@/types/skill-registry";
 
 /** Search phases emitted by the Rust backend during a registry search. */
 export type SearchPhase = "fetching" | "done" | "error" | null;
@@ -24,6 +25,22 @@ interface SkillState {
   readonly searchPhase: SearchPhase;
   /** Error message from a failed search */
   readonly searchError: string | null;
+  /** Skill catalog sources (curated + user-added repos) */
+  readonly sources: readonly SkillSource[];
+  /** Raw content preview of a single skill file */
+  readonly previewContent: string | null;
+  /** Whether a catalog refresh is in progress */
+  readonly isRefreshingCatalog: boolean;
+  /** Skills with available upstream updates */
+  readonly availableUpdates: readonly SkillUpdateInfo[];
+  /** Grouped search results from the V2 unified search */
+  readonly searchResultsV2: SkillSearchResultV2 | null;
+  /** Flat catalog items from all curated sources */
+  readonly catalogItems: readonly CatalogSkillItem[];
+  /** Current search query in the catalog tab */
+  readonly catalogSearchQuery: string;
+  /** Active category filter in the catalog tab */
+  readonly catalogCategoryFilter: string | null;
 
   /** Replace the full skills list */
   setSkills: (skills: readonly Skill[]) => void;
@@ -49,6 +66,22 @@ interface SkillState {
   setSearchError: (error: string | null) => void;
   /** Reset all search state — query, results, error, phase */
   clearSearch: () => void;
+  /** Replace the catalog sources list */
+  setSources: (sources: SkillSource[]) => void;
+  /** Set or clear the skill content preview */
+  setPreviewContent: (content: string | null) => void;
+  /** Set catalog refresh loading state */
+  setRefreshingCatalog: (loading: boolean) => void;
+  /** Replace the available updates list */
+  setAvailableUpdates: (updates: SkillUpdateInfo[]) => void;
+  /** Set grouped V2 search results */
+  setSearchResultsV2: (results: SkillSearchResultV2 | null) => void;
+  /** Replace the flat catalog items list */
+  setCatalogItems: (items: CatalogSkillItem[]) => void;
+  /** Set the catalog search query */
+  setCatalogSearchQuery: (query: string) => void;
+  /** Set the catalog category filter */
+  setCatalogCategoryFilter: (category: string | null) => void;
 }
 
 export const useSkillStore = create<SkillState>((set) => ({
@@ -60,6 +93,14 @@ export const useSkillStore = create<SkillState>((set) => ({
   isSearching: false,
   searchPhase: null,
   searchError: null,
+  sources: [],
+  previewContent: null,
+  isRefreshingCatalog: false,
+  availableUpdates: [],
+  searchResultsV2: null,
+  catalogItems: [],
+  catalogSearchQuery: "",
+  catalogCategoryFilter: null,
 
   setSkills: (skills: readonly Skill[]) => set({ skills }),
 
@@ -93,4 +134,13 @@ export const useSkillStore = create<SkillState>((set) => ({
       searchPhase: null,
       isSearching: false,
     }),
+
+  setSources: (sources: SkillSource[]) => set({ sources }),
+  setPreviewContent: (previewContent: string | null) => set({ previewContent }),
+  setSearchResultsV2: (searchResultsV2: SkillSearchResultV2 | null) => set({ searchResultsV2 }),
+  setRefreshingCatalog: (isRefreshingCatalog: boolean) => set({ isRefreshingCatalog }),
+  setAvailableUpdates: (availableUpdates: SkillUpdateInfo[]) => set({ availableUpdates }),
+  setCatalogItems: (catalogItems: CatalogSkillItem[]) => set({ catalogItems }),
+  setCatalogSearchQuery: (catalogSearchQuery: string) => set({ catalogSearchQuery }),
+  setCatalogCategoryFilter: (catalogCategoryFilter: string | null) => set({ catalogCategoryFilter }),
 }));

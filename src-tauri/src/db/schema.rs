@@ -5,7 +5,7 @@ use rusqlite::Connection;
 use super::DbError;
 
 /// Current schema version. Increment this when adding new migrations.
-const CURRENT_VERSION: i32 = 5;
+const CURRENT_VERSION: i32 = 6;
 
 /// Run all pending migrations up to CURRENT_VERSION.
 /// Uses a schema_version table to track which migrations have been applied.
@@ -40,6 +40,9 @@ pub fn run_migrations(conn: &Connection) -> Result<(), DbError> {
     }
     if current < 5 {
         migrate_v5(conn)?;
+    }
+    if current < 6 {
+        migrate_v6(conn)?;
     }
 
     Ok(())
@@ -330,6 +333,58 @@ fn migrate_v5(conn: &Connection) -> Result<(), DbError> {
     )
     .map_err(|e| DbError::Migration {
         version: 5,
+        message: e.to_string(),
+    })?;
+
+    Ok(())
+}
+
+/// Migration v6: Add skill_sources and skill_source_items tables for the curated catalog,
+/// plus source tracking columns on the skills table.
+fn migrate_v6(conn: &Connection) -> Result<(), DbError> {
+    conn.execute_batch(
+        "
+        -- Skill sources: curated GitHub repositories containing skills
+        CREATE TABLE IF NOT EXISTS skill_sources (
+            id TEXT PRIMARY KEY,
+            repo_name TEXT NOT NULL UNIQUE,
+            repo_url TEXT NOT NULL,
+            description TEXT,
+            stars INTEGER NOT NULL DEFAULT 0,
+            default_branch TEXT NOT NULL DEFAULT 'main',
+            last_fetched_at INTEGER NOT NULL DEFAULT 0,
+            last_commit_sha TEXT,
+            enabled INTEGER NOT NULL DEFAULT 1
+        );
+
+        -- Skill source items: individual skill files within a source repo
+        CREATE TABLE IF NOT EXISTS skill_source_items (
+            id TEXT PRIMARY KEY,
+            source_id TEXT NOT NULL REFERENCES skill_sources(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            description TEXT,
+            file_path TEXT NOT NULL,
+            content TEXT,
+            category TEXT,
+            last_updated_at INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(source_id, file_path)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_source_items_source ON skill_source_items(source_id);
+        CREATE INDEX IF NOT EXISTS idx_source_items_name ON skill_source_items(name);
+
+        -- Add source tracking columns to existing skills table
+        ALTER TABLE skills ADD COLUMN source_url TEXT;
+        ALTER TABLE skills ADD COLUMN source_item_id TEXT REFERENCES skill_source_items(id);
+        ALTER TABLE skills ADD COLUMN installed_at INTEGER;
+        ALTER TABLE skills ADD COLUMN installed_commit TEXT;
+
+        -- Record this migration
+        INSERT INTO schema_version (version) VALUES (6);
+        ",
+    )
+    .map_err(|e| DbError::Migration {
+        version: 6,
         message: e.to_string(),
     })?;
 

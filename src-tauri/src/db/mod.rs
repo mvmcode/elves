@@ -7,6 +7,7 @@ pub mod events;
 pub mod elves;
 pub mod mcp;
 pub mod memory;
+pub mod skill_sources;
 pub mod skills;
 pub mod templates;
 

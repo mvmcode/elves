@@ -4,6 +4,7 @@ mod agents;
 mod commands;
 mod db;
 mod project;
+mod registry;
 
 use agents::process::ProcessManager;
 use commands::projects::DbState;
@@ -213,9 +214,18 @@ pub fn run() {
             commands::workspace::remove_multi_repo_workspace,
             commands::workspace::push_multi_repo_workspace,
             commands::search::search_mcp_servers,
-            commands::search::search_skills,
-            commands::search::install_skill_from_url,
             commands::updates::check_homebrew_update,
+            commands::registry::refresh_skill_catalog,
+            commands::registry::list_skill_sources,
+            commands::registry::browse_source_skills,
+            commands::registry::preview_skill_content,
+            commands::registry::install_selected_skills,
+            commands::registry::toggle_skill,
+            commands::registry::check_skill_updates,
+            commands::registry::search_skills_v2,
+            commands::registry::list_all_catalog_skills,
+            commands::registry::install_skill,
+            commands::registry::search_github_catalog,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");

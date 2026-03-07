@@ -15,7 +15,6 @@ import { Badge } from "@/components/shared/Badge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { getEmptyState } from "@/lib/funny-copy";
 import type { Skill } from "@/types/skill";
-import type { SkillSearchResult } from "@/types/search";
 
 /** Default template content for new skills. */
 const NEW_SKILL_TEMPLATE = `## Skill Name
@@ -64,8 +63,7 @@ export function SkillEditor(): React.JSX.Element {
     handleUpdateSkill,
     handleDeleteSkill,
     handleImportFromClaude,
-    handleSearch,
-    handleInstallFromSearch,
+    handleSearchV2,
   } = useSkillActions();
 
   const { analyzeAndDeploy } = useTeamSession();
@@ -182,26 +180,19 @@ export function SkillEditor(): React.JSX.Element {
   }, [handleImportFromClaude]);
 
   const handleSearchSubmit = useCallback((): void => {
-    void handleSearch(searchQuery);
-  }, [searchQuery, handleSearch]);
+    void handleSearchV2(searchQuery);
+  }, [searchQuery, handleSearchV2]);
 
   const handleSearchKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>): void => {
       if (event.key === "Enter") {
-        void handleSearch(searchQuery);
+        void handleSearchV2(searchQuery);
       }
       if (event.key === "Escape") {
         clearSearch();
       }
     },
-    [searchQuery, handleSearch, clearSearch],
-  );
-
-  const handleInstallResult = useCallback(
-    (result: SkillSearchResult): void => {
-      void handleInstallFromSearch(result);
-    },
-    [handleInstallFromSearch],
+    [searchQuery, handleSearchV2, clearSearch],
   );
 
   /** Export skill content as a .md file via native save dialog. */
@@ -396,7 +387,7 @@ export function SkillEditor(): React.JSX.Element {
                     <Button
                       variant={installed ? "secondary" : "primary"}
                       className="mt-1.5 w-full px-2 py-1 text-xs"
-                      onClick={() => handleInstallResult(result)}
+                      onClick={() => void handleCreateSkill(result.name, result.content ?? "", result.description ?? undefined)}
                       disabled={installed}
                     >
                       {installed ? "Installed" : "Install"}

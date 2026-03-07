@@ -45,6 +45,30 @@ pub fn insert_skill(
     get_skill(conn, id)?.ok_or_else(|| DbError::Sqlite(rusqlite::Error::QueryReturnedNoRows))
 }
 
+/// Insert a new skill with full source tracking fields. Used when installing from the catalog.
+pub fn insert_skill_full(
+    conn: &Connection,
+    id: &str,
+    project_id: Option<&str>,
+    name: &str,
+    description: Option<&str>,
+    content: &str,
+    trigger_pattern: Option<&str>,
+    source_url: Option<&str>,
+    source_item_id: Option<&str>,
+    installed_at: Option<i64>,
+    installed_commit: Option<&str>,
+) -> Result<SkillRow, DbError> {
+    let now = chrono::Utc::now().timestamp();
+    conn.execute(
+        "INSERT INTO skills (id, project_id, name, description, content, trigger_pattern, created_at, updated_at, source_url, source_item_id, installed_at, installed_commit)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        params![id, project_id, name, description, content, trigger_pattern, now, now, source_url, source_item_id, installed_at, installed_commit],
+    )?;
+
+    get_skill(conn, id)?.ok_or_else(|| DbError::Sqlite(rusqlite::Error::QueryReturnedNoRows))
+}
+
 /// Retrieve a single skill by ID. Returns None if not found.
 pub fn get_skill(conn: &Connection, id: &str) -> Result<Option<SkillRow>, DbError> {
     let mut stmt = conn.prepare(
