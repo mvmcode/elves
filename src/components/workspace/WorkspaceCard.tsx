@@ -14,6 +14,8 @@ export interface LastSessionInfo {
 interface WorkspaceCardProps {
   readonly workspace: WorkspaceInfo;
   readonly lastSession?: LastSessionInfo | null;
+  /** When true, hides git-specific actions (Diff, Ship It, Remove worktree). */
+  readonly hideGitActions?: boolean;
   readonly onOpen: (slug: string) => void;
   readonly onResume: (slug: string) => void;
   readonly onDiff: (slug: string) => void;
@@ -50,6 +52,7 @@ function RuntimeBadge({ runtime }: { readonly runtime?: string }): React.JSX.Ele
 export function WorkspaceCard({
   workspace,
   lastSession,
+  hideGitActions,
   onOpen,
   onResume,
   onDiff,
@@ -61,10 +64,20 @@ export function WorkspaceCard({
   const handleDiff = useCallback(() => onDiff(workspace.slug), [onDiff, workspace.slug]);
   const handleShipIt = useCallback(() => onShipIt(workspace.slug), [onShipIt, workspace.slug]);
   const handleRemove = useCallback(() => {
-    if (window.confirm(`Remove workspace "${workspace.slug}"? This will delete the worktree and branch.`)) {
+    if (hideGitActions) {
+      onRemove(workspace.slug);
+    } else if (window.confirm(`Remove workspace "${workspace.slug}"? This will delete the worktree and branch.`)) {
       onRemove(workspace.slug);
     }
-  }, [onRemove, workspace.slug]);
+  }, [onRemove, workspace.slug, hideGitActions]);
+
+  /** True when the workspace can resume a previous Claude session via --resume. */
+  const canResume = workspace.status !== "active" && !!(
+    workspace.status === "paused" || (
+      lastSession?.claudeSessionId &&
+      ["completed", "cancelled", "error", "failed"].includes(lastSession.status)
+    )
+  );
 
   const diffSummary = workspace.filesChanged > 0
     ? `${workspace.filesChanged} file${workspace.filesChanged !== 1 ? "s" : ""} changed`
@@ -88,12 +101,14 @@ export function WorkspaceCard({
       </div>
 
       {/* Branch and file change info */}
-      <div className="mb-2 font-mono text-xs text-text-muted">
-        <span>{workspace.branch}</span>
-        {diffSummary && (
-          <span className="ml-2">{diffSummary}</span>
-        )}
-      </div>
+      {!hideGitActions && (
+        <div className="mb-2 font-mono text-xs text-text-muted">
+          <span>{workspace.branch}</span>
+          {diffSummary && (
+            <span className="ml-2">{diffSummary}</span>
+          )}
+        </div>
+      )}
 
       {/* Last task subtitle from session history */}
       {lastSession?.task && (
@@ -112,35 +127,24 @@ export function WorkspaceCard({
       {/* Action buttons */}
       <div className="flex flex-wrap gap-2">
         <button
-          onClick={handleOpen}
+          onClick={canResume ? handleResume : handleOpen}
           className="cursor-pointer border-[2px] border-border bg-info px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
-          data-testid="workspace-open-btn"
+          data-testid={canResume ? "workspace-resume-btn" : "workspace-open-btn"}
         >
-          Open
+          {canResume ? "Resume" : "Open"}
         </button>
 
-        <button
-          onClick={handleDiff}
-          className="cursor-pointer border-[2px] border-border bg-surface-elevated px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-text-light shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
-          data-testid="workspace-diff-btn"
-        >
-          Diff
-        </button>
-
-        {(workspace.status === "paused" || (
-          lastSession?.claudeSessionId &&
-          ["completed", "cancelled", "error", "failed"].includes(lastSession.status)
-        )) && (
+        {!hideGitActions && (
           <button
-            onClick={handleResume}
-            className="cursor-pointer border-[2px] border-border bg-info px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
-            data-testid="workspace-resume-btn"
+            onClick={handleDiff}
+            className="cursor-pointer border-[2px] border-border bg-surface-elevated px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-text-light shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+            data-testid="workspace-diff-btn"
           >
-            Resume
+            Diff
           </button>
         )}
 
-        {workspace.status === "idle" && (
+        {!hideGitActions && workspace.status === "idle" && (
           <button
             onClick={handleShipIt}
             className="cursor-pointer border-[2px] border-border bg-success px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
@@ -155,7 +159,7 @@ export function WorkspaceCard({
           className="ml-auto cursor-pointer border-[2px] border-border bg-error/10 px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-wider text-error shadow-brutal-xs transition-all duration-100 hover:bg-error hover:text-white hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
           data-testid="workspace-remove-btn"
         >
-          Remove
+          {hideGitActions ? "Close" : "Remove"}
         </button>
       </div>
     </div>

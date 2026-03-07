@@ -150,6 +150,7 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
     useWorkspaceStore.getState().removeWorkspace(workspace.slug);
   }, [workspace.slug]);
 
+  const isDirectMode = !workspace.branch;
   const isActive = workspace.status === "active";
   const diffSummary = workspace.filesChanged > 0
     ? `${workspace.filesChanged} file${workspace.filesChanged !== 1 ? "s" : ""} changed`
@@ -175,7 +176,9 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
           <span className="font-mono text-xs text-text-muted">{diffSummary}</span>
         )}
 
-        <span className="ml-auto font-mono text-xs text-text-muted">{workspace.branch}</span>
+        {!isDirectMode && (
+          <span className="ml-auto font-mono text-xs text-text-muted">{workspace.branch}</span>
+        )}
       </div>
 
       {/* Terminal body */}
@@ -221,22 +224,26 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
 
         {(workspace.status === "idle" || hasExited) && (
           <>
+            {!isDirectMode && (
+              <button
+                onClick={() => {
+                  /* Ship It is handled by the grid — switch to grid view where ShipItDialog lives */
+                  useWorkspaceStore.getState().setActiveWorkspace(null);
+                }}
+                className="cursor-pointer border-[2px] border-border bg-success px-3 py-1 font-display text-[10px] font-bold uppercase tracking-widest text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+                data-testid="workspace-shipit-btn"
+              >
+                Ship It
+              </button>
+            )}
             <button
-              onClick={() => {
-                /* Ship It is handled by the grid — switch to grid view where ShipItDialog lives */
-                useWorkspaceStore.getState().setActiveWorkspace(null);
-              }}
-              className="cursor-pointer border-[2px] border-border bg-success px-3 py-1 font-display text-[10px] font-bold uppercase tracking-widest text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
-              data-testid="workspace-shipit-btn"
-            >
-              Ship It
-            </button>
-            <button
-              onClick={handleRemoveWorkspace}
+              onClick={isDirectMode
+                ? () => useWorkspaceStore.getState().closeWorkspaceTab(workspace.slug)
+                : handleRemoveWorkspace}
               className="cursor-pointer border-[2px] border-border bg-gray-600 px-3 py-1 font-display text-[10px] font-bold uppercase tracking-widest text-white shadow-brutal-xs transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
               data-testid="workspace-remove-btn"
             >
-              Remove
+              {isDirectMode ? "Close" : "Remove"}
             </button>
           </>
         )}
@@ -248,7 +255,9 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
           ].join(" ")}>
             {hasExited ? "ENDED" : isActive ? "LIVE" : "IDLE"}
           </span>
-          <span className="font-mono text-[10px] text-text-muted">{workspace.branch}</span>
+          {!isDirectMode && (
+            <span className="font-mono text-[10px] text-text-muted">{workspace.branch}</span>
+          )}
         </div>
       </div>
     </div>

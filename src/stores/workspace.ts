@@ -26,6 +26,8 @@ interface WorkspaceState {
   readonly ptyIds: Readonly<Record<string, string>>;
   /** Maps workspace slug to team PTY entries (one per role). Presence signals split view. */
   readonly teamPtyEntries: Readonly<Record<string, readonly TeamPtyEntry[]>>;
+  /** Session launch mode — "worktree" creates git worktrees, "direct" runs in the project folder. */
+  readonly sessionMode: "worktree" | "direct";
 
   setWorkspaces: (workspaces: WorkspaceInfo[]) => void;
   setActiveWorkspace: (slug: string | null) => void;
@@ -53,6 +55,8 @@ interface WorkspaceState {
   setTeamPtyEntries: (slug: string, entries: TeamPtyEntry[]) => void;
   /** Clear team PTY entries for a workspace. */
   clearTeamPtyEntries: (slug: string) => void;
+  /** Set the session launch mode. */
+  setSessionMode: (mode: "worktree" | "direct") => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
@@ -67,6 +71,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   multiRepoWorkspaces: [],
   ptyIds: {},
   teamPtyEntries: {},
+  sessionMode: "worktree",
 
   setWorkspaces: (workspaces: WorkspaceInfo[]) => set({ workspaces, error: null }),
   setActiveWorkspace: (slug: string | null) => set({ activeWorkspaceSlug: slug }),
@@ -93,7 +98,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     set((state) => ({ diffs: { ...state.diffs, [slug]: diff } })),
   addShipped: (shipped: ShippedWorkspace) =>
     set((state) => ({ recentlyShipped: [shipped, ...state.recentlyShipped].slice(0, 10) })),
-  setTopology: (topology: ProjectTopology | null) => set({ topology }),
+  setTopology: (topology: ProjectTopology | null) => set({
+    topology,
+    sessionMode:
+      topology === null ? "worktree"
+        : topology.kind === "multi_repo" || topology.kind === "no_git" ? "direct"
+        : "worktree",
+  }),
   setMultiRepoWorkspaces: (workspaces: MultiRepoWorkspace[]) => set({ multiRepoWorkspaces: workspaces }),
   setPtyId: (slug: string, ptyId: string) =>
     set((state) => ({ ptyIds: { ...state.ptyIds, [slug]: ptyId } })),
@@ -137,4 +148,5 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       const { [slug]: _, ...rest } = state.teamPtyEntries;
       return { teamPtyEntries: rest };
     }),
+  setSessionMode: (mode: "worktree" | "direct") => set({ sessionMode: mode }),
 }));
