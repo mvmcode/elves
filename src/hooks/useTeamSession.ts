@@ -203,7 +203,6 @@ export function useTeamSession(): {
               lastModified: new Date().toISOString(),
             });
             wsStore.setPtyId(wsSlug, ptyId);
-            wsStore.openWorkspace(wsSlug);
             /* Background refresh for full metadata — only when a real worktree was created.
              * Skipped for direct mode and worktree-fallback to avoid overwriting the eager entry. */
             if (activeProjectPath && worktreeCreated) {
@@ -337,7 +336,6 @@ export function useTeamSession(): {
           if (ptyEntries[0]) {
             wsStore.setPtyId(teamWsSlug, ptyEntries[0].ptyId);
           }
-          wsStore.openWorkspace(teamWsSlug);
           /* Background refresh — only when a real worktree exists. */
           if (activeProjectPath && hasRealWorktree) {
             const { topology: currentTopology } = useWorkspaceStore.getState();
