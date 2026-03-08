@@ -33,7 +33,9 @@ function formatTimestamp(timestamp: number): string {
 
 /** Returns a human-readable description for an event based on its type. */
 function describeEvent(event: ElfEvent): string {
-  const payload = event.payload as Record<string, unknown>;
+  const payload = (event.payload != null && typeof event.payload === "object")
+    ? (event.payload as Record<string, unknown>)
+    : {};
   switch (event.type) {
     case "spawn":
       return `spawned${payload.role ? ` as ${String(payload.role)}` : ""}`;

@@ -120,8 +120,11 @@ export function SessionTerminal({
           });
         }
 
-        /* Listen for PTY stdout data → write to xterm display + scan for agent spawns */
-        unlistenData = await listen<string>(`pty:data:${ptyId}`, (event) => {
+        /* Listen for PTY stdout data → write to xterm display + scan for agent spawns.
+         * After each await, check mounted to avoid leaking subscriptions when the
+         * component unmounts before the listen() promise resolves. */
+        const dataUnsub = await listen<string>(`pty:data:${ptyId}`, (event) => {
+          if (!mounted) return;
           terminalRef.current?.write(event.payload);
 
           /* Feed PTY output through agent detector to find Agent tool calls */
@@ -130,9 +133,12 @@ export function SessionTerminal({
             onAgentDetectedRef.current?.(agent);
           }
         });
+        if (!mounted) { dataUnsub(); return; }
+        unlistenData = dataUnsub;
 
         /* Listen for PTY process exit → show message and notify parent */
-        unlistenExit = await listen<number>(`pty:exit:${ptyId}`, (event) => {
+        const exitUnsub = await listen<number>(`pty:exit:${ptyId}`, (event) => {
+          if (!mounted) return;
           terminalRef.current?.writeln("");
           terminalRef.current?.writeln(
             `\x1b[33m--- Session ended (exit code: ${event.payload}) ---\x1b[0m`,
@@ -140,6 +146,8 @@ export function SessionTerminal({
           setHasExited(true);
           onPtyExit?.();
         });
+        if (!mounted) { exitUnsub(); return; }
+        unlistenExit = exitUnsub;
       } catch (error) {
         console.error("Failed to spawn PTY:", error);
         terminalRef.current?.writeln(

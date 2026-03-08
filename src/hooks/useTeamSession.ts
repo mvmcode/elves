@@ -136,7 +136,7 @@ export function useTeamSession(): {
           } else {
             try {
               if (topology?.kind === "multi_repo") {
-                const repoPaths = topology.repos.map((r) => r.path);
+                const repoPaths = topology.repos?.map((r) => r.path) ?? [];
                 const mrWorkspace = await createMultiRepoWorkspace(activeProjectPath, slug, repoPaths);
                 worktreeWorkingDir = activeProjectPath;
                 setFloorWorktree(activeFloorIdNow, slug, activeProjectPath);
@@ -175,21 +175,22 @@ export function useTeamSession(): {
           /* Solo task — skip plan preview, deploy immediately via PTY-first */
           const runtime = defaultRuntime;
           const spawnOptions = buildSpawnOptions();
+          /* Use the floor ID captured at the start — not a fresh read — to avoid
+           * a race where the user switches floors during the async workspace creation. */
           const wsSlugForBackend = useSessionStore.getState().floors[
-            useSessionStore.getState().activeFloorId ?? ""
+            activeFloorIdNow ?? ""
           ]?.worktreeSlug ?? undefined;
           const { sessionId, ptyId } = await invokeStartTaskPty(
             activeProjectId, augmentedTask, runtime, worktreeWorkingDir, spawnOptions, wsSlugForBackend,
           );
 
-          /* Store ptyId on the floor for session tracking */
-          const currentFloorId = useSessionStore.getState().activeFloorId;
-          if (currentFloorId) {
-            setFloorPtyId(currentFloorId, ptyId);
+          /* Store ptyId on the floor for session tracking — use captured floor ID */
+          if (activeFloorIdNow) {
+            setFloorPtyId(activeFloorIdNow, ptyId);
           }
 
           /* Wire PTY to workspace store and navigate to terminal view */
-          const wsSlug = useSessionStore.getState().floors[currentFloorId ?? ""]?.worktreeSlug;
+          const wsSlug = useSessionStore.getState().floors[activeFloorIdNow ?? ""]?.worktreeSlug;
           if (wsSlug) {
             const wsStore = useWorkspaceStore.getState();
             /* Add workspace eagerly so the terminal view can find it immediately.
@@ -208,7 +209,7 @@ export function useTeamSession(): {
             if (activeProjectPath && worktreeCreated) {
               const { topology: currentTopology } = useWorkspaceStore.getState();
               if (currentTopology?.kind === "multi_repo") {
-                const repoPaths = currentTopology.repos.map((r) => r.path);
+                const repoPaths = currentTopology.repos?.map((r) => r.path) ?? [];
                 listMultiRepoWorkspaces(activeProjectPath, repoPaths)
                   .then((ws) => wsStore.setMultiRepoWorkspaces(ws))
                   .catch(() => { /* workspace list refresh is best-effort */ });
@@ -340,7 +341,7 @@ export function useTeamSession(): {
           if (activeProjectPath && hasRealWorktree) {
             const { topology: currentTopology } = useWorkspaceStore.getState();
             if (currentTopology?.kind === "multi_repo") {
-              const repoPaths = currentTopology.repos.map((r) => r.path);
+              const repoPaths = currentTopology.repos?.map((r) => r.path) ?? [];
               listMultiRepoWorkspaces(activeProjectPath, repoPaths)
                 .then((ws) => wsStore.setMultiRepoWorkspaces(ws))
                 .catch(() => { /* best-effort refresh */ });
@@ -358,10 +359,15 @@ export function useTeamSession(): {
           setFloorPtyId(currentFloorId, ptyEntries[0].ptyId);
         }
 
-        /* Create one elf per role with personality */
+        /* Create one elf per role with personality.
+         * ptyEntries is built from the same plan.roles in the Rust backend (same order),
+         * but we guard with bounds checking in case of a partial spawn failure. */
         for (let i = 0; i < plan.roles.length; i++) {
           const role = plan.roles[i]!;
-          const entry = ptyEntries[i];
+          const entry = i < ptyEntries.length ? ptyEntries[i] : undefined;
+          if (!entry) {
+            console.warn(`Role ${i} ("${role.name}") has no matching PTY entry — using fallback elf ID`);
+          }
           const personality = generateElf();
           const elfId = entry?.elfId ?? `elf-${sessionId}-${i}`;
 
@@ -398,6 +404,9 @@ export function useTeamSession(): {
         }
       } catch (error) {
         console.error("Failed to deploy team:", error);
+        useWorkspaceStore.getState().setError(
+          `Team deploy failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     },
     [activeProjectId, activeProjectPath, defaultRuntime, buildSpawnOptions, acceptPlan, startSession, addElf, addEvent, updateElfStatus, setFloorPtyId],

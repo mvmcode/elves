@@ -16,6 +16,7 @@ import type { DetectedAgent, DetectedPermission } from "@/lib/pty-agent-detector
 import { generateElf } from "@/lib/elf-names";
 import { playSound } from "@/lib/sounds";
 import { removeWorkspace as invokeRemoveWorkspace, completeSession, updateClaudeSessionId } from "@/lib/tauri";
+import { useToastStore } from "@/stores/toast";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { WorkspaceInfo } from "@/types/workspace";
@@ -56,6 +57,8 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
 
   const terminalRef = useRef<XTerminalHandle>(null);
   const detectorRef = useRef<PtyAgentDetector>(new PtyAgentDetector());
+  /** Track whether we've already shown a PTY error toast to avoid spam. */
+  const ptyErrorShownRef = useRef(false);
   const [hasExited, setHasExited] = useState(false);
   const [pendingPermission, setPendingPermission] = useState<DetectedPermission | null>(null);
   const [spawnError, setSpawnError] = useState<string | null>(null);
@@ -127,7 +130,9 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
 
     async function setup(): Promise<void> {
       try {
-        unlistenData = await listen<string>(`pty:data:${ptyId}`, (event) => {
+        /* After each await listen(), check mounted to prevent leaking subscriptions
+         * when the component unmounts before the promise resolves. */
+        const dataUnsub = await listen<string>(`pty:data:${ptyId}`, (event) => {
           if (!mounted) return;
           terminalRef.current?.write(event.payload);
 
@@ -154,8 +159,10 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
             }
           }
         });
+        if (!mounted) { dataUnsub(); return; }
+        unlistenData = dataUnsub;
 
-        unlistenExit = await listen<number>(`pty:exit:${ptyId}`, (event) => {
+        const exitUnsub = await listen<number>(`pty:exit:${ptyId}`, (event) => {
           if (!mounted) return;
           terminalRef.current?.writeln("");
           terminalRef.current?.writeln(
@@ -189,6 +196,8 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
             }
           }
         });
+        if (!mounted) { exitUnsub(); return; }
+        unlistenExit = exitUnsub;
       } catch (error) {
         console.error("Failed to subscribe to PTY events:", error);
         setHasExited(true);
@@ -204,11 +213,24 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
     };
   }, [ptyId, workspace.slug]);
 
+  /* Reset PTY error toast flag when the PTY changes */
+  useEffect(() => {
+    ptyErrorShownRef.current = false;
+  }, [ptyId]);
+
   /** Forward user keystrokes to PTY stdin. */
   const handleTerminalData = useCallback((data: string): void => {
     if (!ptyId) return;
     writePty(ptyId, data).catch((error: unknown) => {
       console.error("Failed to write to PTY:", error);
+      if (!ptyErrorShownRef.current) {
+        ptyErrorShownRef.current = true;
+        useToastStore.getState().addToast({
+          message: "Terminal connection lost — input may not be reaching the agent",
+          variant: "error",
+          duration: 5000,
+        });
+      }
     });
   }, [ptyId]);
 
