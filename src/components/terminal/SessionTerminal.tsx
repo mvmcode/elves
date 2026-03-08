@@ -70,6 +70,8 @@ export function SessionTerminal({
   const onAgentDetectedRef = useRef(onAgentDetected);
   onAgentDetectedRef.current = onAgentDetected;
   const [hasExited, setHasExited] = useState(false);
+  /** Stores the latest terminal dimensions so we can resize the PTY immediately after spawn. */
+  const termSizeRef = useRef<{ cols: number; rows: number }>({ cols: 80, rows: 24 });
 
   /** Forward user keystrokes to PTY stdin. */
   const handleData = useCallback((data: string): void => {
@@ -81,8 +83,9 @@ export function SessionTerminal({
     }
   }, []);
 
-  /** Forward terminal resize to PTY. */
+  /** Forward terminal resize to PTY. Always stores the latest size so post-spawn resize works. */
   const handleResize = useCallback((cols: number, rows: number): void => {
+    termSizeRef.current = { cols, rows };
     const ptyId = ptyIdRef.current;
     if (ptyId) {
       resizePty(ptyId, cols, rows).catch((error: unknown) => {
@@ -106,6 +109,16 @@ export function SessionTerminal({
           return;
         }
         ptyIdRef.current = ptyId;
+
+        /* Sync PTY to the terminal's actual dimensions.
+         * The initial onResize from XTerminal fires before the PTY exists,
+         * so its resize call is silently dropped. Send the stored size now. */
+        const { cols, rows } = termSizeRef.current;
+        if (cols !== 80 || rows !== 24) {
+          resizePty(ptyId, cols, rows).catch((error: unknown) => {
+            console.error("Failed initial PTY resize:", error);
+          });
+        }
 
         /* Listen for PTY stdout data → write to xterm display + scan for agent spawns */
         unlistenData = await listen<string>(`pty:data:${ptyId}`, (event) => {
