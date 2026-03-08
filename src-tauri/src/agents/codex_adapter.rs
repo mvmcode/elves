@@ -5,6 +5,7 @@
 // so the frontend never knows which runtime is underneath.
 
 use crate::agents::analyzer::TaskPlan;
+use crate::agents::runtime;
 use serde::{Deserialize, Serialize};
 
 /// A parsed event from the Codex CLI's JSONL output stream.
@@ -106,7 +107,9 @@ pub fn spawn_codex(
     task: &str,
     working_dir: &str,
 ) -> Result<std::process::Child, std::io::Error> {
-    std::process::Command::new("codex")
+    let codex_bin = runtime::resolve_binary("codex")
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::NotFound, e))?;
+    std::process::Command::new(&codex_bin)
         .arg("exec")
         .arg("--full-auto")
         .arg("--json")
@@ -196,7 +199,9 @@ pub fn spawn_codex_team(
 ) -> Result<std::process::Child, std::io::Error> {
     let team_prompt = build_codex_team_prompt(task, plan);
 
-    std::process::Command::new("codex")
+    let codex_bin = runtime::resolve_binary("codex")
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::NotFound, e))?;
+    std::process::Command::new(&codex_bin)
         .arg("exec")
         .arg("--full-auto")
         .arg("--json")

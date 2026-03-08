@@ -103,8 +103,22 @@ export function useTeamSession(): {
   const analyzeAndDeploy = useCallback(
     async (task: string): Promise<void> => {
       if (!activeProjectId) {
-        console.error("No active project selected");
+        useWorkspaceStore.getState().setError("No project selected. Create or select a project first.");
         return;
+      }
+
+      /* Check that at least one AI runtime is available before attempting deployment */
+      const { runtimes, defaultRuntime: currentDefault } = useAppStore.getState();
+      if (!runtimes?.claudeCode && !runtimes?.codex) {
+        useWorkspaceStore.getState().setError("No AI runtime found. Install Claude Code CLI or Codex CLI to get started.");
+        return;
+      }
+
+      /* Auto-switch to the available runtime if the preferred one is missing */
+      if (currentDefault === "claude-code" && !runtimes.claudeCode && runtimes.codex) {
+        useAppStore.getState().setDefaultRuntime("codex");
+      } else if (currentDefault === "codex" && !runtimes.codex && runtimes.claudeCode) {
+        useAppStore.getState().setDefaultRuntime("claude-code");
       }
 
       try {

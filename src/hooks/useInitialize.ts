@@ -15,6 +15,9 @@ export function useInitialize(): void {
   const setRuntimes = useAppStore((s) => s.setRuntimes);
   const setClaudeDiscovery = useAppStore((s) => s.setClaudeDiscovery);
   const setLoaded = useAppStore((s) => s.setLoaded);
+  const setInitFailed = useAppStore((s) => s.setInitFailed);
+  const setRuntimeHealthy = useAppStore((s) => s.setRuntimeHealthy);
+  const setIsFirstRun = useAppStore((s) => s.setIsFirstRun);
   const setProjects = useProjectStore((s) => s.setProjects);
 
   useEffect(() => {
@@ -37,6 +40,16 @@ export function useInitialize(): void {
         }
         setClaudeDiscovery(claudeWorld);
 
+        /* Detect first-run: no projects means fresh install */
+        if (projects.length === 0) {
+          setIsFirstRun(true);
+        }
+
+        /* Check runtime availability — flag unhealthy if neither is detected */
+        if (!runtimes.claudeCode && !runtimes.codex) {
+          setRuntimeHealthy(false);
+        }
+
         /* Run memory relevance decay on startup — fades old unused memories */
         decayMemories().catch((error: unknown) => {
           console.error("Memory decay failed:", error);
@@ -46,10 +59,12 @@ export function useInitialize(): void {
         seedTemplates().catch((error: unknown) => {
           console.error("Template seeding failed:", error);
         });
+
+        setLoaded();
       } catch (error) {
         console.error("Initialization failed:", error);
-      } finally {
-        setLoaded();
+        const message = error instanceof Error ? error.message : String(error);
+        setInitFailed(message);
       }
     }
 

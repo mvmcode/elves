@@ -21,6 +21,19 @@ export async function detectRuntimes(): Promise<RuntimeInfo> {
   return invoke<RuntimeInfo>("detect_runtimes");
 }
 
+/** Health check result for a single runtime. */
+export interface RuntimeHealthResult {
+  readonly available: boolean;
+  readonly binary_path: string | null;
+  readonly version: string | null;
+  readonly error: string | null;
+}
+
+/** Run a health check on a specific runtime ("claude-code" or "codex"). */
+export async function healthCheckRuntime(runtime: string): Promise<RuntimeHealthResult> {
+  return invoke<RuntimeHealthResult>("health_check_runtime", { runtime });
+}
+
 /** Discover the user's Claude Code world: custom agents and settings from ~/.claude/ */
 export async function discoverClaude(): Promise<ClaudeDiscovery> {
   return invoke<ClaudeDiscovery>("discover_claude");

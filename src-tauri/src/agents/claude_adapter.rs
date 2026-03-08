@@ -1,6 +1,7 @@
 // Claude Code adapter — spawns Claude CLI as a subprocess and parses its output.
 
 use crate::agents::analyzer::TaskPlan;
+use crate::agents::runtime;
 use serde::{Deserialize, Serialize};
 
 /// Options for customizing a Claude Code CLI invocation.
@@ -59,10 +60,12 @@ pub fn spawn_claude(
     working_dir: &str,
     options: &ClaudeSpawnOptions,
 ) -> Result<std::process::Child, std::io::Error> {
-    log::info!("Spawning claude in {working_dir} with task: {}", &task[..task.len().min(100)]);
+    let claude_bin = runtime::resolve_binary("claude")
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::NotFound, e))?;
+    log::info!("Spawning claude ({}) in {working_dir} with task: {}", claude_bin.display(), &task[..task.len().min(100)]);
     log::info!("Claude spawn options: {:?}", options);
 
-    let mut cmd = std::process::Command::new("claude");
+    let mut cmd = std::process::Command::new(&claude_bin);
     cmd.arg("--print")
         .arg("--verbose")
         .arg("--output-format")
@@ -140,10 +143,12 @@ pub fn spawn_claude_team(
 ) -> Result<std::process::Child, std::io::Error> {
     let team_prompt = build_team_prompt(task, plan);
 
-    log::info!("Spawning claude team in {working_dir} with {} roles", plan.agent_count);
+    let claude_bin = runtime::resolve_binary("claude")
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::NotFound, e))?;
+    log::info!("Spawning claude team ({}) in {working_dir} with {} roles", claude_bin.display(), plan.agent_count);
     log::info!("Claude team spawn options: {:?}", options);
 
-    let mut cmd = std::process::Command::new("claude");
+    let mut cmd = std::process::Command::new(&claude_bin);
     cmd.arg("--print")
         .arg("--verbose")
         .arg("--output-format")

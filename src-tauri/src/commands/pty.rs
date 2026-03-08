@@ -10,21 +10,21 @@ use std::io::{Read, Write};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
 
-use crate::agents::runtime::ensure_full_path;
+use crate::agents::runtime::{ensure_full_path, resolve_binary};
 
-/// Resolve a command name to an absolute path using `which`.
-/// When portable-pty receives an absolute path, it skips its internal PATH search
-/// (which snapshots env vars at CommandBuilder construction time and can miss the
-/// fixed-up PATH). This is belt-and-suspenders on top of `ensure_full_path()`.
+/// Resolve a command name to an absolute path, falling back to the bare name.
+/// Uses `runtime::resolve_binary` for consistent resolution across the codebase.
+/// PTY spawning falls back to the bare name (instead of erroring) because
+/// portable-pty may still find it via its own PATH search.
 fn resolve_command(command: &str) -> String {
-    match which::which(command) {
+    match resolve_binary(command) {
         Ok(abs_path) => {
             let resolved = abs_path.to_string_lossy().to_string();
-            log::info!("Resolved command '{command}' -> {resolved}");
+            log::debug!("Resolved command '{command}' -> {resolved}");
             resolved
         }
-        Err(_) => {
-            log::warn!("Could not resolve '{command}' to absolute path, using bare name");
+        Err(e) => {
+            log::warn!("{e} — falling back to bare name for PTY spawn");
             command.to_string()
         }
     }

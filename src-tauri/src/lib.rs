@@ -121,6 +121,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::agents::detect_runtimes,
             commands::agents::discover_claude,
+            commands::agents::health_check_runtime,
             commands::projects::list_projects,
             commands::projects::create_project,
             commands::projects::open_project_terminal,
