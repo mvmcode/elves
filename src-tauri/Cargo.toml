@@ -1,6 +1,6 @@
 [package]
 name = "elves"
-version = "1.0.8"
+version = "1.0.9"
 description = "Summon your AI army — visual multi-agent orchestration for Claude Code and Codex"
 authors = ["Mani & Raghavan"]
 edition = "2021"

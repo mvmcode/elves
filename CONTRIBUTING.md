@@ -1,6 +1,6 @@
 # Contributing to ELVES
 
-Thanks for wanting to help build the workshop! Here's everything you need to get started.
+Thanks for wanting to contribute! Here's everything you need to get started.
 
 ## Prerequisites
 
@@ -15,30 +15,32 @@ Thanks for wanting to help build the workshop! Here's everything you need to get
 git clone https://github.com/mvmcode/elves.git
 cd elves
 npm install
-cargo tauri dev
+npm run tauri dev
 ```
 
 ## Project Structure
 
 ```
 src/                → React 19 + TypeScript frontend
-src-tauri/src/      → Rust backend (SQLite, process management, adapters)
+src-tauri/src/      → Rust backend (SQLite, PTY management, adapters)
 ```
 
 Key architecture:
-- **Worktree-first workspaces** — every task is a git worktree under `.claude/worktrees/<slug>` with full lifecycle management
+- **Worktree-first workspaces** — every task is a git worktree under `.claude/worktrees/<slug>` with full lifecycle management (create, diff, ship, remove)
+- **Floor system** — multiple concurrent sessions per project, each with its own PTY and worktree
 - **Unified Agent Protocol** — Claude Code and Codex events normalized into `ElfEvent`
-- **Zustand stores** — 12 domain stores (app, project, session, ui, memory, settings, skills, mcp, templates, git, comparison, workspace)
+- **Zustand stores** — 14 domain stores (app, project, session, ui, memory, settings, skills, mcp, templates, git, comparison, workspace, toast, fileExplorer)
 - **Tauri IPC** — `tauri::command` for request/response, `app.emit()` for streaming
 - **Project-scoped config** — `.elves/config.json` per project for runtime, MCP, and memory settings
+- **Embedded PTY terminal** — xterm.js + portable-pty for real-time agent interaction
 
 ## Testing
 
 ```bash
-# Frontend (617+ tests)
+# Frontend
 npx vitest run
 
-# Backend (40+ tests)
+# Backend
 cd src-tauri && cargo test
 
 # Type checking
@@ -70,7 +72,7 @@ type(scope): description
 Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
 
 Examples:
-- `feat(theater): add ElfCard component with avatar and status display`
+- `feat(workspace): add ShipItDialog with merge strategy picker`
 - `fix(memory): prevent decay on pinned memories`
 - `test(mcp): add integration tests for health check command`
 
