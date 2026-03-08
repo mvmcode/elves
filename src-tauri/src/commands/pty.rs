@@ -12,6 +12,24 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::agents::runtime::ensure_full_path;
 
+/// Resolve a command name to an absolute path using `which`.
+/// When portable-pty receives an absolute path, it skips its internal PATH search
+/// (which snapshots env vars at CommandBuilder construction time and can miss the
+/// fixed-up PATH). This is belt-and-suspenders on top of `ensure_full_path()`.
+fn resolve_command(command: &str) -> String {
+    match which::which(command) {
+        Ok(abs_path) => {
+            let resolved = abs_path.to_string_lossy().to_string();
+            log::info!("Resolved command '{command}' -> {resolved}");
+            resolved
+        }
+        Err(_) => {
+            log::warn!("Could not resolve '{command}' to absolute path, using bare name");
+            command.to_string()
+        }
+    }
+}
+
 /// Holds the writable master handle and child process for a single PTY session.
 struct PtyInstance {
     writer: Box<dyn Write + Send>,
@@ -41,6 +59,7 @@ impl PtyManager {
     ) -> Result<String, String> {
         // Ensure full PATH is available (macOS .app bundles get minimal PATH)
         ensure_full_path();
+        let resolved = resolve_command(command);
         let pty_system = native_pty_system();
         let pair = pty_system
             .openpty(PtySize {
@@ -51,7 +70,7 @@ impl PtyManager {
             })
             .map_err(|e| format!("Failed to open PTY: {e}"))?;
 
-        let mut cmd = CommandBuilder::new(command);
+        let mut cmd = CommandBuilder::new(&resolved);
         for arg in args {
             cmd.arg(arg);
         }
@@ -128,6 +147,9 @@ pub fn spawn_pty(
     app: AppHandle,
     state: State<'_, PtyManager>,
 ) -> Result<String, String> {
+    // Ensure full PATH is available (macOS .app bundles get minimal PATH)
+    ensure_full_path();
+    let resolved = resolve_command(&command);
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize {
@@ -138,7 +160,7 @@ pub fn spawn_pty(
         })
         .map_err(|e| format!("Failed to open PTY: {e}"))?;
 
-    let mut cmd = CommandBuilder::new(&command);
+    let mut cmd = CommandBuilder::new(&resolved);
     for arg in &args {
         cmd.arg(arg);
     }

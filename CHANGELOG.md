@@ -4,6 +4,18 @@ All notable changes to ELVES are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.8] - 2026-03-07 — macOS .app PATH Resolution Fix
+
+### Fixed
+- **CLI binary resolution in .app bundles** — `codex` and `claude` could not be found when ELVES was launched from Finder/Dock because macOS .app bundles get a minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`). The existing `ensure_full_path()` fix was fragile: shell profile noise (motd, brew warnings) corrupted the captured PATH, and `.zshrc` was never sourced (only `.zprofile`/`.zshenv`).
+- **Shell PATH resolution rewritten** — now uses `-ilc` (interactive login) so `.zshrc` is sourced, `printf '%s'` instead of `echo` to avoid newline issues, and stderr is redirected to suppress shell noise. Multi-line output (contaminated by motd) is handled by taking only the last line.
+- **Fallback PATH directories** — always appends well-known macOS binary locations that exist on disk (`/opt/homebrew/bin`, `~/.cargo/bin`, `~/.npm/bin`, `~/.nvm/current/bin`, `~/.local/bin`, `~/go/bin`) as a safety net when shell resolution fails.
+- **PTY binary resolution** — bare command names (`codex`, `claude`) are now resolved to absolute paths via `which` before passing to `portable-pty`'s `CommandBuilder`, bypassing its internal PATH snapshot that could miss the fixed-up PATH.
+- **Missing `ensure_full_path()` in `spawn_pty`** — the `spawn_pty` Tauri command was missing the defensive PATH fix that `spawn_with_app` already had.
+
+### Changed
+- **Diagnostic logging** — PATH resolution now logs the resolved PATH, fallback directories, and any failures for easier debugging of binary-not-found issues.
+
 ## [1.0.6] - 2026-03-06 — Homebrew Update Check
 
 ### Added
