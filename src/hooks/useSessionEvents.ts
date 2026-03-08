@@ -352,56 +352,81 @@ export function useSessionEvents(): void {
     /* Listen for session completion (Claude process exited successfully) */
     cleanups.push(
       subscribeSafe<SessionCompletedPayload>("session:completed", (data) => {
-        const store = useSessionStore.getState();
-        const floorId = store.getFloorBySessionId(data.sessionId);
-        if (!floorId) return;
+        try {
+          const store = useSessionStore.getState();
+          const floorId = store.getFloorBySessionId(data.sessionId);
+          if (!floorId) return;
 
-        const floor = store.floors[floorId];
-        if (!floor) return;
+          const floor = store.floors[floorId];
+          if (!floor) return;
 
-        /* Guard against duplicate completion events (StrictMode or event replay) */
-        if (floor.session?.status === "completed") return;
+          /* Guard against duplicate completion events (StrictMode or event replay) */
+          if (floor.session?.status === "completed") return;
 
-        /* Transition all elves to "done" */
-        store.updateAllElfStatusOnFloor(floorId, "done");
+          /* Transition all elves to "done" */
+          store.updateAllElfStatusOnFloor(floorId, "done");
 
-        /* Add celebration event */
-        const runtime = floor.session?.runtime ?? "claude-code";
-        const leadElf = floor.elves[0];
-        const leadName = leadElf?.name ?? "The Elves";
+          /* Add celebration event */
+          const runtime = floor.session?.runtime ?? "claude-code";
+          const leadElf = floor.elves[0];
+          const leadName = leadElf?.name ?? "The Elves";
 
-        store.addEventToFloor(floorId, {
-          id: `event-complete-${Date.now()}`,
-          timestamp: Date.now(),
-          elfId: "system",
-          elfName: "System",
-          runtime,
-          type: "task_update",
-          payload: { status: "completed", message: `ALL DONE! ${leadName}: "The elves have spoken."` },
-          funnyStatus: `${leadName} declares victory!`,
-        });
-
-        /* Extract memories if auto-learn is enabled */
-        const autoLearn = useSettingsStore.getState().autoLearn;
-        if (autoLearn) {
-          extractSessionMemories(data.sessionId).catch((error: unknown) => {
-            console.error("Failed to extract session memories:", error);
+          store.addEventToFloor(floorId, {
+            id: `event-complete-${Date.now()}`,
+            timestamp: Date.now(),
+            elfId: "system",
+            elfName: "System",
+            runtime,
+            type: "task_update",
+            payload: { status: "completed", message: `ALL DONE! ${leadName}: "The elves have spoken."` },
+            funnyStatus: `${leadName} declares victory!`,
           });
-        }
 
-        store.endSessionOnFloor(floorId, "completed");
+          /* Extract memories if auto-learn is enabled */
+          const autoLearn = useSettingsStore.getState().autoLearn;
+          if (autoLearn) {
+            const sid = data.sessionId;
+            extractSessionMemories(sid)
+              .then(() => {
+                if (!mounted.current) return;
+                useToastStore.getState().addToast({
+                  message: "Memories extracted from session",
+                  variant: "info",
+                  duration: 3000,
+                });
+              })
+              .catch((error: unknown) => {
+                if (!mounted.current) return;
+                console.error("Failed to extract session memories:", error);
+                useToastStore.getState().addToast({
+                  message: "Failed to extract session memories",
+                  variant: "warning",
+                  duration: 4000,
+                });
+              });
+          }
 
-        /* Toast for cross-floor events — only when this session is on a non-active floor */
-        if (store.activeFloorId !== floorId) {
-          const floorLabel = floor.label || "another floor";
+          store.endSessionOnFloor(floorId, "completed");
+
+          /* Toast for cross-floor events — only when this session is on a non-active floor */
+          if (store.activeFloorId !== floorId) {
+            const floorLabel = floor.label || "another floor";
+            useToastStore.getState().addToast({
+              message: `Session completed on "${floorLabel}"`,
+              variant: "success",
+              duration: 5000,
+              action: {
+                label: "VIEW",
+                onClick: () => useSessionStore.getState().switchFloor(floorId),
+              },
+            });
+          }
+        } catch (error: unknown) {
+          console.error("Error handling session completion:", error);
           useToastStore.getState().addToast({
-            message: `Session completed on "${floorLabel}"`,
-            variant: "success",
+            message: "Session completed but post-processing failed",
+            variant: "warning",
             duration: 5000,
-            action: {
-              label: "VIEW",
-              onClick: () => useSessionStore.getState().switchFloor(floorId),
-            },
           });
         }
       }),
