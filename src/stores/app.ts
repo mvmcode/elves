@@ -96,7 +96,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedApprovalMode: null,
   budgetCap: null,
   selectedEffort: null,
-  forceTeamMode: true,
+  forceTeamMode: false,
   isOptionsExpanded: false,
   attachedFiles: [],
 
