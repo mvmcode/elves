@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { ProjectWorkspace } from "@/components/workspace/ProjectWorkspace";
-import { FileExplorerView } from "@/components/files/FileExplorerView";
+import { SplitPaneLayout } from "@/components/layout/SplitPaneLayout";
 import { MemoryExplorer } from "@/components/memory/MemoryExplorer";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { SkillManager } from "@/components/skills/SkillManager";
@@ -105,7 +105,7 @@ export function Shell(): React.JSX.Element {
         {activeView === "workspace" ? (
           <ProjectWorkspace />
         ) : activeView === "files" ? (
-          <FileExplorerView />
+          <SplitPaneLayout />
         ) : activeView === "memory" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <MemoryExplorer
