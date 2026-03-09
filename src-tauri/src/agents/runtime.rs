@@ -3,6 +3,7 @@
 // resolve the user's login shell PATH before searching for binaries.
 
 use serde::Serialize;
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Once;
 
@@ -64,11 +65,30 @@ pub fn ensure_full_path() {
 fn resolve_shell_path() -> Option<String> {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
 
-    // printf avoids trailing newline issues; 2>/dev/null suppresses shell noise
-    let output = Command::new(&shell)
-        .args(["-ilc", "printf '%s' \"$PATH\""])
-        .stderr(std::process::Stdio::null())
-        .output();
+    // Detect shell type from the path (e.g. /bin/zsh, /usr/local/bin/fish)
+    let shell_name = std::path::Path::new(&shell)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+
+    // Build the appropriate command based on shell type:
+    // - fish: does not support -i with -c, use -lc and fish's $PATH variable directly
+    // - bash/zsh: use -ilc so .zshrc/.bashrc are sourced (not just .zprofile/.bash_profile)
+    // - unknown: skip shell resolution entirely, rely on fallback dirs
+    let output = match shell_name {
+        "fish" => Command::new(&shell)
+            .args(["-lc", "printf '%s' $PATH"])
+            .stderr(std::process::Stdio::null())
+            .output(),
+        "bash" | "zsh" => Command::new(&shell)
+            .args(["-ilc", "printf '%s' \"$PATH\""])
+            .stderr(std::process::Stdio::null())
+            .output(),
+        _ => {
+            log::info!("Unknown shell '{shell_name}' — skipping shell PATH resolution");
+            return None;
+        }
+    };
 
     match output {
         Ok(out) if out.status.success() => {
@@ -112,6 +132,9 @@ fn resolve_fallback_dirs() -> String {
         // but /usr/local/bin is already covered above — n symlinks there
         format!("{home}/.local/bin"),
         format!("{home}/go/bin"),
+        format!("{home}/.nix-profile/bin"),
+        format!("{home}/.asdf/shims"),
+        format!("{home}/.local/share/mise/shims"),
     ];
 
     candidates
@@ -119,6 +142,26 @@ fn resolve_fallback_dirs() -> String {
         .filter(|dir| std::path::Path::new(dir).is_dir())
         .collect::<Vec<_>>()
         .join(":")
+}
+
+/// Resolve a CLI binary to its absolute path, ensuring PATH is fully populated first.
+///
+/// Call this before spawning any child process to guarantee the binary path is
+/// resolved against the user's real PATH — not the minimal PATH that macOS .app
+/// bundles receive from Finder/Dock.
+///
+/// Returns the absolute PathBuf on success, or a user-friendly error message
+/// with installation hints for known binaries (claude, codex).
+pub fn resolve_binary(name: &str) -> Result<PathBuf, String> {
+    ensure_full_path();
+    which::which(name).map_err(|_| {
+        let install_hint = match name {
+            "claude" => " Install it with: npm install -g @anthropic-ai/claude-code",
+            "codex" => " Install it with: npm install -g @openai/codex",
+            _ => "",
+        };
+        format!("'{name}' CLI not found on PATH.{install_hint}")
+    })
 }
 
 /// Detect a runtime binary by name. Looks up the binary in PATH using `which`,
