@@ -50,7 +50,7 @@ export function SkillManager(): React.JSX.Element {
   }
 
   return (
-    <div className="flex h-full flex-col" data-testid="skill-manager">
+    <div className="flex h-full w-full flex-col" data-testid="skill-manager">
       <div className="flex border-b-token-normal border-border">
         {(["my-skills", "catalog"] as const).map((tab) => {
           const isActive = activeTab === tab;
@@ -60,13 +60,12 @@ export function SkillManager(): React.JSX.Element {
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={[
-                "px-6 py-3 font-display text-sm font-bold uppercase tracking-wide",
-                "border-r-[2px] border-border transition-all duration-100",
+                "cursor-pointer px-6 py-3 font-display text-sm font-bold uppercase tracking-wide",
+                "border-[2px] border-border border-b-[3px] transition-all duration-100",
                 isActive
-                  ? "bg-accent text-black border-b-[3px] border-b-accent"
-                  : "bg-white text-text-light hover:bg-accent-light border-b-[3px] border-b-transparent",
+                  ? "bg-accent text-black border-b-accent shadow-brutal-sm"
+                  : "bg-surface-elevated text-text-light hover:bg-accent-light border-b-transparent",
               ].join(" ")}
-              style={isActive ? { boxShadow: "inset 0 -3px 0 0 #000" } : undefined}
             >
               {label}
             </button>
