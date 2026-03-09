@@ -34,6 +34,7 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const terminalRef = useRef<Terminal | null>(null);
     const fitAddonRef = useRef<FitAddon | null>(null);
+    const fitPendingRef = useRef(false);
 
     /** Expose write/writeln to parent via ref. */
     useImperativeHandle(ref, () => ({
@@ -45,16 +46,29 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
       },
     }), []);
 
-    /** Fit the terminal to its container. Debounced to avoid rapid re-fits. */
+    /** Fit the terminal to its container. Skips when container has zero dimensions to prevent cursor corruption. */
     const fit = useCallback((): void => {
       if (fitAddonRef.current && containerRef.current) {
+        if (containerRef.current.offsetWidth <= 0 || containerRef.current.offsetHeight <= 0) {
+          return;
+        }
         try {
           fitAddonRef.current.fit();
         } catch {
-          /* FitAddon can throw if container has zero dimensions during transitions */
+          /* FitAddon can throw if container dimensions change mid-fit */
         }
       }
     }, []);
+
+    /** Debounced fit — coalesces multiple fit triggers within a single animation frame. */
+    const scheduleFit = useCallback((): void => {
+      if (fitPendingRef.current) return;
+      fitPendingRef.current = true;
+      requestAnimationFrame(() => {
+        fit();
+        fitPendingRef.current = false;
+      });
+    }, [fit]);
 
     useEffect(() => {
       const container = containerRef.current;
@@ -100,9 +114,9 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
       terminalRef.current = terminal;
       fitAddonRef.current = fitAddon;
 
-      /* Initial fit after DOM paint */
+      /* Initial fit after DOM paint — uses guarded fit() to skip if container is hidden */
       requestAnimationFrame(() => {
-        fitAddon.fit();
+        fit();
         onResize(terminal.cols, terminal.rows);
       });
 
@@ -116,19 +130,42 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 
       /* Auto-fit on container resize */
       const resizeObserver = new ResizeObserver(() => {
-        requestAnimationFrame(() => fit());
+        scheduleFit();
       });
       resizeObserver.observe(container);
 
+      /* Re-fit when container transitions from hidden (display:none) to visible */
+      const intersectionObserver = new IntersectionObserver(([entry]) => {
+        if (entry && entry.intersectionRatio > 0) {
+          scheduleFit();
+        }
+      });
+      intersectionObserver.observe(container);
+
+      /* Re-fit after minimize/restore or tab switch to fix corrupted cursor state */
+      const handleVisibilityChange = (): void => {
+        if (document.visibilityState === "visible") {
+          scheduleFit();
+        }
+      };
+      const handleWindowFocus = (): void => {
+        scheduleFit();
+      };
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      window.addEventListener("focus", handleWindowFocus);
+
       return () => {
         resizeObserver.disconnect();
+        intersectionObserver.disconnect();
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+        window.removeEventListener("focus", handleWindowFocus);
         dataDisposable.dispose();
         resizeDisposable.dispose();
         terminal.dispose();
         terminalRef.current = null;
         fitAddonRef.current = null;
       };
-    }, [onData, onResize, fit]);
+    }, [onData, onResize, fit, scheduleFit]);
 
     return (
       <div

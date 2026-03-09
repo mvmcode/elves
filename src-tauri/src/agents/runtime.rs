@@ -54,7 +54,7 @@ pub fn ensure_full_path() {
             // SAFETY: called once at startup via `Once`, before any multithreaded work
             #[allow(deprecated)]
             std::env::set_var("PATH", &merged);
-            log::debug!("Resolved PATH: {merged}");
+            log::info!("Resolved PATH: {merged}");
         }
     });
 }

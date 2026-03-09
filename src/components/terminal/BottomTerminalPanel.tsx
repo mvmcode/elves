@@ -131,7 +131,7 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
       const handleDragMove = (moveEvent: MouseEvent): void => {
         if (!dragRef.current) return;
         const delta = dragRef.current.startY - moveEvent.clientY;
-        const maxHeight = window.innerHeight * MAX_HEIGHT_FRACTION;
+        const maxHeight = document.documentElement.clientHeight * MAX_HEIGHT_FRACTION;
         const newHeight = Math.min(maxHeight, Math.max(MIN_HEIGHT, dragRef.current.startHeight + delta));
         setTerminalPanelHeight(newHeight);
       };

@@ -286,10 +286,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         };
       }
 
-      /* If closing the active floor, switch to adjacent */
+      /* If closing the active floor, switch to an idle floor first to avoid
+       * triggering ensureAvailableFloor → createFloor chain reactions.
+       * Fall back to adjacent floor if all floors are active. */
       if (state.activeFloorId === floorId) {
         const removedOrder = removed.order;
-        const next =
+        const idleFloor = orderedFloors.find((f) => !f.session || f.session.status !== "active");
+        const next = idleFloor ??
           orderedFloors.find((f) => f.order > removedOrder) ??
           orderedFloors[orderedFloors.length - 1]!;
         return {

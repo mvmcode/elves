@@ -489,8 +489,7 @@ export function ProjectWorkspace(): React.JSX.Element {
                 void handleSummon();
               }
             }}
-            placeholder="What do you want the elves to do?"
-
+            placeholder="Describe a task — a new workspace will be created"
           />
           <span className="shrink-0 border-[2px] border-border bg-[#4D96FF] px-2 py-1 font-mono text-[10px] font-bold uppercase text-white shadow-[2px_2px_0px_0px_#000]">
             {defaultRuntime === "codex" ? "CX" : "CC"}
