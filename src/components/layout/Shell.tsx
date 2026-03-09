@@ -5,10 +5,10 @@ import { useEffect, useCallback } from "react";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { ProjectWorkspace } from "@/components/workspace/ProjectWorkspace";
-import { FileExplorerView } from "@/components/files/FileExplorerView";
+import { SplitPaneLayout } from "@/components/layout/SplitPaneLayout";
 import { MemoryExplorer } from "@/components/memory/MemoryExplorer";
 import { SettingsView } from "@/components/settings/SettingsView";
-import { SkillEditor } from "@/components/editors/SkillEditor";
+import { SkillManager } from "@/components/skills/SkillManager";
 import { McpManager } from "@/components/editors/McpManager";
 import { SessionHistory } from "@/components/project/SessionHistory";
 import { SessionComparison } from "@/components/project/SessionComparison";
@@ -151,7 +151,7 @@ export function Shell(): React.JSX.Element {
         {activeView === "workspace" ? (
           <ProjectWorkspace />
         ) : activeView === "files" ? (
-          <FileExplorerView />
+          <SplitPaneLayout />
         ) : activeView === "memory" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <MemoryExplorer
@@ -164,7 +164,7 @@ export function Shell(): React.JSX.Element {
           </div>
         ) : activeView === "skills" ? (
           <div className="flex flex-1 overflow-hidden">
-            <SkillEditor />
+            <SkillManager />
           </div>
         ) : activeView === "mcp" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
