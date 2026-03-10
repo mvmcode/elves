@@ -135,6 +135,7 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
       if (!container) return;
 
       const terminal = new Terminal({
+        allowProposedApi: true,
         fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
         fontSize: 13,
         lineHeight: 1.4,
@@ -252,8 +253,13 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
       const handleWindowFocus = (): void => {
         scheduleFit();
       };
+      /* Re-fit when Shell dispatches view transition event (display:none → flex) */
+      const handleRefit = (): void => {
+        scheduleFit();
+      };
       document.addEventListener("visibilitychange", handleVisibilityChange);
       window.addEventListener("focus", handleWindowFocus);
+      window.addEventListener("elves:refit-terminals", handleRefit);
 
       return () => {
         /* Clear debounce and WebGL recovery timers to prevent leaks */
@@ -269,6 +275,7 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
         intersectionObserver.disconnect();
         document.removeEventListener("visibilitychange", handleVisibilityChange);
         window.removeEventListener("focus", handleWindowFocus);
+        window.removeEventListener("elves:refit-terminals", handleRefit);
         dataDisposable.dispose();
         resizeDisposable.dispose();
         scrollDisposable.dispose();

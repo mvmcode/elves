@@ -227,7 +227,7 @@ fn find_utf8_boundary(bytes: &[u8]) -> usize {
     let len = bytes.len();
 
     // Walk backward up to 3 bytes from the end to find a potential leading byte
-    let check_start = if len >= 4 { len - 4 } else { 0 };
+    let check_start = len.saturating_sub(4);
     for i in (check_start..len).rev() {
         let b = bytes[i];
         if b & 0x80 == 0 {

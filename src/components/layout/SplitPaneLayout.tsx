@@ -1,11 +1,10 @@
 /* SplitPaneLayout — resizable side-by-side layout for files + workspace views.
- * Left panel: FileExplorerView, Right panel: ProjectWorkspace.
+ * Left panel: FileExplorerView, Right panel: children (ProjectWorkspace passed in).
  * Supports three modes: split (both visible), files-only, workspace-only.
  * Uses CSS hidden class for collapsed panels to preserve xterm terminal buffers. */
 
 import { useCallback, useEffect, useRef } from "react";
 import { FileExplorerView } from "@/components/files/FileExplorerView";
-import { ProjectWorkspace } from "@/components/workspace/ProjectWorkspace";
 import { useUiStore } from "@/stores/ui";
 import type { SplitPaneMode } from "@/stores/ui";
 
@@ -52,11 +51,18 @@ const MODE_CONFIG: Record<SplitPaneMode, { label: string; Icon: () => React.JSX.
   "workspace-only": { label: "Workspace", Icon: IconWorkspaceOnly },
 };
 
+interface SplitPaneLayoutProps {
+  /** Whether to show the file explorer panel. */
+  readonly showFileExplorer: boolean;
+  /** The workspace content (ProjectWorkspace) — passed in to keep a single React instance. */
+  readonly children: React.ReactNode;
+}
+
 /**
  * Resizable split pane layout — file explorer on left, workspace on right.
- * Rendered by Shell when activeView === "files".
+ * Shell passes ProjectWorkspace as children so the terminal instance is never remounted.
  */
-export function SplitPaneLayout(): React.JSX.Element {
+export function SplitPaneLayout({ showFileExplorer, children }: SplitPaneLayoutProps): React.JSX.Element {
   const splitPaneMode = useUiStore((s) => s.splitPaneMode);
   const splitPaneRatio = useUiStore((s) => s.splitPaneRatio);
   const setSplitPaneRatio = useUiStore((s) => s.setSplitPaneRatio);
@@ -76,9 +82,9 @@ export function SplitPaneLayout(): React.JSX.Element {
     };
   }, []);
 
-  const isSplit = splitPaneMode === "split";
-  const showLeft = splitPaneMode !== "workspace-only";
-  const showRight = splitPaneMode !== "files-only";
+  const isSplit = showFileExplorer && splitPaneMode === "split";
+  const showLeft = showFileExplorer && splitPaneMode !== "workspace-only";
+  const showRight = !showFileExplorer || splitPaneMode !== "files-only";
 
   /* Drag handlers — convert pixel delta to ratio change. */
   const handleDragStart = useCallback(
@@ -127,8 +133,9 @@ export function SplitPaneLayout(): React.JSX.Element {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Toolbar — split mode toggle */}
-      <div className="flex shrink-0 items-center justify-between border-b-[3px] border-border bg-surface-elevated px-3 py-1.5">
+      {/* Toolbar — split mode toggle (only visible when file explorer is active) */}
+      <div className="flex shrink-0 items-center justify-between border-b-[3px] border-border bg-surface-elevated px-3 py-1.5"
+           style={{ display: showFileExplorer ? "flex" : "none" }}>
         <span className="font-display text-xs font-bold uppercase tracking-wider text-text-light/50">
           {splitPaneMode === "split" ? "Files + Workspace" : splitPaneMode === "files-only" ? "Files" : "Workspace"}
         </span>
@@ -192,11 +199,11 @@ export function SplitPaneLayout(): React.JSX.Element {
           </div>
         )}
 
-        {/* Right panel — ProjectWorkspace */}
+        {/* Right panel — workspace content (ProjectWorkspace passed as children) */}
         <div
           className={showRight ? "flex h-full min-w-0 flex-1 flex-col overflow-hidden" : "hidden"}
         >
-          <ProjectWorkspace />
+          {children}
         </div>
       </div>
     </div>
