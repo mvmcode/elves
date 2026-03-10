@@ -4,6 +4,7 @@ pub mod agents;
 pub mod export;
 pub mod filesystem;
 pub mod git;
+pub mod insights;
 pub mod mcp;
 pub mod memory;
 pub mod projects;

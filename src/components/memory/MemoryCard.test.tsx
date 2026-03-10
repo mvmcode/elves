@@ -1,4 +1,4 @@
-/* Tests for MemoryCard — verifies rendering, pin toggle, delete confirmation, and edit callback. */
+/* Tests for MemoryCard — verifies rendering, pin toggle, delete confirmation, edit callback, truncation, tags, and fading warning. */
 
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
@@ -220,5 +220,159 @@ describe("MemoryCard", () => {
       expect(screen.getByTestId("memory-category")).toHaveTextContent(labels[index]!);
       unmount();
     });
+  });
+
+  /* --- Content truncation tests --- */
+
+  it("truncates long content and shows 'Show more' toggle", () => {
+    const longContent = "A".repeat(200);
+    render(
+      <MemoryCard
+        memory={createTestMemory({ content: longContent })}
+        onEdit={vi.fn()}
+        onPin={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const contentEl = screen.getByTestId("memory-content");
+    expect(contentEl.textContent).toHaveLength(153); /* 150 chars + "..." */
+    expect(screen.getByTestId("content-toggle")).toHaveTextContent("Show more");
+  });
+
+  it("expands content when 'Show more' is clicked", () => {
+    const longContent = "B".repeat(200);
+    render(
+      <MemoryCard
+        memory={createTestMemory({ content: longContent })}
+        onEdit={vi.fn()}
+        onPin={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("content-toggle"));
+    const contentEl = screen.getByTestId("memory-content");
+    expect(contentEl.textContent).toHaveLength(200);
+    expect(screen.getByTestId("content-toggle")).toHaveTextContent("Show less");
+  });
+
+  it("collapses content when 'Show less' is clicked", () => {
+    const longContent = "C".repeat(200);
+    render(
+      <MemoryCard
+        memory={createTestMemory({ content: longContent })}
+        onEdit={vi.fn()}
+        onPin={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("content-toggle"));
+    fireEvent.click(screen.getByTestId("content-toggle"));
+    const contentEl = screen.getByTestId("memory-content");
+    expect(contentEl.textContent).toHaveLength(153);
+  });
+
+  it("does not show toggle for short content", () => {
+    render(
+      <MemoryCard
+        memory={createTestMemory({ content: "Short content" })}
+        onEdit={vi.fn()}
+        onPin={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("content-toggle")).not.toBeInTheDocument();
+  });
+
+  /* --- Tag badge tests --- */
+
+  it("renders tag badges from JSON tags string", () => {
+    render(
+      <MemoryCard
+        memory={createTestMemory({ tags: '["tauri","react","typescript"]' })}
+        onEdit={vi.fn()}
+        onPin={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("memory-tags")).toBeInTheDocument();
+    const tags = screen.getAllByTestId("memory-tag");
+    expect(tags).toHaveLength(3);
+    expect(tags[0]).toHaveTextContent("tauri");
+    expect(tags[1]).toHaveTextContent("react");
+    expect(tags[2]).toHaveTextContent("typescript");
+  });
+
+  it("does not render tags section for empty tags string", () => {
+    render(
+      <MemoryCard
+        memory={createTestMemory({ tags: "" })}
+        onEdit={vi.fn()}
+        onPin={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("memory-tags")).not.toBeInTheDocument();
+  });
+
+  it("handles invalid JSON tags gracefully", () => {
+    render(
+      <MemoryCard
+        memory={createTestMemory({ tags: "not-json" })}
+        onEdit={vi.fn()}
+        onPin={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("memory-tags")).not.toBeInTheDocument();
+  });
+
+  /* --- Fading warning tests --- */
+
+  it("shows fading warning badge when relevance < 0.3", () => {
+    render(
+      <MemoryCard
+        memory={createTestMemory({ relevanceScore: 0.2 })}
+        onEdit={vi.fn()}
+        onPin={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("fading-warning")).toBeInTheDocument();
+    expect(screen.getByTestId("fading-warning")).toHaveTextContent("Fading");
+  });
+
+  it("does not show fading warning when relevance >= 0.3", () => {
+    render(
+      <MemoryCard
+        memory={createTestMemory({ relevanceScore: 0.5 })}
+        onEdit={vi.fn()}
+        onPin={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("fading-warning")).not.toBeInTheDocument();
+  });
+
+  it("applies warning border accent on fading cards", () => {
+    render(
+      <MemoryCard
+        memory={createTestMemory({ relevanceScore: 0.1 })}
+        onEdit={vi.fn()}
+        onPin={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const card = screen.getByTestId("memory-card");
+    expect(card.className).toContain("border-l-warning");
   });
 });

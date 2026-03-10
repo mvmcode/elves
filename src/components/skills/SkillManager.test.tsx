@@ -75,7 +75,7 @@ describe("SkillManager", () => {
     expect(screen.getByText("Skill Catalog")).toBeInTheDocument();
   });
 
-  it("shows unsupported message for Codex runtime", () => {
+  it("shows coming soon message for Codex runtime", () => {
     useAppStore.setState({ defaultRuntime: "codex" });
     render(<SkillManager />);
     expect(screen.getByTestId("skill-editor-unsupported")).toBeInTheDocument();

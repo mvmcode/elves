@@ -272,6 +272,7 @@ pub fn run() {
             commands::registry::list_all_catalog_skills,
             commands::registry::install_skill,
             commands::registry::search_github_catalog,
+            commands::insights::load_insights,
         ])
         .run(tauri::generate_context!())
         .expect("Error while running ELVES application");

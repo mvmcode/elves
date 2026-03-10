@@ -1,8 +1,15 @@
 /* MemoryCard — neo-brutalist card displaying a single memory entry with actions. */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Badge } from "@/components/shared/Badge";
-import type { MemoryEntry, MemoryCategory } from "@/types/memory";
+import { CATEGORY_STYLES } from "./categoryStyles";
+import type { MemoryEntry } from "@/types/memory";
+
+/** Character limit before content is truncated with a "Show more" toggle. */
+const TRUNCATION_LIMIT = 150;
+
+/** Relevance score threshold below which the fading warning appears. */
+const FADING_THRESHOLD = 0.3;
 
 interface MemoryCardProps {
   readonly memory: MemoryEntry;
@@ -10,15 +17,6 @@ interface MemoryCardProps {
   readonly onPin: (memory: MemoryEntry) => void;
   readonly onDelete: (memory: MemoryEntry) => void;
 }
-
-/** Maps memory category to a Badge-compatible background color class. */
-const CATEGORY_STYLES: Record<MemoryCategory, { className: string; label: string }> = {
-  context: { className: "bg-info text-white", label: "Context" },
-  decision: { className: "bg-elf-gold text-text-light", label: "Decision" },
-  learning: { className: "bg-success text-white", label: "Learning" },
-  preference: { className: "bg-[#C084FC] text-white", label: "Preference" },
-  fact: { className: "bg-gray-400 text-white", label: "Fact" },
-};
 
 /** Formats a unix timestamp (seconds) as a relative time string. */
 function formatRelativeTime(timestamp: number): string {
@@ -50,9 +48,24 @@ function formatSource(source: string | null): string {
   return source;
 }
 
+/** Parse the tags JSON string into an array of tag strings. Returns empty array on failure. */
+function parseTags(tags: string): readonly string[] {
+  if (!tags || tags.trim() === "") return [];
+  try {
+    const parsed: unknown = JSON.parse(tags);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((t): t is string => typeof t === "string" && t.length > 0);
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Neo-brutalist card for a single memory entry.
- * Shows category badge, content, source, relevance bar, timestamp, and action buttons.
+ * Shows category badge, content (truncated if long), tags, source,
+ * relevance bar, timestamp, fading warning, and action buttons.
  * Delete requires inline confirmation before firing the callback.
  */
 export function MemoryCard({
@@ -62,8 +75,17 @@ export function MemoryCard({
   onDelete,
 }: MemoryCardProps): React.JSX.Element {
   const [isDeleteConfirm, setIsDeleteConfirm] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const categoryStyle = CATEGORY_STYLES[memory.category];
   const isPinned = memory.source === "pinned";
+  const isFading = memory.relevanceScore < FADING_THRESHOLD;
+  const isLongContent = memory.content.length > TRUNCATION_LIMIT;
+  const tags = useMemo(() => parseTags(memory.tags), [memory.tags]);
+
+  const displayedContent =
+    isLongContent && !isExpanded
+      ? memory.content.slice(0, TRUNCATION_LIMIT) + "..."
+      : memory.content;
 
   const handleDelete = useCallback((): void => {
     setIsDeleteConfirm(true);
@@ -80,14 +102,24 @@ export function MemoryCard({
 
   return (
     <div
-      className="border-token-normal border-border bg-surface-elevated rounded-token-md p-5 shadow-brutal"
+      className={[
+        "border-token-normal border-border bg-surface-elevated rounded-token-md p-5 shadow-brutal",
+        isFading ? "border-l-4 border-l-warning" : "",
+      ].join(" ")}
       data-testid="memory-card"
     >
       {/* Top row — category badge + timestamp */}
       <div className="flex items-center justify-between">
-        <Badge className={categoryStyle.className} data-testid="memory-category">
-          {categoryStyle.label}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge className={categoryStyle.className} data-testid="memory-category">
+            {categoryStyle.label}
+          </Badge>
+          {isFading && (
+            <Badge variant="warning" data-testid="fading-warning">
+              Fading
+            </Badge>
+          )}
+        </div>
         <span
           className="font-mono text-xs text-text-muted-light"
           data-testid="memory-timestamp"
@@ -96,13 +128,37 @@ export function MemoryCard({
         </span>
       </div>
 
-      {/* Content */}
+      {/* Content with truncation */}
       <p
         className="mt-3 font-body text-sm leading-relaxed text-text-light"
         data-testid="memory-content"
       >
-        {memory.content}
+        {displayedContent}
       </p>
+      {isLongContent && (
+        <button
+          onClick={() => setIsExpanded((prev) => !prev)}
+          className="mt-1 cursor-pointer font-body text-xs font-bold text-info hover:underline"
+          data-testid="content-toggle"
+        >
+          {isExpanded ? "Show less" : "Show more"}
+        </button>
+      )}
+
+      {/* Tag badges */}
+      {tags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1" data-testid="memory-tags">
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className="inline-block border-token-thin border-border bg-surface-muted rounded-token-sm px-2 py-0.5 font-mono text-[11px] text-text-muted-light"
+              data-testid="memory-tag"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Source label */}
       <div className="mt-3 flex items-center gap-2">

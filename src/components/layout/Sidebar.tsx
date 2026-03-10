@@ -53,6 +53,16 @@ function IconMcp(): React.JSX.Element {
 }
 
 
+function IconInsights(): React.JSX.Element {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 20V10" />
+      <path d="M12 20V4" />
+      <path d="M6 20v-6" />
+    </svg>
+  );
+}
+
 function IconHistory(): React.JSX.Element {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -105,6 +115,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { id: "skills", view: "skills", label: "Skills", Icon: IconSkills },
   { id: "mcp", view: "mcp", label: "MCP Servers", Icon: IconMcp },
   { id: "history", view: "history", label: "History", Icon: IconHistory },
+  { id: "insights", view: "insights", label: "Insights", Icon: IconInsights },
   { id: "settings", view: "settings", label: "Settings", Icon: IconSettings },
 ];
 

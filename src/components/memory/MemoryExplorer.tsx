@@ -1,7 +1,8 @@
-/* MemoryExplorer — full-page memory browser with search, category filters, and inline add form. */
+/* MemoryExplorer — full-page memory browser with dashboard, search, category filters, and inline add form. */
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { MemoryCard } from "./MemoryCard";
+import { MemoryDashboard } from "./MemoryDashboard";
 import { Button } from "@/components/shared/Button";
 import { useMemoryStore } from "@/stores/memory";
 import type { MemoryEntry, MemoryCategory } from "@/types/memory";
@@ -39,8 +40,8 @@ const ADD_CATEGORIES: readonly { value: MemoryCategory; label: string }[] = [
 ];
 
 /**
- * Full-page memory explorer with search, category filters, memory card list,
- * empty state, and inline add-memory form. Reads from and writes to the memory store.
+ * Full-page memory explorer with stats dashboard, search, category filters,
+ * memory card list, empty state, and inline add-memory form.
  */
 export function MemoryExplorer({
   onCreateMemory,
@@ -101,21 +102,33 @@ export function MemoryExplorer({
     setIsAddFormOpen(false);
   }, []);
 
+  /** Open the add form with a pre-selected category (called from dashboard insights). */
+  const handleAddWithCategory = useCallback((category: MemoryCategory): void => {
+    setAddCategory(category);
+    setIsAddFormOpen(true);
+  }, []);
+
   return (
     <div className="flex flex-col gap-6 p-6" data-testid="memory-explorer">
-      {/* Header */}
-      <h1 className="font-display text-4xl text-heading">
-        Memory Explorer
-      </h1>
+      {/* Header + Search */}
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="font-display text-4xl text-heading">
+          Memory
+        </h1>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(event) => handleSearchChange(event.target.value)}
+          placeholder="Search memories..."
+          className="flex-1 border-token-normal border-border bg-surface-elevated rounded-token-md px-4 py-3 font-body text-base text-text-light outline-none placeholder:text-text-light/40 focus:focus-ring"
+          data-testid="memory-search"
+        />
+      </div>
 
-      {/* Search bar */}
-      <input
-        type="text"
-        value={searchQuery}
-        onChange={(event) => handleSearchChange(event.target.value)}
-        placeholder="Search memories..."
-        className="w-full border-token-normal border-border bg-surface-elevated rounded-token-md px-4 py-3 font-body text-base text-text-light outline-none placeholder:text-text-light/40 focus:focus-ring"
-        data-testid="memory-search"
+      {/* Dashboard — stats, distribution, insights */}
+      <MemoryDashboard
+        memories={memories}
+        onAddWithCategory={handleAddWithCategory}
       />
 
       {/* Category filter row */}

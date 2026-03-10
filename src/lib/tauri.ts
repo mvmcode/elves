@@ -771,6 +771,15 @@ export async function checkHomebrewUpdate(): Promise<string | null> {
   return invoke<string | null>("check_homebrew_update");
 }
 
+/* ── Insights commands ────────────────────────────────────────── */
+
+import type { InsightsData } from "@/types/insights";
+
+/** Load aggregated usage insights from Claude Code telemetry files and ELVES sessions DB. */
+export async function loadInsights(): Promise<InsightsData> {
+  return invoke<InsightsData>("load_insights");
+}
+
 /* ── Event subscription ──────────────────────────────────────── */
 
 /** Subscribe to a Tauri event. Returns an unsubscribe function. */
