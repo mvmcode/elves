@@ -1,13 +1,14 @@
 /* StatusBar — thin bottom bar showing runtime picker, task state, and session metrics.
  * Includes clickable runtime toggle (Claude Code / Codex) on the left. */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAppStore } from "@/stores/app";
 import { useSessionStore } from "@/stores/session";
 import { useGitStore } from "@/stores/git";
 import { useProjectStore } from "@/stores/project";
 import { useUiStore } from "@/stores/ui";
 import { BranchSwitcher } from "@/components/git/BranchSwitcher";
+import { detectRuntimes } from "@/lib/tauri";
 import type { Runtime } from "@/types/elf";
 
 /** Runtime display metadata. */
@@ -22,6 +23,9 @@ const RUNTIME_META: Record<Runtime, { label: string; icon: string; color: string
  */
 export function StatusBar(): React.JSX.Element {
   const runtimes = useAppStore((s) => s.runtimes);
+  const runtimeHealthy = useAppStore((s) => s.runtimeHealthy);
+  const setRuntimes = useAppStore((s) => s.setRuntimes);
+  const setRuntimeHealthy = useAppStore((s) => s.setRuntimeHealthy);
   const defaultRuntime = useAppStore((s) => s.defaultRuntime);
   const setDefaultRuntime = useAppStore((s) => s.setDefaultRuntime);
   const activeSession = useSessionStore((s) => s.activeSession);
@@ -37,7 +41,39 @@ export function StatusBar(): React.JSX.Element {
   });
   const setActiveView = useUiStore((s) => s.setActiveView);
 
+  const [healthPopoverOpen, setHealthPopoverOpen] = useState(false);
+  const healthRef = useRef<HTMLDivElement>(null);
+
   const totalChanges = stagedFiles.length + unstagedFiles.length;
+
+  /** Re-check runtime availability and update the store. */
+  const recheckRuntimes = useCallback(async (): Promise<void> => {
+    try {
+      const detected = await detectRuntimes();
+      setRuntimes(detected);
+      setRuntimeHealthy(!!(detected.claudeCode || detected.codex));
+    } catch {
+      /* Detection failure — leave current state as-is */
+    }
+  }, [setRuntimes, setRuntimeHealthy]);
+
+  /* Periodic health check every 5 minutes */
+  useEffect(() => {
+    const interval = setInterval(() => void recheckRuntimes(), 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [recheckRuntimes]);
+
+  /* Close health popover on outside click */
+  useEffect(() => {
+    if (!healthPopoverOpen) return;
+    function handleClick(event: MouseEvent): void {
+      if (healthRef.current && !healthRef.current.contains(event.target as Node)) {
+        setHealthPopoverOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [healthPopoverOpen]);
 
   /** Load branch info when a project is active — skip if gitState already populated. */
   useEffect(() => {
@@ -130,6 +166,49 @@ export function StatusBar(): React.JSX.Element {
           ].join(" ")}
         />
       </button>
+
+      {/* Runtime health indicator */}
+      <div ref={healthRef} className="relative">
+        <button
+          onClick={() => setHealthPopoverOpen(!healthPopoverOpen)}
+          className="flex cursor-pointer items-center gap-1 border-none bg-transparent px-1 text-[10px] text-text-light/70 transition-colors hover:text-text-light"
+          title={runtimeHealthy ? "Runtimes healthy" : "Runtime issue detected"}
+        >
+          <span
+            className={[
+              "inline-block h-2 w-2 rounded-full",
+              runtimeHealthy ? "bg-success" : "bg-error",
+            ].join(" ")}
+          />
+        </button>
+
+        {/* Health detail popover */}
+        {healthPopoverOpen && (
+          <div className="absolute bottom-full left-0 z-50 mb-2 min-w-[220px] border-token-thin border-border bg-surface-elevated p-3 shadow-brutal-sm">
+            <h4 className="mb-2 font-display text-[10px] text-label tracking-wider">
+              Runtime Status
+            </h4>
+            <div className="flex flex-col gap-1.5 text-[11px]">
+              <div className="flex items-center gap-2">
+                <span className={["inline-block h-1.5 w-1.5 rounded-full", runtimes?.claudeCode ? "bg-success" : "bg-error"].join(" ")} />
+                <span className="text-text-light/70">Claude Code</span>
+                {runtimes?.claudeCode && <span className="ml-auto font-mono text-[10px] text-text-muted">{runtimes.claudeCode.version}</span>}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={["inline-block h-1.5 w-1.5 rounded-full", runtimes?.codex ? "bg-success" : "bg-error"].join(" ")} />
+                <span className="text-text-light/70">Codex</span>
+                {runtimes?.codex && <span className="ml-auto font-mono text-[10px] text-text-muted">{runtimes.codex.version}</span>}
+              </div>
+            </div>
+            <button
+              onClick={() => void recheckRuntimes()}
+              className="mt-2 cursor-pointer border-token-thin border-border bg-surface-light px-2 py-1 font-display text-[10px] font-bold text-label tracking-wider transition-all duration-100 hover:bg-surface-hover"
+            >
+              Re-check
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Branch display + git indicators */}
       <div className="flex items-center gap-2">

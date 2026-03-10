@@ -129,6 +129,7 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
       setIsAtBottom(true);
     }, []);
 
+
     useEffect(() => {
       const container = containerRef.current;
       if (!container) return;
@@ -207,7 +208,7 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
       fitAddonRef.current = fitAddon;
       searchAddonRef.current = searchAddon;
 
-      /* Initial fit after DOM paint */
+      /* Initial fit after DOM paint — uses guarded fit() to skip if container is hidden */
       requestAnimationFrame(() => {
         fit();
         onResize(terminal.cols, terminal.rows);

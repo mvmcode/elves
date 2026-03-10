@@ -15,6 +15,13 @@ interface AppState {
   /** User-selected default runtime for new tasks */
   readonly defaultRuntime: Runtime;
 
+  /** Initialization error message (null = no error) */
+  readonly initError: string | null;
+  /** Whether at least one AI runtime (Claude Code or Codex) is available */
+  readonly runtimeHealthy: boolean;
+  /** Whether this is a fresh install with no projects */
+  readonly isFirstRun: boolean;
+
   /** Discovered Claude Code world: agents, settings, existence flags */
   readonly claudeDiscovery: ClaudeDiscovery | null;
   /** Currently selected custom agent for the next task (null = default) */
@@ -41,6 +48,14 @@ interface AppState {
   setLoaded: () => void;
   /** Set the default runtime for new tasks */
   setDefaultRuntime: (runtime: Runtime) => void;
+  /** Record an initialization failure — sets initError and stops loading */
+  setInitFailed: (error: string) => void;
+  /** Clear the initialization error (e.g., before retrying) */
+  clearInitError: () => void;
+  /** Update runtime health status */
+  setRuntimeHealthy: (healthy: boolean) => void;
+  /** Set first-run state (fresh install, no projects) */
+  setIsFirstRun: (isFirstRun: boolean) => void;
   /** Set Claude discovery results from startup scan */
   setClaudeDiscovery: (discovery: ClaudeDiscovery) => void;
   /** Select a custom agent for the next task */
@@ -72,18 +87,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   runtimes: null,
   isLoading: true,
   defaultRuntime: "claude-code",
+  initError: null,
+  runtimeHealthy: true,
+  isFirstRun: false,
   claudeDiscovery: null,
   selectedAgent: null,
   selectedModel: null,
   selectedApprovalMode: null,
   budgetCap: null,
   selectedEffort: null,
-  forceTeamMode: true,
+  forceTeamMode: false,
   isOptionsExpanded: false,
   attachedFiles: [],
 
   setRuntimes: (runtimes: RuntimeInfo) => set({ runtimes }),
   setLoaded: () => set({ isLoading: false }),
+  setInitFailed: (error: string) => set({ initError: error, isLoading: false }),
+  clearInitError: () => set({ initError: null }),
+  setRuntimeHealthy: (runtimeHealthy: boolean) => set({ runtimeHealthy }),
+  setIsFirstRun: (isFirstRun: boolean) => set({ isFirstRun }),
   setDefaultRuntime: (defaultRuntime: Runtime) =>
     set({
       defaultRuntime,

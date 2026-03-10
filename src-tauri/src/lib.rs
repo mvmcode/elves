@@ -9,7 +9,8 @@ mod registry;
 use agents::process::ProcessManager;
 use commands::projects::DbState;
 use commands::pty::PtyManager;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::Emitter;
 
@@ -105,6 +106,50 @@ pub fn run() {
         .setup(|app| {
             let menu = build_app_menu(app.handle())?;
             app.set_menu(menu)?;
+
+            // Workaround for WKWebView bug where the webview gets stuck at the wrong
+            // size after minimize/restore on macOS (tauri-apps/tauri#14843).
+            // On re-focus, nudge the window size by 1px and immediately restore it,
+            // forcing WKWebView to recalculate its layout.
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::Manager;
+                if let Some(window) = app.get_webview_window("main") {
+                    let was_unfocused = Arc::new(AtomicBool::new(false));
+                    let flag = was_unfocused.clone();
+                    let win = window.clone();
+
+                    window.on_window_event(move |event| {
+                        match event {
+                            tauri::WindowEvent::Focused(false) => {
+                                flag.store(true, Ordering::Relaxed);
+                            }
+                            tauri::WindowEvent::Focused(true) => {
+                                if !flag.swap(false, Ordering::Relaxed) {
+                                    return;
+                                }
+                                // Spawn a thread to avoid blocking the main event loop.
+                                // The 16ms sleep (one frame) lets WKWebView process the
+                                // first set_size before we restore the original.
+                                let win2 = win.clone();
+                                std::thread::spawn(move || {
+                                    if let Ok(size) = win2.outer_size() {
+                                        let nudged = tauri::PhysicalSize::new(
+                                            size.width.saturating_sub(1),
+                                            size.height,
+                                        );
+                                        let _ = win2.set_size(tauri::Size::Physical(nudged));
+                                        std::thread::sleep(std::time::Duration::from_millis(16));
+                                        let _ = win2.set_size(tauri::Size::Physical(size));
+                                    }
+                                });
+                            }
+                            _ => {}
+                        }
+                    });
+                }
+            }
+
             Ok(())
         })
         .on_menu_event(|app, event| {
@@ -121,6 +166,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::agents::detect_runtimes,
             commands::agents::discover_claude,
+            commands::agents::health_check_runtime,
             commands::projects::list_projects,
             commands::projects::create_project,
             commands::projects::open_project_terminal,

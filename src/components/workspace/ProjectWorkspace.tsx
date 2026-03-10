@@ -53,6 +53,7 @@ export function ProjectWorkspace(): React.JSX.Element {
   const openWorkspaceAction = useWorkspaceStore((state) => state.openWorkspace);
   const gitState = useGitStore((state) => state.gitState);
   const defaultRuntime = useAppStore((state) => state.defaultRuntime);
+  const runtimeHealthy = useAppStore((state) => state.runtimeHealthy);
   const { analyzeAndDeploy } = useTeamSession();
   const setFloorWorktree = useSessionStore((s) => s.setFloorWorktree);
   const setFloorPtyId = useSessionStore((s) => s.setFloorPtyId);
@@ -427,7 +428,18 @@ export function ProjectWorkspace(): React.JSX.Element {
 
   if (!activeProject) {
     return (
-      <div className="flex flex-1 items-center justify-center p-8">
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
+        {error && (
+          <div className="w-full max-w-md border-[2px] border-border bg-error/10 px-4 py-3 font-body text-sm text-error">
+            {error}
+            <button
+              onClick={() => setError(null)}
+              className="ml-3 cursor-pointer border-none bg-transparent font-bold text-error underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         <p className="font-display text-lg text-text-muted">
           Select or create a project to manage workspaces.
         </p>
@@ -435,7 +447,7 @@ export function ProjectWorkspace(): React.JSX.Element {
     );
   }
 
-  const canSummon = taskText.trim().length > 0;
+  const canSummon = taskText.trim().length > 0 && runtimeHealthy;
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden" data-testid="project-workspace">
@@ -477,14 +489,18 @@ export function ProjectWorkspace(): React.JSX.Element {
                 void handleSummon();
               }
             }}
-            placeholder="What do you want the elves to do?"
-
+            placeholder="Describe a task — a new workspace will be created"
           />
           <span className="shrink-0 border-[2px] border-border bg-[#4D96FF] px-2 py-1 font-mono text-[10px] font-bold uppercase text-white shadow-[2px_2px_0px_0px_#000]">
             {defaultRuntime === "codex" ? "CX" : "CC"}
           </span>
           <DeployButton onClick={() => void handleSummon()} disabled={!canSummon} />
         </div>
+        {!runtimeHealthy && (
+          <p className="mx-auto mt-1 max-w-[800px] font-body text-[11px] text-error">
+            No AI runtime detected. Install Claude Code or Codex CLI.
+          </p>
+        )}
       </div>
 
       <div className="p-6">

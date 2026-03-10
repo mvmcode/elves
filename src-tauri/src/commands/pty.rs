@@ -11,7 +11,26 @@ use std::sync::Mutex;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, State};
 
-use crate::agents::runtime::ensure_full_path;
+use crate::agents::runtime::{ensure_full_path, resolve_binary};
+
+/// Resolve a command name to an absolute path, falling back to the bare name.
+/// Uses `runtime::resolve_binary` for consistent resolution across the codebase.
+/// PTY spawning falls back to the bare name (instead of erroring) because
+/// portable-pty may still find it via its own PATH search.
+fn resolve_command(command: &str) -> String {
+    match resolve_binary(command) {
+        Ok(abs_path) => {
+            let resolved = abs_path.to_string_lossy().to_string();
+            log::debug!("Resolved command '{command}' -> {resolved}");
+            resolved
+        }
+        Err(e) => {
+            log::warn!("{e} — falling back to bare name for PTY spawn");
+            command.to_string()
+        }
+    }
+}
+
 
 /// Coalescing pause to batch rapid PTY writes. Half a 60fps frame.
 const COALESCE_DELAY_MS: u64 = 8;
@@ -46,6 +65,7 @@ impl PtyManager {
     ) -> Result<String, String> {
         // Ensure full PATH is available (macOS .app bundles get minimal PATH)
         ensure_full_path();
+        let resolved = resolve_command(command);
         let pty_system = native_pty_system();
         let pair = pty_system
             .openpty(PtySize {
@@ -56,7 +76,6 @@ impl PtyManager {
             })
             .map_err(|e| format!("Failed to open PTY: {e}"))?;
 
-        let resolved = resolve_command(command);
         let mut cmd = CommandBuilder::new(&resolved);
         for arg in args {
             cmd.arg(arg);
@@ -110,14 +129,6 @@ impl PtyManager {
         log::info!("Spawned PTY {pty_id}: {command} {}", args.join(" "));
         Ok(pty_id)
     }
-}
-
-/// Resolve a command name to its full path via `which`, falling back to the
-/// original name if lookup fails (lets the OS handle it at spawn time).
-fn resolve_command(cmd: &str) -> String {
-    which::which(cmd)
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| cmd.to_string())
 }
 
 /// Shared reader loop for PTY output with coalescing.

@@ -4,6 +4,33 @@ All notable changes to ELVES are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.9] - 2026-03-08 — Robust Distribution & Solo Task Fix
+
+### Fixed
+- **Solo tasks silently blocked by `forceTeamMode` default** — `forceTeamMode` initialized to `true` in the app store, which intercepted all solo-classified tasks (e.g. "hi") and showed a plan preview card instead of spawning the agent. No PTY was created, no session started — the task appeared to silently fail. Codex appeared to work only because toggling runtimes called `setDefaultRuntime()` which reset `forceTeamMode` to `false` as a side effect. Fixed by defaulting `forceTeamMode` to `false` so solo tasks deploy immediately as intended.
+- **Duplicate `resolve_command` in pty.rs** — removed stale `which::which`-based function that conflicted with the new `resolve_binary` delegation added in the distribution fix.
+- **CLI binary resolution in adapters** — `claude_adapter` and `codex_adapter` now resolve binary names to absolute paths via `resolve_binary()`, fixing silent spawn failures on fresh macOS installs.
+- **Initialization errors swallowed** — init failures were silently caught and ignored. Now surfaces a full-screen error card with a Retry button.
+- **Task submission silent failures** — submitting a task when no runtime is available now shows a visible error instead of silently returning.
+
+### Added
+- **First-run wizard** — 3-step onboarding flow for new users: runtime detection with install hints, project creation, and a ready screen. Triggered automatically on fresh installs with no projects.
+- **Runtime health check system** — new `health_check_runtime` Tauri command detects runtime versions. StatusBar shows a health indicator with clickable detail popover. Periodic 5-minute re-checks keep status current.
+- **Graceful runtime degradation** — auto-switches to the available runtime if the default is missing. Summon button disabled with explanation when no runtimes are detected.
+- **`resolve_binary()` in runtime.rs** — centralized binary resolution function used by adapters and PTY spawning. Expanded fallback directories for nix, asdf, mise, and Fish shell users.
+
+## [1.0.8] - 2026-03-07 — macOS .app PATH Resolution Fix
+
+### Fixed
+- **CLI binary resolution in .app bundles** — `codex` and `claude` could not be found when ELVES was launched from Finder/Dock because macOS .app bundles get a minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`). The existing `ensure_full_path()` fix was fragile: shell profile noise (motd, brew warnings) corrupted the captured PATH, and `.zshrc` was never sourced (only `.zprofile`/`.zshenv`).
+- **Shell PATH resolution rewritten** — now uses `-ilc` (interactive login) so `.zshrc` is sourced, `printf '%s'` instead of `echo` to avoid newline issues, and stderr is redirected to suppress shell noise. Multi-line output (contaminated by motd) is handled by taking only the last line.
+- **Fallback PATH directories** — always appends well-known macOS binary locations that exist on disk (`/opt/homebrew/bin`, `~/.cargo/bin`, `~/.npm/bin`, `~/.nvm/current/bin`, `~/.local/bin`, `~/go/bin`) as a safety net when shell resolution fails.
+- **PTY binary resolution** — bare command names (`codex`, `claude`) are now resolved to absolute paths via `which` before passing to `portable-pty`'s `CommandBuilder`, bypassing its internal PATH snapshot that could miss the fixed-up PATH.
+- **Missing `ensure_full_path()` in `spawn_pty`** — the `spawn_pty` Tauri command was missing the defensive PATH fix that `spawn_with_app` already had.
+
+### Changed
+- **Diagnostic logging** — PATH resolution now logs the resolved PATH, fallback directories, and any failures for easier debugging of binary-not-found issues.
+
 ## [1.0.6] - 2026-03-06 — Homebrew Update Check
 
 ### Added

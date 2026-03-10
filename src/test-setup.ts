@@ -24,3 +24,12 @@ if (typeof globalThis.ResizeObserver === "undefined") {
     disconnect(): void {}
   } as unknown as typeof globalThis.ResizeObserver;
 }
+
+/* Mock IntersectionObserver for jsdom — required by XTerminal hidden→visible re-fit. */
+if (typeof globalThis.IntersectionObserver === "undefined") {
+  globalThis.IntersectionObserver = class IntersectionObserver {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  } as unknown as typeof globalThis.IntersectionObserver;
+}

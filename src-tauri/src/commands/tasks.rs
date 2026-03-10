@@ -272,7 +272,10 @@ pub async fn start_task_pty(
 
     // 5. Select binary and build CLI args based on runtime
     let is_codex = runtime == "codex";
-    let binary = if is_codex { "codex" } else { "claude" };
+    let binary_name = if is_codex { "codex" } else { "claude" };
+    let binary_path = crate::agents::runtime::resolve_binary(binary_name)
+        .map_err(|e| e.to_string())?;
+    let binary = binary_path.to_string_lossy().to_string();
     let mut args: Vec<String> = Vec::new();
 
     if is_codex {
@@ -331,7 +334,7 @@ pub async fn start_task_pty(
     }
 
     // 6. Spawn via PtyManager — reuses existing PTY infrastructure
-    let pty_id = pty_mgr.spawn_with_app(binary, &args, &working_dir, &app, None)
+    let pty_id = pty_mgr.spawn_with_app(&binary, &args, &working_dir, &app, None)
         .map_err(|e| format!("Failed to spawn PTY: {e}"))?;
 
     log::info!(
@@ -705,7 +708,10 @@ pub async fn start_team_task_pty(
 
         // Build CLI args — runtime-aware (same pattern as start_task_pty)
         let is_codex = runtime == "codex";
-        let binary = if is_codex { "codex" } else { "claude" };
+        let binary_name = if is_codex { "codex" } else { "claude" };
+        let binary_path = crate::agents::runtime::resolve_binary(binary_name)
+            .map_err(|e| e.to_string())?;
+        let binary = binary_path.to_string_lossy().to_string();
         let mut args: Vec<String> = Vec::new();
 
         if is_codex {
@@ -755,7 +761,7 @@ pub async fn start_team_task_pty(
         }
 
         // Spawn PTY for this role
-        let pty_id = pty_mgr.spawn_with_app(binary, &args, &working_dir, &app, None)
+        let pty_id = pty_mgr.spawn_with_app(&binary, &args, &working_dir, &app, None)
             .map_err(|e| format!("Failed to spawn PTY for role {}: {e}", role.name))?;
 
         log::info!(

@@ -5,6 +5,9 @@ import { create } from "zustand";
 /** Top-level views the shell can render in the main content area. */
 export type AppView = "workspace" | "files" | "memory" | "skills" | "mcp" | "history" | "settings" | "comparison";
 
+/** Split pane mode when in files view — which panels are visible. */
+export type SplitPaneMode = "split" | "files-only" | "workspace-only";
+
 /** Panel width constraints for resizable layout. */
 const SIDEBAR_MIN = 200;
 const SIDEBAR_MAX = 400;
@@ -47,6 +50,10 @@ interface UiState {
   readonly isFileEditing: boolean;
   /** Whether the file has unsaved changes. */
   readonly isFileDirty: boolean;
+  /** Split pane mode when in files view. */
+  readonly splitPaneMode: SplitPaneMode;
+  /** Split ratio (0-1) — proportion of width allocated to left panel. */
+  readonly splitPaneRatio: number;
 
   setTaskBarFocused: (focused: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
@@ -65,6 +72,9 @@ interface UiState {
   toggleFocusMode: () => void;
   setFileEditing: (editing: boolean) => void;
   setFileDirty: (dirty: boolean) => void;
+  setSplitPaneMode: (mode: SplitPaneMode) => void;
+  setSplitPaneRatio: (ratio: number) => void;
+  cycleSplitPaneMode: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -83,6 +93,8 @@ export const useUiStore = create<UiState>((set) => ({
   isFocusMode: false,
   isFileEditing: false,
   isFileDirty: false,
+  splitPaneMode: "split",
+  splitPaneRatio: 0.5,
 
   setTaskBarFocused: (focused: boolean) => set({ isTaskBarFocused: focused }),
   setSettingsOpen: (open: boolean) => set({ isSettingsOpen: open }),
@@ -103,4 +115,12 @@ export const useUiStore = create<UiState>((set) => ({
   })),
   setFileEditing: (editing: boolean) => set({ isFileEditing: editing }),
   setFileDirty: (dirty: boolean) => set({ isFileDirty: dirty }),
+  setSplitPaneMode: (mode: SplitPaneMode) => set({ splitPaneMode: mode }),
+  /** Safety bounds — the drag handler enforces tighter pixel-based limits. */
+  setSplitPaneRatio: (ratio: number) => set({ splitPaneRatio: clamp(ratio, 0.1, 0.9) }),
+  cycleSplitPaneMode: () => set((state) => {
+    const order: SplitPaneMode[] = ["split", "files-only", "workspace-only"];
+    const idx = order.indexOf(state.splitPaneMode);
+    return { splitPaneMode: order[(idx + 1) % order.length] };
+  }),
 }));

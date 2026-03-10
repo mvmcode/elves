@@ -1,10 +1,11 @@
-/* App shell — thin routing shell: Sidebar + view-switched main area + StatusBar. */
+/* App shell — thin routing shell: Sidebar + view-switched main area + StatusBar.
+ * Also renders full-screen error and first-run wizard states when appropriate. */
 
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { ProjectWorkspace } from "@/components/workspace/ProjectWorkspace";
-import { FileExplorerView } from "@/components/files/FileExplorerView";
+import { SplitPaneLayout } from "@/components/layout/SplitPaneLayout";
 import { MemoryExplorer } from "@/components/memory/MemoryExplorer";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { SkillManager } from "@/components/skills/SkillManager";
@@ -14,7 +15,9 @@ import { SessionComparison } from "@/components/project/SessionComparison";
 import { ShortcutOverlay } from "@/components/shared/ShortcutOverlay";
 import { ToastContainer } from "@/components/shared/Toast";
 import { NewProjectDialog } from "@/components/project/NewProjectDialog";
+import { FirstRunWizard } from "@/components/onboarding/FirstRunWizard";
 import { useSessionStore } from "@/stores/session";
+import { useAppStore } from "@/stores/app";
 import { useUiStore } from "@/stores/ui";
 import { useTeamSession } from "@/hooks/useTeamSession";
 import { useMemoryActions } from "@/hooks/useMemoryActions";
@@ -23,6 +26,7 @@ import { useSessionEvents } from "@/hooks/useSessionEvents";
 import { useProjectContext } from "@/hooks/useProjectContext";
 import { useCheckForUpdate } from "@/hooks/useCheckForUpdate";
 import { onEvent } from "@/lib/tauri";
+import { Button } from "@/components/shared/Button";
 
 /**
  * Root layout shell — workspace-first structure:
@@ -41,6 +45,10 @@ export function Shell(): React.JSX.Element {
   const activeView = useUiStore((state) => state.activeView);
   const isNewProjectDialogOpen = useUiStore((state) => state.isNewProjectDialogOpen);
   const setNewProjectDialogOpen = useUiStore((state) => state.setNewProjectDialogOpen);
+  const initError = useAppStore((state) => state.initError);
+  const isLoading = useAppStore((state) => state.isLoading);
+  const isFirstRun = useAppStore((state) => state.isFirstRun);
+  const clearInitError = useAppStore((state) => state.clearInitError);
   const { stopSession } = useTeamSession();
   const {
     handleCreateMemory,
@@ -55,6 +63,12 @@ export function Shell(): React.JSX.Element {
   const { shortcutOverlayOpen, toggleOverlay } = useKeyboardShortcuts({
     onCancelTask: () => void stopSession(),
   });
+
+  /** Retry initialization after an error — clears the error and reloads the page. */
+  const handleRetryInit = useCallback((): void => {
+    clearInitError();
+    window.location.reload();
+  }, [clearInitError]);
 
   /* Subscribe to Tauri backend events (elf:event, session:completed) */
   useSessionEvents();
@@ -94,6 +108,38 @@ export function Shell(): React.JSX.Element {
     return () => cleanups.forEach((unsub) => unsub());
   }, [toggleOverlay]);
 
+  /* ── Full-screen init error ─────────────────────────────────── */
+  if (initError) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-surface-light p-8">
+        <div className="w-full max-w-md border-token-normal border-border bg-surface-elevated p-8 shadow-brutal-lg">
+          {/* Error icon */}
+          <div className="mb-4 flex h-12 w-12 items-center justify-center border-token-normal border-border bg-error/10">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-error">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="15" y1="9" x2="9" y2="15" />
+              <line x1="9" y1="9" x2="15" y2="15" />
+            </svg>
+          </div>
+          <h1 className="mb-2 font-display text-xl text-heading tracking-tight">
+            Initialization Failed
+          </h1>
+          <p className="mb-6 font-body text-sm text-text-muted">
+            {initError}
+          </p>
+          <Button variant="primary" onClick={handleRetryInit}>
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── First-run wizard ───────────────────────────────────────── */
+  if (!isLoading && isFirstRun) {
+    return <FirstRunWizard />;
+  }
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-surface-light">
       {/* Icon sidebar */}
@@ -105,7 +151,7 @@ export function Shell(): React.JSX.Element {
         {activeView === "workspace" ? (
           <ProjectWorkspace />
         ) : activeView === "files" ? (
-          <FileExplorerView />
+          <SplitPaneLayout />
         ) : activeView === "memory" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <MemoryExplorer
