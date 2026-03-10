@@ -16,7 +16,7 @@ import { PtyAgentDetector } from "@/lib/pty-agent-detector";
 import type { DetectedAgent, DetectedPermission } from "@/lib/pty-agent-detector";
 import { generateElf } from "@/lib/elf-names";
 import { playSound } from "@/lib/sounds";
-import { removeWorkspace as invokeRemoveWorkspace, completeSession, updateClaudeSessionId } from "@/lib/tauri";
+import { removeWorkspace as invokeRemoveWorkspace, completeSession, updateClaudeSessionId, getLastWorkspaceSession } from "@/lib/tauri";
 import { useToastStore } from "@/stores/toast";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -97,6 +97,22 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
 
     async function autoSpawn(): Promise<void> {
       try {
+        /* Check if there's a previous Claude session to resume.
+         * If found, pass --resume <id> so the user picks up where they left off
+         * instead of starting a blank session after app restart. */
+        let spawnArgs: string[] = [];
+        const projectId = useProjectStore.getState().activeProjectId;
+        if (projectId) {
+          try {
+            const lastSession = await getLastWorkspaceSession(projectId, workspace.slug);
+            if (lastSession?.claudeSessionId) {
+              spawnArgs = ["--resume", lastSession.claudeSessionId];
+            }
+          } catch {
+            /* Failed to query last session — fall through to fresh spawn */
+          }
+        }
+
         /* Create a Tauri v2 Channel for streaming PTY output.
          * The onmessage handler writes data to xterm and runs agent detection. */
         const onOutput = new Channel<string>();
@@ -129,7 +145,7 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
 
         const newPtyId = await invoke<string>("spawn_pty", {
           command: "claude",
-          args: [],
+          args: spawnArgs,
           cwd: workspace.path,
           onOutput,
         });
