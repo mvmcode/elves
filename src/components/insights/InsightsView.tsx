@@ -1,23 +1,28 @@
 /* InsightsView — root view for the Insights Dashboard with tab navigation.
- * Combines Claude Code usage telemetry with ELVES session data. */
+ * Reads Claude Code usage telemetry and presents Overview, Timeline, Analysis, and AI Report tabs. */
 
 import { useState, useCallback } from "react";
 import { useInsights } from "@/hooks/useInsights";
+import { useAppStore } from "@/stores/app";
 import { InsightsOverview } from "./InsightsOverview";
 import { InsightsTimeline } from "./InsightsTimeline";
 import { InsightsAnalysis } from "./InsightsAnalysis";
+import { InsightsReport } from "./InsightsReport";
 
 /** Available tabs in the insights dashboard. */
-type InsightsTab = "overview" | "timeline" | "analysis";
+type InsightsTab = "overview" | "timeline" | "analysis" | "report";
 
 const TABS: readonly { readonly id: InsightsTab; readonly label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "timeline", label: "Timeline" },
   { id: "analysis", label: "Analysis" },
+  { id: "report", label: "AI Report" },
 ];
 
 /** Insights dashboard — tab bar + routed tab content panels. */
 export function InsightsView(): React.JSX.Element {
+  const defaultRuntime = useAppStore((s) => s.defaultRuntime);
+  const isCodex = defaultRuntime === "codex";
   const { data, isLoading, error, reload } = useInsights();
   const [activeTab, setActiveTab] = useState<InsightsTab>("overview");
 
@@ -60,7 +65,14 @@ export function InsightsView(): React.JSX.Element {
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto p-6">
-        {error ? (
+        {isCodex ? (
+          <div className="flex flex-col items-center justify-center py-24" data-testid="codex-coming-soon">
+            <p className="font-display text-2xl font-black uppercase tracking-tight text-text-muted">Coming Soon</p>
+            <p className="mt-2 max-w-md text-center font-body text-sm text-text-muted">
+              Codex insights are not yet available. Switch to Claude Code to view usage analytics, session history, and the AI-generated report.
+            </p>
+          </div>
+        ) : error ? (
           <div className="border-[3px] border-border bg-error/10 p-6 shadow-brutal">
             <p className="font-display text-sm font-bold uppercase text-error">Failed to load insights</p>
             <p className="mt-1 font-body text-sm text-text-muted">{error}</p>
@@ -75,6 +87,7 @@ export function InsightsView(): React.JSX.Element {
             {activeTab === "overview" && <InsightsOverview data={data} />}
             {activeTab === "timeline" && <InsightsTimeline data={data} />}
             {activeTab === "analysis" && <InsightsAnalysis data={data} />}
+            {activeTab === "report" && <InsightsReport reportHtml={data.reportHtml} />}
           </>
         )}
       </div>

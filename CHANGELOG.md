@@ -4,6 +4,39 @@ All notable changes to ELVES are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1] - 2026-03-09 — Insights Overhaul, Terminal Revamp & Memory Dashboard
+
+### Added
+- **Insights overhaul — real Claude Code data** — completely rewrote the Insights backend and frontend to surface actual Claude Code telemetry. Fixes broken deserialization where every field was `None` due to wrong `rename_all` on snake_case JSON. Now reads `stats-cache.json` (316 sessions, 91K messages, per-model tokens), per-session metadata (project, first prompt, feature adoption, tool/language counts), and facets (outcomes, helpfulness, satisfaction, friction, goals, session types).
+- **AI Report tab** — new 4th tab in Insights renders Claude Code's AI-generated `report.html` (74KB narrative report) in a sandboxed iframe. Shows "No AI Report" instructions when the file doesn't exist.
+- **Model usage breakdown** — Overview tab shows per-model token counts (input, output, cache read, cache creation) with cache hit rate bars. Supports all Claude model variants.
+- **Project summary table** — Overview tab aggregates sessions, lines added, commits, duration, and tokens per project directory.
+- **Feature adoption panel** — Analysis tab shows Task Agent, MCP, Web Search, and Web Fetch usage counts with percentage of total sessions.
+- **Recent sessions list** — Analysis tab shows the last 20 sessions with project name, date, first prompt (truncated), outcome badge, and brief AI-generated summary.
+- **Session quality metrics** — Analysis tab shows helpfulness, satisfaction, and session type distributions from Claude Code facets data.
+- **Daily messages chart** — Timeline tab adds a daily message count bar chart alongside the existing daily sessions chart, both sourced from `stats-cache.json`.
+- **Codex insights coming soon** — Insights view shows a "Coming Soon" state when the runtime is set to Codex, since Codex has no equivalent telemetry source.
+- **Memory dashboard** — new Memory view with search, timeline, and category filtering.
+- **Terminal toolbar** — new toolbar component with search, font size, and clear actions for embedded terminals.
+- **Terminal persistence** — terminal content survives view switches without re-rendering or losing scroll position.
+- **Terminal auto-resume** — reopening a workspace tab automatically resumes the last Claude session via `--resume`.
+- **Channel IPC for PTY** — revamped PTY pipeline uses Rust channels instead of direct event emission for reliable terminal data delivery.
+- **WebGL terminal renderer** — xterm.js upgraded to use WebGL renderer for smoother terminal rendering.
+- **Split pane layout** — file explorer and workspace now display side-by-side in a resizable split pane.
+
+### Changed
+- **Insights KPI grid** — expanded from 4×2 to 3×3: Sessions, Messages, Duration, Input Tokens, Output Tokens, Commits, Lines+, Lines−, Files. Removed Cost (not in real data). Token counts use compact formatting (e.g., "385M", "29K").
+- **Insights Timeline** — daily activity and hourly distribution now sourced from `stats-cache.json` instead of manually aggregating session-meta timestamps. Richer data with message and tool call counts per day.
+- **Insights Analysis** — outcome labels updated to match real facet values (`fully_achieved`, `mostly_achieved`, etc.). Goals and friction now read from `HashMap<String, u32>` instead of `Vec<String>`. Added helpfulness, satisfaction, and session type charts.
+- **Removed runtime split panel** — the ELVES sessions DB query returned zeros and added unnecessary complexity. All insights now come directly from Claude Code telemetry files.
+- **Removed DB dependency from insights** — `load_insights()` no longer takes `State<DbState>`, eliminating the lock contention and zero-data ELVES sessions query.
+
+### Fixed
+- **Insights deserialization** — `RawSessionMeta` had `#[serde(rename_all = "camelCase")]` but the actual JSON uses snake_case, causing every field to deserialize as `None`. Fixed by removing the rename and using actual field names.
+- **Facets field types** — `goals: Vec<String>` changed to `goal_categories: HashMap<String, u32>`, `friction_points: Vec<String>` changed to `friction_counts: HashMap<String, u32>` to match the real JSON structure.
+- **Skill Catalog tab visibility** — Catalog tab button was not visible due to styling issue.
+- **Terminal persistence on view switch** — terminals no longer lose content when switching between views.
+
 ## [1.0.9] - 2026-03-08 — Robust Distribution & Solo Task Fix
 
 ### Fixed

@@ -72,6 +72,9 @@ Each project gets a `.elves/config.json` for default runtime, MCP servers, and m
 ### Everything Local
 All data lives on your machine. SQLite for structured data, `.elves/` per project for config. No cloud sync. No accounts. Export everything anytime.
 
+### Usage Insights Dashboard
+Four-tab analytics view built on real Claude Code telemetry. **Overview** shows 9 KPIs (sessions, messages, tokens, commits, lines, files), per-model token breakdown with cache hit rates, and per-project summaries. **Timeline** shows daily session and message counts plus an hour-of-day heatmap. **Analysis** shows outcome distribution, helpfulness, satisfaction, session types, goals, friction, tool/language usage, feature adoption, and a recent sessions list with AI-generated summaries. **AI Report** renders Claude Code's full narrative HTML report in a sandboxed iframe. Falls back to "Coming Soon" for Codex.
+
 ### Session History & Replay
 Every session records a full event log with cost tracking and duration. Step through past sessions event-by-event, compare sessions side-by-side, resume completed sessions via `claude --resume`, or export as HTML replays.
 
@@ -280,6 +283,8 @@ elves/
 │   │   ├── feed/                # ActivityFeed, SidePanel
 │   │   ├── git/                 # BranchSwitcher, DiffViewer, GitPanel
 │   │   ├── memory/              # MemoryExplorer, MemoryCard
+│   │   ├── insights/            # InsightsView, InsightsOverview, InsightsTimeline,
+│   │   │                        # InsightsAnalysis, InsightsReport, BarChart, HeatmapChart
 │   │   └── settings/            # MemorySettings, SettingsView, RuntimeSettings,
 │   │                            # ThemePicker
 │   ├── stores/                  # Zustand stores (app, project, session, ui, memory,
@@ -294,7 +299,8 @@ elves/
 │   │                            # useKeyboardShortcuts, useSessionHistory,
 │   │                            # useAutoInteractive, useStallDetection,
 │   │                            # useCheckForUpdate, useProjectContext,
-│   │                            # useResizable, useTemplateActions
+│   │                            # useResizable, useTemplateActions, useInsights
+│   ├── test/                    # Shared test fixture factories
 │   └── lib/                     # elf-names, Tauri IPC wrappers, pty-agent-detector,
 │                                # slug, sounds
 │
@@ -304,7 +310,7 @@ elves/
 │       │                        # interop, task analyzer, context builder, memory extractor
 │       ├── commands/            # Tauri IPC handlers (agents, projects, sessions, tasks,
 │       │                        # memory, skills, mcp, export, pty, git, workspace,
-│       │                        # filesystem, search, templates, registry, updates)
+│       │                        # filesystem, search, templates, registry, updates, insights)
 │       ├── project/             # Project config management (.elves/config.json)
 │       └── db/                  # SQLite schema + migrations, CRUD modules
 │                                # (projects, sessions, elves, events, memory, skills, mcp)
@@ -356,6 +362,7 @@ All core phases are complete. Post-release work focuses on stability, runtime ha
 - [x] **Phase 8: Streaming & Terminal** — Real-time stream-json events, Claude discovery, embedded PTY terminal, session resume, resizable panels, solo terminal mode, native dialogs, TaskBar options
 - [x] **Phase 9: Workspace Redesign** — Worktree-first workspaces, Ship It completion flow, project-scoped config, branch management, DiffViewer, merge strategy picker
 - [x] **Post-release** — macOS .app PATH resolution, multi-repo support, floor system, skill catalog, file attachments, stall detection, auto-update checks, race condition fixes, PTY/xterm hardening
+- [x] **v1.1** — Insights dashboard overhaul (real Claude Code telemetry, model usage, project summaries, AI report), terminal revamp (Channel IPC, WebGL, toolbar, persistence, auto-resume), memory dashboard, split pane layout
 
 ---
 

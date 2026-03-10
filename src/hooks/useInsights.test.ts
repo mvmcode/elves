@@ -3,26 +3,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { useInsights } from "./useInsights";
-import type { InsightsData } from "@/types/insights";
-
-const MOCK_DATA: InsightsData = {
-  totalSessions: 42,
-  totalTokens: 150000,
-  totalCost: 12.5,
-  totalDuration: 7200,
-  totalCommits: 15,
-  linesAdded: 3000,
-  linesRemoved: 800,
-  filesChanged: 25,
-  dailySessions: [{ date: "2026-03-01", count: 5 }],
-  hourlyDistribution: Array.from({ length: 24 }, () => 0),
-  runtimeSplit: [{ runtime: "claude-code", sessions: 42, cost: 12.5 }],
-  outcomes: [{ outcome: "success", count: 30, percentage: 71.4 }],
-  topTools: [{ name: "Edit", count: 100 }],
-  topLanguages: [{ name: "TypeScript", count: 80 }],
-  topGoals: [{ name: "feature", count: 20 }],
-  topFriction: [{ name: "slow-response", count: 5 }],
-};
+import { insightsData } from "@/test/fixtures";
 
 vi.mock("@/lib/tauri", () => ({
   loadInsights: vi.fn(),
@@ -37,11 +18,11 @@ beforeEach(() => {
 
 describe("useInsights", () => {
   it("returns loading state initially, then data", async () => {
-    mockLoadInsights.mockResolvedValue(MOCK_DATA);
+    const data = insightsData({ totalSessions: 42 });
+    mockLoadInsights.mockResolvedValue(data);
 
     const { result } = renderHook(() => useInsights());
 
-    // Initial state — loading
     expect(result.current.isLoading).toBe(true);
     expect(result.current.data).toBeNull();
     expect(result.current.error).toBeNull();
@@ -50,7 +31,7 @@ describe("useInsights", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(result.current.data).toEqual(MOCK_DATA);
+    expect(result.current.data).toEqual(data);
     expect(result.current.error).toBeNull();
     expect(mockLoadInsights).toHaveBeenCalledOnce();
   });
@@ -69,7 +50,7 @@ describe("useInsights", () => {
   });
 
   it("reload fetches fresh data", async () => {
-    mockLoadInsights.mockResolvedValue(MOCK_DATA);
+    mockLoadInsights.mockResolvedValue(insightsData({ totalSessions: 10 }));
 
     const { result } = renderHook(() => useInsights());
 
@@ -79,8 +60,7 @@ describe("useInsights", () => {
 
     expect(mockLoadInsights).toHaveBeenCalledTimes(1);
 
-    const updatedData = { ...MOCK_DATA, totalSessions: 50 };
-    mockLoadInsights.mockResolvedValue(updatedData);
+    mockLoadInsights.mockResolvedValue(insightsData({ totalSessions: 50 }));
 
     await act(async () => {
       await result.current.reload();

@@ -1,22 +1,17 @@
-/* Insights types — aggregated usage analytics from Claude Code telemetry and ELVES sessions. */
+/* Insights types — aggregated usage analytics from Claude Code telemetry files. */
 
-/** A single day's count for timeline charts. */
-export interface DailyCount {
+/** A single day's activity from stats-cache. */
+export interface DailyActivityEntry {
   readonly date: string;
-  readonly count: number;
+  readonly sessionCount: number;
+  readonly messageCount: number;
+  readonly toolCallCount: number;
 }
 
 /** A named item with a numeric count, used for top-N bar charts. */
 export interface NamedCount {
   readonly name: string;
   readonly count: number;
-}
-
-/** Runtime split — sessions and cost per runtime. */
-export interface RuntimeSplit {
-  readonly runtime: string;
-  readonly sessions: number;
-  readonly cost: number;
 }
 
 /** Outcome distribution entry (from facets analysis). */
@@ -26,41 +21,91 @@ export interface OutcomeEntry {
   readonly percentage: number;
 }
 
-/** Full aggregated insights data returned from the Rust backend in a single IPC call. */
-export interface InsightsData {
-  /** Total sessions across all sources. */
-  readonly totalSessions: number;
-  /** Total tokens consumed. */
-  readonly totalTokens: number;
-  /** Total estimated cost in USD. */
-  readonly totalCost: number;
-  /** Total duration in seconds across all sessions. */
-  readonly totalDuration: number;
-  /** Total git commits recorded. */
-  readonly totalCommits: number;
-  /** Total lines added. */
-  readonly linesAdded: number;
-  /** Total lines removed. */
-  readonly linesRemoved: number;
-  /** Total files touched. */
-  readonly filesChanged: number;
+/** Per-model token breakdown from stats-cache. */
+export interface ModelUsageEntry {
+  readonly model: string;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly cacheReadTokens: number;
+  readonly cacheCreationTokens: number;
+  readonly cacheHitRate: number;
+}
 
-  /** Sessions per day for the timeline chart (last 90 days). */
-  readonly dailySessions: readonly DailyCount[];
-  /** Sessions per hour-of-day (0-23) for the heatmap. */
+/** Per-project aggregated summary. */
+export interface ProjectSummary {
+  readonly name: string;
+  readonly sessions: number;
+  readonly linesAdded: number;
+  readonly commits: number;
+  readonly durationMinutes: number;
+  readonly tokens: number;
+}
+
+/** Per-session summary for the recent sessions list. */
+export interface SessionSummary {
+  readonly sessionId: string;
+  readonly project: string;
+  readonly startTime: string;
+  readonly durationMinutes: number;
+  readonly firstPrompt: string;
+  readonly outcome: string;
+  readonly briefSummary: string;
+  readonly linesAdded: number;
+  readonly tokens: number;
+  readonly commits: number;
+}
+
+/** Feature adoption stats. */
+export interface FeatureAdoption {
+  readonly taskAgent: number;
+  readonly mcp: number;
+  readonly webSearch: number;
+  readonly webFetch: number;
+  readonly total: number;
+}
+
+/** Full aggregated insights data returned from the Rust backend. */
+export interface InsightsData {
+  /* KPIs */
+  readonly totalSessions: number;
+  readonly totalMessages: number;
+  readonly totalInputTokens: number;
+  readonly totalOutputTokens: number;
+  readonly totalDurationMinutes: number;
+  readonly totalCommits: number;
+  readonly linesAdded: number;
+  readonly linesRemoved: number;
+  readonly filesChanged: number;
+  readonly firstSessionDate: string | null;
+
+  /* Timeline */
+  readonly dailyActivity: readonly DailyActivityEntry[];
   readonly hourlyDistribution: readonly number[];
 
-  /** Cost and session count per runtime. */
-  readonly runtimeSplit: readonly RuntimeSplit[];
+  /* Models */
+  readonly modelUsage: readonly ModelUsageEntry[];
 
-  /** Outcome distribution from facets analysis. */
+  /* Projects */
+  readonly projects: readonly ProjectSummary[];
+
+  /* Quality */
   readonly outcomes: readonly OutcomeEntry[];
-  /** Top tools by usage count. */
-  readonly topTools: readonly NamedCount[];
-  /** Top programming languages by usage count. */
-  readonly topLanguages: readonly NamedCount[];
-  /** Top goal categories from facets. */
-  readonly topGoals: readonly NamedCount[];
-  /** Top friction points from facets. */
+  readonly topHelpfulness: readonly NamedCount[];
+  readonly topSatisfaction: readonly NamedCount[];
   readonly topFriction: readonly NamedCount[];
+  readonly topGoals: readonly NamedCount[];
+  readonly topSessionTypes: readonly NamedCount[];
+
+  /* Tools */
+  readonly topTools: readonly NamedCount[];
+  readonly topLanguages: readonly NamedCount[];
+
+  /* Features */
+  readonly featureAdoption: FeatureAdoption;
+
+  /* Sessions */
+  readonly recentSessions: readonly SessionSummary[];
+
+  /* Report */
+  readonly reportHtml: string | null;
 }
