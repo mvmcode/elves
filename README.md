@@ -82,20 +82,52 @@ Every session records a full event log with cost tracking and duration. Step thr
 
 ## Screenshots
 
-### Workspace Terminal View
-The main view — a live embedded terminal showing the agent's work in real-time. Header displays workspace slug, runtime badge, and diff summary. Footer has Stop, Ship It, and Remove controls.
+<table>
+  <tr>
+    <td width="50%">
+      <a href="docs/screenshots/workspaces.png">
+        <img src="docs/screenshots/workspaces.png" alt="Workspaces" />
+      </a>
+      <p align="center"><strong>Workspaces</strong> — Task bar, workspace cards, worktree/direct modes</p>
+    </td>
+    <td width="50%">
+      <a href="docs/screenshots/files-workspace-split.png">
+        <img src="docs/screenshots/files-workspace-split.png" alt="Files + Workspace Split" />
+      </a>
+      <p align="center"><strong>Files + Workspace</strong> — Split pane with file explorer, code viewer, and live terminal</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <a href="docs/screenshots/insights-overview.png">
+        <img src="docs/screenshots/insights-overview.png" alt="Insights Overview" />
+      </a>
+      <p align="center"><strong>Insights Overview</strong> — Sessions, tokens, commits, model usage, project breakdown</p>
+    </td>
+    <td width="50%">
+      <a href="docs/screenshots/insights-analysis.png">
+        <img src="docs/screenshots/insights-analysis.png" alt="Insights Analysis" />
+      </a>
+      <p align="center"><strong>Insights Analysis</strong> — Outcomes, helpfulness, goals, friction points</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <a href="docs/screenshots/skill-catalog.png">
+        <img src="docs/screenshots/skill-catalog.png" alt="Skill Catalog" />
+      </a>
+      <p align="center"><strong>Skill Catalog</strong> — Searchable catalog with category tags, preview, and install</p>
+    </td>
+    <td width="50%">
+      <a href="docs/screenshots/mcp-servers.png">
+        <img src="docs/screenshots/mcp-servers.png" alt="MCP Servers" />
+      </a>
+      <p align="center"><strong>MCP Servers</strong> — Import from Claude, add servers, health checks, tool listing</p>
+    </td>
+  </tr>
+</table>
 
-### Workspace Grid
-Overview of all active and idle workspaces as cards with status, diff counts, and branch names. Click to open the terminal view.
-
-### Memory Explorer
-Searchable timeline of project memories with FTS5 full-text search. Relevance scores decay over time and boost on access. Pin important memories to keep them permanent.
-
-### Skill Catalog
-Flat searchable catalog of all skills — custom, Claude Code slash commands, and project-local commands — with live preview and category filtering.
-
-### Settings
-Runtime defaults, model selection, permission modes, memory settings, theme picker, and custom system prompt configuration.
+<p align="center"><em>Click any screenshot to view full size.</em></p>
 
 ---
 
