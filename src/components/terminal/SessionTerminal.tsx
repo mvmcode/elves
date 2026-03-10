@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { XTerminal } from "./XTerminal";
 import type { XTerminalHandle } from "./XTerminal";
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { PtyAgentDetector } from "@/lib/pty-agent-detector";
 import type { DetectedAgent } from "@/lib/pty-agent-detector";
@@ -23,15 +23,19 @@ interface SessionTerminalProps {
   readonly onPtyExit?: () => void;
   /** Called when Agent tool calls are detected in the PTY output stream. */
   readonly onAgentDetected?: (agent: DetectedAgent) => void;
+  /** Optional external ref for parent to access terminal methods (e.g. clear, search). */
+  readonly terminalRef?: React.RefObject<XTerminalHandle | null>;
 }
 
-/** Tauri IPC: spawn a new PTY process. Returns a unique pty_id. */
+/** Tauri IPC: spawn a new PTY process with a Channel for streaming output.
+ * Returns a unique pty_id. Output is streamed via the Channel (not events). */
 async function spawnPty(
   command: string,
   args: readonly string[],
   cwd: string,
+  onOutput: Channel<string>,
 ): Promise<string> {
-  return invoke<string>("spawn_pty", { command, args, cwd });
+  return invoke<string>("spawn_pty", { command, args, cwd, onOutput });
 }
 
 /** Tauri IPC: write data to PTY stdin. */
@@ -63,8 +67,10 @@ export function SessionTerminal({
   onClose,
   onPtyExit,
   onAgentDetected,
+  terminalRef,
 }: SessionTerminalProps): React.JSX.Element {
-  const terminalRef = useRef<XTerminalHandle>(null);
+  const localTerminalRef = useRef<XTerminalHandle>(null);
+  const effectiveTerminalRef = terminalRef ?? localTerminalRef;
   const ptyIdRef = useRef<string | null>(null);
   const detectorRef = useRef<PtyAgentDetector>(new PtyAgentDetector());
   const onAgentDetectedRef = useRef(onAgentDetected);
@@ -94,15 +100,28 @@ export function SessionTerminal({
     }
   }, []);
 
-  /** Spawn PTY and wire events on mount; kill PTY on unmount. */
+  /** Spawn PTY and wire Channel + exit event on mount; kill PTY on unmount. */
   useEffect(() => {
-    let unlistenData: (() => void) | null = null;
     let unlistenExit: (() => void) | null = null;
     let mounted = true;
 
     async function setup(): Promise<void> {
       try {
-        const ptyId = await spawnPty("claude", ["--resume", claudeSessionId], projectPath);
+        /* Create a Tauri v2 Channel for streaming PTY output.
+         * Channels provide ordered delivery and lower overhead than events. */
+        const onOutput = new Channel<string>();
+        onOutput.onmessage = (data: string): void => {
+          if (!mounted) return;
+          effectiveTerminalRef.current?.write(data);
+
+          /* Feed PTY output through agent detector to find Agent tool calls */
+          const { agents } = detectorRef.current.feed(data);
+          for (const agent of agents) {
+            onAgentDetectedRef.current?.(agent);
+          }
+        };
+
+        const ptyId = await spawnPty("claude", ["--resume", claudeSessionId], projectPath, onOutput);
         if (!mounted) {
           /* Component unmounted before spawn completed — clean up immediately */
           void killPty(ptyId);
@@ -120,27 +139,12 @@ export function SessionTerminal({
           });
         }
 
-        /* Listen for PTY stdout data → write to xterm display + scan for agent spawns.
-         * After each await, check mounted to avoid leaking subscriptions when the
-         * component unmounts before the listen() promise resolves. */
-        const dataUnsub = await listen<string>(`pty:data:${ptyId}`, (event) => {
-          if (!mounted) return;
-          terminalRef.current?.write(event.payload);
-
-          /* Feed PTY output through agent detector to find Agent tool calls */
-          const { agents } = detectorRef.current.feed(event.payload);
-          for (const agent of agents) {
-            onAgentDetectedRef.current?.(agent);
-          }
-        });
-        if (!mounted) { dataUnsub(); return; }
-        unlistenData = dataUnsub;
-
-        /* Listen for PTY process exit → show message and notify parent */
+        /* Listen for PTY process exit → show message and notify parent.
+         * Exit is a one-shot signal, so it stays as a regular Tauri event. */
         const exitUnsub = await listen<number>(`pty:exit:${ptyId}`, (event) => {
           if (!mounted) return;
-          terminalRef.current?.writeln("");
-          terminalRef.current?.writeln(
+          effectiveTerminalRef.current?.writeln("");
+          effectiveTerminalRef.current?.writeln(
             `\x1b[33m--- Session ended (exit code: ${event.payload}) ---\x1b[0m`,
           );
           setHasExited(true);
@@ -150,7 +154,7 @@ export function SessionTerminal({
         unlistenExit = exitUnsub;
       } catch (error) {
         console.error("Failed to spawn PTY:", error);
-        terminalRef.current?.writeln(
+        effectiveTerminalRef.current?.writeln(
           `\x1b[31mFailed to start terminal: ${error instanceof Error ? error.message : String(error)}\x1b[0m`,
         );
         setHasExited(true);
@@ -161,7 +165,6 @@ export function SessionTerminal({
 
     return () => {
       mounted = false;
-      unlistenData?.();
       unlistenExit?.();
       const ptyId = ptyIdRef.current;
       if (ptyId) {
@@ -199,7 +202,7 @@ export function SessionTerminal({
 
       {/* Terminal viewport */}
       <div className="flex-1 overflow-hidden p-1">
-        <XTerminal ref={terminalRef} onData={handleData} onResize={handleResize} />
+        <XTerminal ref={effectiveTerminalRef} onData={handleData} onResize={handleResize} />
       </div>
 
       {/* Exited footer */}

@@ -334,7 +334,7 @@ pub async fn start_task_pty(
     }
 
     // 6. Spawn via PtyManager — reuses existing PTY infrastructure
-    let pty_id = pty_mgr.spawn_with_app(&binary, &args, &working_dir, &app)
+    let pty_id = pty_mgr.spawn_with_app(&binary, &args, &working_dir, &app, None)
         .map_err(|e| format!("Failed to spawn PTY: {e}"))?;
 
     log::info!(
@@ -761,7 +761,7 @@ pub async fn start_team_task_pty(
         }
 
         // Spawn PTY for this role
-        let pty_id = pty_mgr.spawn_with_app(&binary, &args, &working_dir, &app)
+        let pty_id = pty_mgr.spawn_with_app(&binary, &args, &working_dir, &app, None)
             .map_err(|e| format!("Failed to spawn PTY for role {}: {e}", role.name))?;
 
         log::info!(

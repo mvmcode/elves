@@ -1,6 +1,7 @@
 /* WorkspaceTerminalView — full-width terminal view for an open workspace.
  * Shows header with back navigation, runtime badge, diff summary, and a live XTerminal.
- * PTY events are wired via the pty:data:{ptyId} listener pattern. */
+ * Auto-spawned PTYs stream data via Tauri v2 Channels; PTYs from startTaskPty use events.
+ * Exit is always signaled via pty:exit:{ptyId} events. */
 
 import { useCallback, useRef, useState, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
@@ -17,7 +18,7 @@ import { generateElf } from "@/lib/elf-names";
 import { playSound } from "@/lib/sounds";
 import { removeWorkspace as invokeRemoveWorkspace, completeSession, updateClaudeSessionId } from "@/lib/tauri";
 import { useToastStore } from "@/stores/toast";
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { WorkspaceInfo } from "@/types/workspace";
 
@@ -50,20 +51,23 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
   const teamEntries = useWorkspaceStore((s) => s.teamPtyEntries[workspace.slug]);
   const ptyId = useWorkspaceStore((s) => s.ptyIds[workspace.slug] ?? null);
 
-  /* Team mode: render split terminal grid instead of single terminal. */
-  if (teamEntries && teamEntries.length > 0) {
-    return <SplitTerminalView workspace={workspace} entries={teamEntries} />;
-  }
-
   const terminalRef = useRef<XTerminalHandle>(null);
   const detectorRef = useRef<PtyAgentDetector>(new PtyAgentDetector());
   /** Track whether we've already shown a PTY error toast to avoid spam. */
   const ptyErrorShownRef = useRef(false);
+  /** Whether the current PTY was spawned with a Channel (true) or uses events (false).
+   * PTYs spawned by auto-spawn use Channels; PTYs from startTaskPty use events. */
+  const hasChannelRef = useRef(false);
   const [hasExited, setHasExited] = useState(false);
   const [pendingPermission, setPendingPermission] = useState<DetectedPermission | null>(null);
   const [spawnError, setSpawnError] = useState<string | null>(null);
   /** Guard against double-spawning during auto-spawn. */
   const autoSpawnAttempted = useRef(false);
+
+  /* Team mode: render split terminal grid instead of single terminal. */
+  if (teamEntries && teamEntries.length > 0) {
+    return <SplitTerminalView workspace={workspace} entries={teamEntries} />;
+  }
 
   /** Auto-spawn a Claude interactive PTY when workspace has no terminal.
    * This covers the case where a workspace tab is opened on an existing worktree
@@ -93,11 +97,43 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
 
     async function autoSpawn(): Promise<void> {
       try {
+        /* Create a Tauri v2 Channel for streaming PTY output.
+         * The onmessage handler writes data to xterm and runs agent detection. */
+        const onOutput = new Channel<string>();
+        onOutput.onmessage = (data: string): void => {
+          terminalRef.current?.write(data);
+
+          const { agents, permissions, claudeSessionId: detectedSessionId } = detectorRef.current.feed(data);
+          for (const agent of agents) {
+            handleAgentDetected(agent, workspace.slug);
+          }
+          for (const perm of permissions) {
+            setPendingPermission(perm);
+          }
+
+          /* Save Claude session ID to DB when first detected — enables Resume in History. */
+          if (detectedSessionId) {
+            const sessionState = useSessionStore.getState();
+            const floorId = sessionState.activeFloorId;
+            if (floorId) {
+              const floor = sessionState.floors[floorId];
+              const dbSessionId = floor?.session?.id;
+              if (dbSessionId) {
+                updateClaudeSessionId(dbSessionId, detectedSessionId).catch((error: unknown) => {
+                  console.error("Failed to save Claude session ID:", error);
+                });
+              }
+            }
+          }
+        };
+
         const newPtyId = await invoke<string>("spawn_pty", {
           command: "claude",
           args: [],
           cwd: workspace.path,
+          onOutput,
         });
+        hasChannelRef.current = true;
         useWorkspaceStore.getState().setPtyId(workspace.slug, newPtyId);
         useWorkspaceStore.getState().updateWorkspaceStatus(workspace.slug, "active");
       } catch (error: unknown) {
@@ -118,50 +154,58 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
     setPendingPermission(null);
   }, [ptyId]);
 
-  /** PTY event listener — always active when ptyId exists. */
+  /** PTY event listener — always active when ptyId exists.
+   * When the PTY was spawned with a Channel (auto-spawn), only subscribes to exit events.
+   * When the PTY was spawned without a Channel (startTaskPty), also subscribes to data events. */
   useEffect(() => {
     if (!ptyId) return;
     let unlistenData: (() => void) | null = null;
     let unlistenExit: (() => void) | null = null;
     let mounted = true;
 
-    detectorRef.current.reset();
+    /* Only reset detector when data comes via events (non-Channel PTYs).
+     * Channel-based PTYs reset the detector in the auto-spawn effect. */
+    if (!hasChannelRef.current) {
+      detectorRef.current.reset();
+    }
     setHasExited(false);
 
     async function setup(): Promise<void> {
       try {
-        /* After each await listen(), check mounted to prevent leaking subscriptions
-         * when the component unmounts before the promise resolves. */
-        const dataUnsub = await listen<string>(`pty:data:${ptyId}`, (event) => {
-          if (!mounted) return;
-          terminalRef.current?.write(event.payload);
+        /* Subscribe to pty:data events only for PTYs spawned without a Channel
+         * (e.g., from startTaskPty). Channel-based PTYs handle data via onmessage. */
+        if (!hasChannelRef.current) {
+          const dataUnsub = await listen<string>(`pty:data:${ptyId}`, (event) => {
+            if (!mounted) return;
+            terminalRef.current?.write(event.payload);
 
-          const { agents, permissions, claudeSessionId } = detectorRef.current.feed(event.payload);
-          for (const agent of agents) {
-            handleAgentDetected(agent, workspace.slug);
-          }
-          for (const perm of permissions) {
-            setPendingPermission(perm);
-          }
+            const { agents, permissions, claudeSessionId: detectedSessionId } = detectorRef.current.feed(event.payload);
+            for (const agent of agents) {
+              handleAgentDetected(agent, workspace.slug);
+            }
+            for (const perm of permissions) {
+              setPendingPermission(perm);
+            }
 
-          /* Save Claude session ID to DB when first detected — enables Resume in History. */
-          if (claudeSessionId) {
-            const sessionState = useSessionStore.getState();
-            const floorId = sessionState.activeFloorId;
-            if (floorId) {
-              const floor = sessionState.floors[floorId];
-              const dbSessionId = floor?.session?.id;
-              if (dbSessionId) {
-                updateClaudeSessionId(dbSessionId, claudeSessionId).catch((error: unknown) => {
-                  console.error("Failed to save Claude session ID:", error);
-                });
+            if (detectedSessionId) {
+              const sessionState = useSessionStore.getState();
+              const floorId = sessionState.activeFloorId;
+              if (floorId) {
+                const floor = sessionState.floors[floorId];
+                const dbSessionId = floor?.session?.id;
+                if (dbSessionId) {
+                  updateClaudeSessionId(dbSessionId, detectedSessionId).catch((error: unknown) => {
+                    console.error("Failed to save Claude session ID:", error);
+                  });
+                }
               }
             }
-          }
-        });
-        if (!mounted) { dataUnsub(); return; }
-        unlistenData = dataUnsub;
+          });
+          if (!mounted) { dataUnsub(); return; }
+          unlistenData = dataUnsub;
+        }
 
+        /* Exit event — always via Tauri events (one-shot signal, not streaming). */
         const exitUnsub = await listen<number>(`pty:exit:${ptyId}`, (event) => {
           if (!mounted) return;
           terminalRef.current?.writeln("");
@@ -169,6 +213,7 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
             `\x1b[33m--- Session ended (exit code: ${event.payload}) ---\x1b[0m`,
           );
           setHasExited(true);
+          hasChannelRef.current = false;
           const wsStore = useWorkspaceStore.getState();
           wsStore.updateWorkspaceStatus(workspace.slug, "idle");
           /* Remove stale PTY ID so reopening the tab triggers a fresh auto-spawn
@@ -213,9 +258,12 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
     };
   }, [ptyId, workspace.slug]);
 
-  /* Reset PTY error toast flag when the PTY changes */
+  /* Reset PTY error toast flag and channel flag when the PTY changes */
   useEffect(() => {
     ptyErrorShownRef.current = false;
+    if (!ptyId) {
+      hasChannelRef.current = false;
+    }
   }, [ptyId]);
 
   /** Forward user keystrokes to PTY stdin. */
