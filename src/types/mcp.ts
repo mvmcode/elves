@@ -23,3 +23,21 @@ export interface NewMcpServer {
   readonly env?: Record<string, string>;
   readonly scope?: McpScope;
 }
+
+/** A curated MCP server entry from the built-in catalog. */
+export interface McpCatalogItem {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly command: string;
+  readonly args: string[];
+  readonly category: string;
+  readonly sourceUrl: string | null;
+  readonly envKeys: string[];
+}
+
+/** Result from importing MCP servers from Claude Code config files. */
+export interface McpImportResult {
+  readonly imported: number;
+  readonly scanned: number;
+}

@@ -28,6 +28,68 @@ Everything is local. Projects, memory, sessions — all stored on your machine i
 
 ---
 
+<!-- Image viewer — click arrows or thumbnails to browse -->
+<div align="center">
+
+<a href="#img-workspaces"><img src="docs/screenshots/files-workspace-split.png" alt="ELVES — Files + Workspace split view" width="800" /></a>
+
+<br/>
+
+<table><tr>
+<td align="center"><a href="#img-workspaces"><img src="docs/screenshots/workspaces.png" width="120" alt="Workspaces" /><br/><sub>Workspaces</sub></a></td>
+<td align="center"><a href="#img-split"><img src="docs/screenshots/files-workspace-split.png" width="120" alt="Files + Terminal" /><br/><sub>Files + Terminal</sub></a></td>
+<td align="center"><a href="#img-insights"><img src="docs/screenshots/insights-overview.png" width="120" alt="Insights" /><br/><sub>Insights</sub></a></td>
+<td align="center"><a href="#img-analysis"><img src="docs/screenshots/insights-analysis.png" width="120" alt="Analysis" /><br/><sub>Analysis</sub></a></td>
+<td align="center"><a href="#img-skills"><img src="docs/screenshots/skill-catalog.png" width="120" alt="Skills" /><br/><sub>Skills</sub></a></td>
+<td align="center"><a href="#img-mcp"><img src="docs/screenshots/mcp-servers.png" width="120" alt="MCP Servers" /><br/><sub>MCP Servers</sub></a></td>
+</tr></table>
+
+</div>
+
+<details id="img-workspaces">
+<summary><strong>Workspaces</strong> — Task bar, workspace cards, worktree/direct modes</summary>
+<br/>
+<p align="center"><img src="docs/screenshots/workspaces.png" alt="Workspaces" width="800" /></p>
+<p align="center"><a href="#img-mcp">&larr; MCP Servers</a> &nbsp;&bull;&nbsp; <a href="#img-split">Files + Terminal &rarr;</a></p>
+</details>
+
+<details id="img-split">
+<summary><strong>Files + Workspace</strong> — Split pane with file explorer, code viewer, and live terminal</summary>
+<br/>
+<p align="center"><img src="docs/screenshots/files-workspace-split.png" alt="Files + Workspace Split" width="800" /></p>
+<p align="center"><a href="#img-workspaces">&larr; Workspaces</a> &nbsp;&bull;&nbsp; <a href="#img-insights">Insights &rarr;</a></p>
+</details>
+
+<details id="img-insights">
+<summary><strong>Insights Overview</strong> — Sessions, tokens, commits, model usage, project breakdown</summary>
+<br/>
+<p align="center"><img src="docs/screenshots/insights-overview.png" alt="Insights Overview" width="800" /></p>
+<p align="center"><a href="#img-split">&larr; Files + Terminal</a> &nbsp;&bull;&nbsp; <a href="#img-analysis">Analysis &rarr;</a></p>
+</details>
+
+<details id="img-analysis">
+<summary><strong>Insights Analysis</strong> — Outcomes, helpfulness, satisfaction, goals, friction points</summary>
+<br/>
+<p align="center"><img src="docs/screenshots/insights-analysis.png" alt="Insights Analysis" width="800" /></p>
+<p align="center"><a href="#img-insights">&larr; Insights</a> &nbsp;&bull;&nbsp; <a href="#img-skills">Skills &rarr;</a></p>
+</details>
+
+<details id="img-skills">
+<summary><strong>Skill Catalog</strong> — Searchable catalog with category tags, preview, and install</summary>
+<br/>
+<p align="center"><img src="docs/screenshots/skill-catalog.png" alt="Skill Catalog" width="800" /></p>
+<p align="center"><a href="#img-analysis">&larr; Analysis</a> &nbsp;&bull;&nbsp; <a href="#img-mcp">MCP Servers &rarr;</a></p>
+</details>
+
+<details id="img-mcp">
+<summary><strong>MCP Servers</strong> — Import from Claude, add servers, health checks, tool listing</summary>
+<br/>
+<p align="center"><img src="docs/screenshots/mcp-servers.png" alt="MCP Servers" width="800" /></p>
+<p align="center"><a href="#img-skills">&larr; Skills</a> &nbsp;&bull;&nbsp; <a href="#img-workspaces">Workspaces &rarr;</a></p>
+</details>
+
+---
+
 ## Features
 
 ### Worktree-First Workspaces
@@ -77,25 +139,6 @@ Four-tab analytics view built on real Claude Code telemetry. **Overview** shows 
 
 ### Session History & Replay
 Every session records a full event log with cost tracking and duration. Step through past sessions event-by-event, compare sessions side-by-side, resume completed sessions via `claude --resume`, or export as HTML replays.
-
----
-
-## Screenshots
-
-### Workspace Terminal View
-The main view — a live embedded terminal showing the agent's work in real-time. Header displays workspace slug, runtime badge, and diff summary. Footer has Stop, Ship It, and Remove controls.
-
-### Workspace Grid
-Overview of all active and idle workspaces as cards with status, diff counts, and branch names. Click to open the terminal view.
-
-### Memory Explorer
-Searchable timeline of project memories with FTS5 full-text search. Relevance scores decay over time and boost on access. Pin important memories to keep them permanent.
-
-### Skill Catalog
-Flat searchable catalog of all skills — custom, Claude Code slash commands, and project-local commands — with live preview and category filtering.
-
-### Settings
-Runtime defaults, model selection, permission modes, memory settings, theme picker, and custom system prompt configuration.
 
 ---
 

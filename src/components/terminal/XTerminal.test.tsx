@@ -14,6 +14,9 @@ const mockLoadAddon = vi.fn();
 const mockWrite = vi.fn();
 const mockWriteln = vi.fn();
 const mockScrollToBottom = vi.fn();
+const mockRefresh = vi.fn();
+const mockClearTextureAtlas = vi.fn();
+const mockFocus = vi.fn();
 
 /* Shared mutable buffer object so tests can change viewportY/baseY */
 const mockBuffer = { active: { viewportY: 0, baseY: 0 } };
@@ -29,6 +32,9 @@ vi.mock("@xterm/xterm", () => ({
     write: mockWrite,
     writeln: mockWriteln,
     scrollToBottom: mockScrollToBottom,
+    refresh: mockRefresh,
+    clearTextureAtlas: mockClearTextureAtlas,
+    focus: mockFocus,
     cols: 80,
     rows: 24,
     buffer: mockBuffer,
@@ -272,6 +278,33 @@ describe("XTerminal", () => {
       mockBuffer.active.baseY = 50;
       act(() => { scrollCallback?.(); });
       expect(screen.queryByTestId("scroll-to-bottom")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("visibility restore (fitImmediate)", () => {
+    it("triggers fit + refresh + clearTextureAtlas when elves:refit-terminals fires", () => {
+      render(<XTerminal onData={vi.fn()} onResize={vi.fn()} />);
+
+      /* Mock positive container dimensions so fit() doesn't early-return in jsdom */
+      const container = screen.getByTestId("xterminal-container");
+      Object.defineProperty(container, "offsetWidth", { value: 800, configurable: true });
+      Object.defineProperty(container, "offsetHeight", { value: 600, configurable: true });
+
+      /* Flush initial mount rAF (vi.useFakeTimers includes rAF), then clear mocks */
+      act(() => { vi.advanceTimersByTime(16); });
+      mockFit.mockClear();
+      mockRefresh.mockClear();
+      mockClearTextureAtlas.mockClear();
+
+      /* Dispatch the refit event and advance past the rAF queued by fitImmediate */
+      act(() => {
+        window.dispatchEvent(new Event("elves:refit-terminals"));
+        vi.advanceTimersByTime(16);
+      });
+
+      expect(mockFit).toHaveBeenCalledTimes(1);
+      expect(mockRefresh).toHaveBeenCalledWith(0, 23); /* rows - 1 = 24 - 1 */
+      expect(mockClearTextureAtlas).toHaveBeenCalledTimes(1);
     });
   });
 

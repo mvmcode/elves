@@ -467,7 +467,7 @@ export function ProjectWorkspace(): React.JSX.Element {
             className="flex flex-1 flex-col overflow-hidden"
             style={{ display: slug === activeWorkspaceSlug ? "flex" : "none" }}
           >
-            <WorkspaceTerminalView workspace={ws} />
+            <WorkspaceTerminalView workspace={ws} isActiveTab={slug === activeWorkspaceSlug} />
           </div>
         );
       })}

@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useProjectStore } from "@/stores/project";
 import { useSkillStore } from "@/stores/skills";
+import { useToastStore } from "@/stores/toast";
 import {
   listSkills,
   createSkill as invokeCreateSkill,
@@ -190,8 +191,11 @@ export function useSkillActions(): {
     try {
       await installSkill(itemId, activeProject?.path);
       await loadSkills();
+      useToastStore.getState().addToast({ message: "Skill installed successfully", variant: "success", duration: 3000 });
     } catch (err) {
       console.error("Failed to install skill:", err);
+      const message = err instanceof Error ? err.message : String(err);
+      useToastStore.getState().addToast({ message: `Install failed: ${message}`, variant: "error", duration: 5000 });
     }
   }, [loadSkills]);
 

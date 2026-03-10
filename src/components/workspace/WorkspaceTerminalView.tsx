@@ -35,6 +35,8 @@ async function resizePty(ptyId: string, cols: number, rows: number): Promise<voi
 interface WorkspaceTerminalViewProps {
   /** The workspace currently being viewed. */
   readonly workspace: WorkspaceInfo;
+  /** Whether this tab is the currently visible/active workspace tab. */
+  readonly isActiveTab: boolean;
 }
 
 /**
@@ -47,7 +49,7 @@ interface WorkspaceTerminalViewProps {
  * interactive Claude session in the workspace directory so the user always
  * gets a working terminal.
  */
-export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps): React.JSX.Element {
+export function WorkspaceTerminalView({ workspace, isActiveTab }: WorkspaceTerminalViewProps): React.JSX.Element {
   const teamEntries = useWorkspaceStore((s) => s.teamPtyEntries[workspace.slug]);
   const ptyId = useWorkspaceStore((s) => s.ptyIds[workspace.slug] ?? null);
 
@@ -63,6 +65,19 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
   const [spawnError, setSpawnError] = useState<string | null>(null);
   /** Guard against double-spawning during auto-spawn. */
   const autoSpawnAttempted = useRef(false);
+  /** Whether the current spawn is resuming a previous session. */
+  const [isResuming, setIsResuming] = useState(false);
+
+  /** When this tab becomes visible, force a repaint and focus the terminal.
+   * The 16ms delay ensures the display:flex layout has painted before measuring. */
+  useEffect(() => {
+    if (!isActiveTab) return;
+    const timerId = setTimeout(() => {
+      terminalRef.current?.forceRepaint();
+      terminalRef.current?.focus();
+    }, 16);
+    return () => clearTimeout(timerId);
+  }, [isActiveTab]);
 
   /* Team mode: render split terminal grid instead of single terminal. */
   if (teamEntries && teamEntries.length > 0) {
@@ -110,6 +125,7 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
             if (lastSession?.claudeSessionId) {
               spawnArgs = ["--resume", lastSession.claudeSessionId];
               existingDbSessionId = lastSession.id;
+              setIsResuming(true);
             }
           } catch {
             /* Failed to query last session — fall through to fresh spawn */
@@ -160,10 +176,12 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
           onOutput,
         });
         hasChannelRef.current = true;
+        setIsResuming(false);
         useWorkspaceStore.getState().setPtyId(workspace.slug, newPtyId);
         useWorkspaceStore.getState().updateWorkspaceStatus(workspace.slug, "active");
       } catch (error: unknown) {
         console.error("Failed to auto-spawn Claude session:", error);
+        setIsResuming(false);
         setSpawnError(String(error));
       }
     }
@@ -410,7 +428,7 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
               </>
             ) : (
               <p className="font-mono text-sm text-gray-500">
-                Starting Claude session...
+                {isResuming ? "Reconnecting to previous session..." : "Starting Claude session..."}
               </p>
             )}
           </div>
