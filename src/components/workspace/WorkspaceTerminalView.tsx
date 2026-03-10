@@ -16,7 +16,7 @@ import { PtyAgentDetector } from "@/lib/pty-agent-detector";
 import type { DetectedAgent, DetectedPermission } from "@/lib/pty-agent-detector";
 import { generateElf } from "@/lib/elf-names";
 import { playSound } from "@/lib/sounds";
-import { removeWorkspace as invokeRemoveWorkspace, completeSession, updateClaudeSessionId, getLastWorkspaceSession } from "@/lib/tauri";
+import { removeWorkspace as invokeRemoveWorkspace, completeSession, updateClaudeSessionId, getLastWorkspaceSession, createSession } from "@/lib/tauri";
 import { useToastStore } from "@/stores/toast";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -97,19 +97,37 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
 
     async function autoSpawn(): Promise<void> {
       try {
+        const projectId = useProjectStore.getState().activeProjectId;
+
         /* Check if there's a previous Claude session to resume.
          * If found, pass --resume <id> so the user picks up where they left off
          * instead of starting a blank session after app restart. */
         let spawnArgs: string[] = [];
-        const projectId = useProjectStore.getState().activeProjectId;
+        let existingDbSessionId: string | null = null;
         if (projectId) {
           try {
             const lastSession = await getLastWorkspaceSession(projectId, workspace.slug);
             if (lastSession?.claudeSessionId) {
               spawnArgs = ["--resume", lastSession.claudeSessionId];
+              existingDbSessionId = lastSession.id;
             }
           } catch {
             /* Failed to query last session — fall through to fresh spawn */
+          }
+        }
+
+        /* Create a DB session record so we can persist the Claude session ID.
+         * Auto-spawned PTYs don't go through startTask(), so without this there's
+         * no DB row to attach the Claude session ID to — breaking --resume on restart. */
+        let dbSessionId = existingDbSessionId;
+        if (!dbSessionId && projectId) {
+          try {
+            const isResume = spawnArgs.length > 0;
+            const task = isResume ? "Resumed session" : "Interactive session";
+            const dbSession = await createSession(projectId, task, "claude-code", workspace.slug);
+            dbSessionId = dbSession.id;
+          } catch (error: unknown) {
+            console.error("Failed to create DB session for auto-spawn:", error);
           }
         }
 
@@ -127,19 +145,11 @@ export function WorkspaceTerminalView({ workspace }: WorkspaceTerminalViewProps)
             setPendingPermission(perm);
           }
 
-          /* Save Claude session ID to DB when first detected — enables Resume in History. */
-          if (detectedSessionId) {
-            const sessionState = useSessionStore.getState();
-            const floorId = sessionState.activeFloorId;
-            if (floorId) {
-              const floor = sessionState.floors[floorId];
-              const dbSessionId = floor?.session?.id;
-              if (dbSessionId) {
-                updateClaudeSessionId(dbSessionId, detectedSessionId).catch((error: unknown) => {
-                  console.error("Failed to save Claude session ID:", error);
-                });
-              }
-            }
+          /* Save Claude session ID to DB when first detected — enables --resume on restart. */
+          if (detectedSessionId && dbSessionId) {
+            updateClaudeSessionId(dbSessionId, detectedSessionId).catch((error: unknown) => {
+              console.error("Failed to save Claude session ID:", error);
+            });
           }
         };
 
