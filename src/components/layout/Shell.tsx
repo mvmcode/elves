@@ -70,6 +70,23 @@ export function Shell(): React.JSX.Element {
     window.location.reload();
   }, [clearInitError]);
 
+  /* Dispatch refit event after view transitions so xterm.js FitAddon
+   * re-measures after display:none → flex layout settles.
+   * Double-rAF guarantees we run after the browser paints the layout change. */
+  useEffect(() => {
+    let raf1: number;
+    let raf2: number;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        window.dispatchEvent(new CustomEvent("elves:refit-terminals"));
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [activeView]);
+
   /* Subscribe to Tauri backend events (elf:event, session:completed) */
   useSessionEvents();
 
@@ -147,12 +164,18 @@ export function Shell(): React.JSX.Element {
 
       {/* Main area */}
       <main className="flex flex-1 flex-col overflow-hidden">
-        {/* View routing */}
-        {activeView === "workspace" ? (
-          <ProjectWorkspace />
-        ) : activeView === "files" ? (
-          <SplitPaneLayout />
-        ) : activeView === "memory" ? (
+        {/* Always-mounted workspace + optional file explorer.
+         * SplitPaneLayout wraps ProjectWorkspace so the terminal React instance
+         * is never remounted when switching between workspace/files views. */}
+        <div className="flex flex-1 flex-col overflow-hidden"
+             style={{ display: activeView === "workspace" || activeView === "files" ? "flex" : "none" }}>
+          <SplitPaneLayout showFileExplorer={activeView === "files"}>
+            <ProjectWorkspace />
+          </SplitPaneLayout>
+        </div>
+
+        {/* View routing for non-workspace views */}
+        {activeView === "memory" ? (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <MemoryExplorer
               onCreateMemory={handleCreateMemory}

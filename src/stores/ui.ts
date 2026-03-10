@@ -93,7 +93,7 @@ export const useUiStore = create<UiState>((set) => ({
   isFocusMode: false,
   isFileEditing: false,
   isFileDirty: false,
-  splitPaneMode: "split",
+  splitPaneMode: "files-only",
   splitPaneRatio: 0.5,
 
   setTaskBarFocused: (focused: boolean) => set({ isTaskBarFocused: focused }),

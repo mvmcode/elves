@@ -96,6 +96,22 @@ export async function updateClaudeSessionId(
   return invoke<boolean>("update_claude_session_id", { sessionId, claudeSessionId });
 }
 
+/** Create a new session record in the DB. Returns the created session row.
+ * Used by auto-spawn to persist Claude session IDs for --resume support. */
+export async function createSession(
+  projectId: string,
+  task: string,
+  runtime: string,
+  worktreeSlug?: string,
+): Promise<Session> {
+  return invoke<Session>("create_session", {
+    projectId,
+    task,
+    runtime,
+    worktreeSlug: worktreeSlug ?? null,
+  });
+}
+
 /** Get the most recent session for a project + workspace slug. Used for session resume on workspace cards. */
 export async function getLastWorkspaceSession(
   projectId: string,
