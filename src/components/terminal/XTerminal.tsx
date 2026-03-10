@@ -31,6 +31,10 @@ export interface XTerminalHandle {
   clear: () => void;
   /** Get the currently selected text in the terminal. */
   getSelection: () => string;
+  /** Focus the terminal so it receives keyboard input. */
+  focus: () => void;
+  /** Force an immediate refit and WebGL texture repaint (no debounce). */
+  forceRepaint: () => void;
 }
 
 interface XTerminalProps {
@@ -66,32 +70,6 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
     const webglRecoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isAtBottom, setIsAtBottom] = useState(true);
 
-    /** Expose write/writeln/search/scrollToBottom to parent via ref. */
-    useImperativeHandle(ref, () => ({
-      write(data: string): void {
-        terminalRef.current?.write(data);
-      },
-      writeln(line: string): void {
-        terminalRef.current?.writeln(line);
-      },
-      search(query: string): boolean {
-        return searchAddonRef.current?.findNext(query) ?? false;
-      },
-      clearSearch(): void {
-        searchAddonRef.current?.clearDecorations();
-      },
-      scrollToBottom(): void {
-        terminalRef.current?.scrollToBottom();
-        setIsAtBottom(true);
-      },
-      clear(): void {
-        terminalRef.current?.clear();
-      },
-      getSelection(): string {
-        return terminalRef.current?.getSelection() ?? "";
-      },
-    }), []);
-
     /** Fit the terminal to its container. Skips zero-dimension containers. */
     const fit = useCallback((): void => {
       if (fitAddonRef.current && containerRef.current) {
@@ -122,6 +100,60 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
         });
       }, RESIZE_DEBOUNCE_MS);
     }, [fit]);
+
+    /**
+     * Immediate fit — skips debounce and forces a WebGL texture repaint.
+     * Used after display:none → display:flex transitions where the WebGL renderer
+     * has a stale GPU texture. Cancels any pending debounced fit to prevent double-fit races.
+     */
+    const fitImmediate = useCallback((): void => {
+      if (debounceTimerRef.current !== null) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      requestAnimationFrame(() => {
+        fit();
+        const terminal = terminalRef.current;
+        if (terminal) {
+          terminal.refresh(0, terminal.rows - 1);
+          if ("clearTextureAtlas" in terminal) {
+            (terminal as Terminal & { clearTextureAtlas: () => void }).clearTextureAtlas();
+          }
+        }
+      });
+    }, [fit]);
+
+    /** Expose write/writeln/search/scrollToBottom/focus/forceRepaint to parent via ref. */
+    useImperativeHandle(ref, () => ({
+      write(data: string): void {
+        terminalRef.current?.write(data);
+      },
+      writeln(line: string): void {
+        terminalRef.current?.writeln(line);
+      },
+      search(query: string): boolean {
+        return searchAddonRef.current?.findNext(query) ?? false;
+      },
+      clearSearch(): void {
+        searchAddonRef.current?.clearDecorations();
+      },
+      scrollToBottom(): void {
+        terminalRef.current?.scrollToBottom();
+        setIsAtBottom(true);
+      },
+      clear(): void {
+        terminalRef.current?.clear();
+      },
+      getSelection(): string {
+        return terminalRef.current?.getSelection() ?? "";
+      },
+      focus(): void {
+        terminalRef.current?.focus();
+      },
+      forceRepaint(): void {
+        fitImmediate();
+      },
+    }), [fitImmediate]);
 
     /** Handle scroll-to-bottom button click. */
     const handleScrollToBottom = useCallback((): void => {
@@ -236,10 +268,11 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
       });
       resizeObserver.observe(container);
 
-      /* Re-fit when container transitions from hidden to visible */
+      /* Re-fit when container transitions from hidden to visible — uses fitImmediate
+       * to skip debounce and force WebGL texture repaint after display:none → flex. */
       const intersectionObserver = new IntersectionObserver(([entry]) => {
         if (entry && entry.intersectionRatio > 0) {
-          scheduleFit();
+          fitImmediate();
         }
       });
       intersectionObserver.observe(container);
@@ -253,9 +286,10 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
       const handleWindowFocus = (): void => {
         scheduleFit();
       };
-      /* Re-fit when Shell dispatches view transition event (display:none → flex) */
+      /* Re-fit when Shell dispatches view transition event (display:none → flex) —
+       * uses fitImmediate to force WebGL repaint without debounce delay. */
       const handleRefit = (): void => {
-        scheduleFit();
+        fitImmediate();
       };
       document.addEventListener("visibilitychange", handleVisibilityChange);
       window.addEventListener("focus", handleWindowFocus);
@@ -284,7 +318,7 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
         fitAddonRef.current = null;
         searchAddonRef.current = null;
       };
-    }, [onData, onResize, fit, scheduleFit]);
+    }, [onData, onResize, fit, scheduleFit, fitImmediate]);
 
     return (
       <div className="relative h-full w-full" data-testid="xterminal-wrapper">
