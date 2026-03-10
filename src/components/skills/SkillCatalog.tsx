@@ -30,7 +30,13 @@ export function SkillCatalog(): React.JSX.Element {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    void handleLoadCatalog();
+    void handleLoadCatalog().then(() => {
+      const items = useSkillStore.getState().catalogItems;
+      const refreshing = useSkillStore.getState().isRefreshingCatalog;
+      if (items.length === 0 && !refreshing) {
+        void handleRefreshCatalog();
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -236,8 +242,8 @@ export function SkillCatalog(): React.JSX.Element {
                   <div className="flex flex-col gap-2">
                     {githubResults.map((result) => (
                       <button
-                        key={result.repoUrl}
-                        onClick={() => void openUrl(result.repoUrl)}
+                        key={result.url}
+                        onClick={() => void openUrl(result.url)}
                         className={[
                           "flex flex-col gap-1 border-[2px] border-border/60 bg-white p-3 text-left",
                           "transition-all duration-100 cursor-pointer",
@@ -245,7 +251,7 @@ export function SkillCatalog(): React.JSX.Element {
                         ].join(" ")}
                       >
                         <div className="flex items-center justify-between">
-                          <p className="font-body text-sm font-bold truncate">{result.name}</p>
+                          <p className="font-body text-sm font-bold truncate">{result.repoName}</p>
                           <div className="flex items-center gap-2 shrink-0">
                             {result.stars > 0 && (
                               <span className="font-mono text-xs text-text-light/50">{result.stars.toLocaleString()} ★</span>

@@ -1,4 +1,4 @@
-/* McpManager — neo-brutalist card grid for managing MCP server configurations. */
+/* McpManager — two-tab MCP management view: My Servers + Catalog. */
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useMcpStore } from "@/stores/mcp";
@@ -11,17 +11,71 @@ import { Button } from "@/components/shared/Button";
 import { Badge } from "@/components/shared/Badge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { getEmptyState } from "@/lib/funny-copy";
+import { McpCatalog } from "./McpCatalog";
 import type { McpServer } from "@/types/mcp";
 import type { McpSearchResult } from "@/types/search";
 
+type McpTab = "my-servers" | "catalog";
+
 /**
- * MCP server manager with a card grid and add server form.
- * Each card shows server name, command, status indicator, toggle switch, and actions.
+ * Top-level MCP management container with two tabs:
+ * - "My Servers": existing server grid with add form, import, and search
+ * - "Catalog": curated MCP server catalog with instant filtering and npm fallback
  */
 export function McpManager(): React.JSX.Element {
   const defaultRuntime = useAppStore((s) => s.defaultRuntime);
   const controlConfig = getRuntimeControlConfig(defaultRuntime);
 
+  const [activeTab, setActiveTab] = useState<McpTab>("my-servers");
+
+  if (!controlConfig.supportsMcp) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8" data-testid="mcp-manager-unsupported">
+        <EmptyState
+          message="MCP for Codex — Coming Soon"
+          submessage="Codex now supports MCP servers, and ELVES integration is on the way. Switch to Claude Code to use MCP now."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full flex-col" data-testid="mcp-manager">
+      {/* Tab bar */}
+      <div className="flex border-b-token-normal border-border">
+        {(["my-servers", "catalog"] as const).map((tab) => {
+          const isActive = activeTab === tab;
+          const label = tab === "my-servers" ? "My Servers" : "Catalog";
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={[
+                "cursor-pointer px-6 py-3 font-display text-sm font-bold uppercase tracking-wide",
+                "border-[2px] border-border border-b-[3px] transition-all duration-100",
+                isActive
+                  ? "bg-accent text-black border-b-accent shadow-brutal-sm"
+                  : "bg-surface-elevated text-text-light hover:bg-accent-light border-b-transparent",
+              ].join(" ")}
+              data-testid={`mcp-tab-${tab}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+        <div className="flex-1 border-b-[3px] border-b-transparent" />
+      </div>
+
+      {/* Tab content */}
+      <div className="flex flex-1 overflow-hidden">
+        {activeTab === "my-servers" ? <MyServersTab /> : <McpCatalog />}
+      </div>
+    </div>
+  );
+}
+
+/** My Servers tab — card grid with add form, import, search, and server management. */
+function MyServersTab(): React.JSX.Element {
   const servers = useMcpStore((s) => s.servers);
   const isLoading = useMcpStore((s) => s.isLoading);
   const searchQuery = useMcpStore((s) => s.searchQuery);
@@ -53,9 +107,10 @@ export function McpManager(): React.JSX.Element {
   const [toolsExpanded, setToolsExpanded] = useState<Record<string, boolean>>({});
   const [toolsLoading, setToolsLoading] = useState<Record<string, boolean>>({});
   const [searchElapsed, setSearchElapsed] = useState(0);
+  const [importFeedback, setImportFeedback] = useState<string | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  /** Derive installed names from actual server list — not local state. */
+  /** Derive installed names from actual server list. */
   const installedNames = useMemo(() => {
     const names = new Set<string>();
     for (const server of servers) {
@@ -65,7 +120,7 @@ export function McpManager(): React.JSX.Element {
     return names;
   }, [servers]);
 
-  /** Clear search state when this component unmounts (tab switch). */
+  /** Clear search state on unmount. */
   useEffect(() => {
     return () => {
       clearSearch();
@@ -140,7 +195,15 @@ export function McpManager(): React.JSX.Element {
   }, [toolsData]);
 
   const handleImport = useCallback((): void => {
-    void handleImportFromClaude();
+    setImportFeedback(null);
+    void (async () => {
+      const result = await handleImportFromClaude();
+      if (result.imported > 0) {
+        setImportFeedback(`Imported ${result.imported} server${result.imported === 1 ? "" : "s"}`);
+      } else {
+        setImportFeedback(`No new servers found (scanned ${result.scanned} file${result.scanned === 1 ? "" : "s"})`);
+      }
+    })();
   }, [handleImportFromClaude]);
 
   const handleSearchSubmit = useCallback((): void => {
@@ -166,7 +229,6 @@ export function McpManager(): React.JSX.Element {
     [handleInstallFromSearch],
   );
 
-  /** Check if a search result is already installed by matching name or command. */
   const isResultInstalled = useCallback(
     (result: McpSearchResult): boolean => {
       return installedNames.has(result.name) || installedNames.has(result.command);
@@ -175,17 +237,6 @@ export function McpManager(): React.JSX.Element {
   );
 
   const hasSearchContent = searchResults.length > 0 || searchError !== null;
-
-  if (!controlConfig.supportsMcp) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-8" data-testid="mcp-manager-unsupported">
-        <EmptyState
-          message="MCP for Codex — Coming Soon"
-          submessage="Codex now supports MCP servers, and ELVES integration is on the way. Switch to Claude Code to use MCP now."
-        />
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (
@@ -196,7 +247,7 @@ export function McpManager(): React.JSX.Element {
   }
 
   return (
-    <div className="p-4" data-testid="mcp-manager">
+    <div className="flex-1 overflow-y-auto p-4">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <h2 className="font-display text-2xl text-heading tracking-tight">
@@ -212,6 +263,22 @@ export function McpManager(): React.JSX.Element {
         </div>
       </div>
 
+      {/* Import feedback banner */}
+      {importFeedback && (
+        <div
+          className="mb-4 flex items-center justify-between border-token-normal border-border bg-accent-light rounded-token-md px-4 py-3"
+          data-testid="mcp-import-feedback"
+        >
+          <span className="font-body text-sm font-bold">{importFeedback}</span>
+          <button
+            onClick={() => setImportFeedback(null)}
+            className="font-body text-xs font-bold text-text-light/60 hover:text-text-light"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Search bar */}
       <div className="mb-4 flex gap-2" data-testid="mcp-search">
         <div className="relative flex-1">
@@ -225,14 +292,13 @@ export function McpManager(): React.JSX.Element {
             disabled={isSearching}
             data-testid="mcp-search-input"
           />
-          {/* Clear input button */}
           {(searchQuery || hasSearchContent) && !isSearching && (
             <button
               onClick={clearSearch}
               className="absolute right-2 top-1/2 -translate-y-1/2 font-body text-lg text-text-light/40 hover:text-text-light"
               title="Clear search"
             >
-              ×
+              x
             </button>
           )}
         </div>
@@ -416,7 +482,6 @@ export function McpManager(): React.JSX.Element {
                 {/* Card header */}
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    {/* Status dot */}
                     <span
                       className="inline-block h-3 w-3 border-token-thin border-border"
                       style={{
@@ -444,7 +509,6 @@ export function McpManager(): React.JSX.Element {
 
                 {/* Toggle + actions */}
                 <div className="flex items-center gap-2">
-                  {/* Toggle switch */}
                   <button
                     onClick={() => handleToggleServer(server.id, !server.enabled)}
                     className={[
@@ -476,7 +540,7 @@ export function McpManager(): React.JSX.Element {
                     data-testid="mcp-show-tools"
                   >
                     {toolsLoading[server.id]
-                      ? "…"
+                      ? "..."
                       : toolsExpanded[server.id]
                         ? "Hide Tools"
                         : "Show Tools"}
@@ -487,7 +551,7 @@ export function McpManager(): React.JSX.Element {
                     className="ml-auto px-2 py-1 text-xs"
                     onClick={() => handleDeleteServer(server.id)}
                   >
-                    ×
+                    x
                   </Button>
                 </div>
 

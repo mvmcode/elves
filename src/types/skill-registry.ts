@@ -41,10 +41,11 @@ export interface CatalogSkillItem {
 /** Information about an available upstream update for an installed skill. */
 export interface SkillUpdateInfo {
   readonly skillId: string;
+  readonly skillName: string;
   readonly sourceItemId: string;
-  readonly currentHash: string;
-  readonly latestHash: string;
-  readonly changelog: string | null;
+  readonly currentCommit: string | null;
+  readonly latestCommit: string;
+  readonly sourceRepoName: string;
 }
 
 /** Grouped search results from the V2 unified search. */
@@ -65,9 +66,9 @@ export interface SkillSearchResultV2Item {
 
 /** A GitHub search result for skill repositories. */
 export interface RemoteSkillResult {
-  readonly name: string;
-  readonly description: string | null;
-  readonly repoUrl: string;
+  readonly repoName: string;
+  readonly description: string;
+  readonly url: string;
   readonly stars: number;
-  readonly author: string | null;
+  readonly author: string;
 }

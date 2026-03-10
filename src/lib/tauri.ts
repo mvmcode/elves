@@ -7,7 +7,7 @@ import type { Project } from "@/types/project";
 import type { Session, TaskPlan } from "@/types/session";
 import type { MemoryEntry, ExtractionResult } from "@/types/memory";
 import type { Skill } from "@/types/skill";
-import type { McpServer } from "@/types/mcp";
+import type { McpServer, McpCatalogItem, McpImportResult } from "@/types/mcp";
 import type { Template } from "@/types/template";
 import type { ClaudeDiscovery, ClaudeSpawnOptions } from "@/types/claude";
 import type { FileEntry } from "@/types/filesystem";
@@ -364,9 +364,9 @@ export async function listSkillSources(): Promise<SkillSource[]> {
   return invoke<SkillSource[]>("list_skill_sources");
 }
 
-/** Refresh the skill catalog — re-fetches all curated sources. */
-export async function refreshSkillCatalog(): Promise<boolean> {
-  return invoke<boolean>("refresh_skill_catalog");
+/** Refresh the skill catalog — re-fetches all curated sources. Returns updated source list. */
+export async function refreshSkillCatalog(): Promise<SkillSource[]> {
+  return invoke<SkillSource[]>("refresh_skill_catalog");
 }
 
 /** Preview a single skill file's content from a catalog source. */
@@ -428,9 +428,14 @@ export async function healthCheckMcp(id: string): Promise<boolean> {
   return invoke<boolean>("health_check_mcp", { id });
 }
 
-/** Import MCP servers from Claude Code config files. Returns count imported. */
-export async function importMcpFromClaude(): Promise<number> {
-  return invoke<number>("import_mcp_from_claude");
+/** Import MCP servers from all Claude Code config files. Returns import count and files scanned. */
+export async function importMcpFromClaude(): Promise<McpImportResult> {
+  return invoke<McpImportResult>("import_mcp_from_claude");
+}
+
+/** Load the curated MCP server catalog. Returns a hardcoded list — no network dependency. */
+export async function loadMcpCatalog(): Promise<McpCatalogItem[]> {
+  return invoke<McpCatalogItem[]>("load_mcp_catalog");
 }
 
 /** Delete an MCP server. */

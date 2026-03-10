@@ -12,8 +12,10 @@ import {
   importMcpFromClaude as invokeImportMcp,
   deleteMcpServer as invokeDeleteMcpServer,
   searchMcpServers as invokeSearchMcp,
+  loadMcpCatalog as invokeLoadCatalog,
 } from "@/lib/tauri";
 import type { McpSearchResult } from "@/types/search";
+import type { McpImportResult } from "@/types/mcp";
 
 /** Payload shape emitted by the Rust backend for search progress. */
 interface SearchProgressPayload {
@@ -33,10 +35,11 @@ export function useMcpActions(): {
   handleAddServer: (name: string, command: string, args?: string, env?: string, scope?: string) => Promise<void>;
   handleToggleServer: (id: string, enabled: boolean) => void;
   handleHealthCheck: (id: string) => Promise<boolean>;
-  handleImportFromClaude: () => Promise<number>;
+  handleImportFromClaude: () => Promise<McpImportResult>;
   handleDeleteServer: (id: string) => void;
   handleSearch: (query: string) => Promise<void>;
   handleInstallFromSearch: (result: McpSearchResult) => Promise<void>;
+  handleLoadCatalog: () => Promise<void>;
 } {
   const setServers = useMcpStore((s) => s.setServers);
   const addServer = useMcpStore((s) => s.addServer);
@@ -47,6 +50,7 @@ export function useMcpActions(): {
   const setSearching = useMcpStore((s) => s.setSearching);
   const setSearchPhase = useMcpStore((s) => s.setSearchPhase);
   const setSearchError = useMcpStore((s) => s.setSearchError);
+  const setCatalogItems = useMcpStore((s) => s.setCatalogItems);
 
   /** Fetch all MCP servers from the backend. */
   const loadServers = useCallback(async (): Promise<void> => {
@@ -117,17 +121,17 @@ export function useMcpActions(): {
     [updateServer],
   );
 
-  /** Import MCP servers from Claude Code config. Returns count imported. */
-  const handleImportFromClaude = useCallback(async (): Promise<number> => {
+  /** Import MCP servers from Claude Code config. Returns import result with count and files scanned. */
+  const handleImportFromClaude = useCallback(async (): Promise<McpImportResult> => {
     try {
-      const count = await invokeImportMcp();
-      if (count > 0) {
+      const result = await invokeImportMcp();
+      if (result.imported > 0) {
         await loadServers();
       }
-      return count;
+      return result;
     } catch (error) {
       console.error("Failed to import MCP servers:", error);
-      return 0;
+      return { imported: 0, scanned: 0 };
     }
   }, [loadServers]);
 
@@ -191,6 +195,16 @@ export function useMcpActions(): {
     [handleAddServer],
   );
 
+  /** Load the curated MCP catalog from the backend. */
+  const handleLoadCatalog = useCallback(async (): Promise<void> => {
+    try {
+      const items = await invokeLoadCatalog();
+      setCatalogItems(items);
+    } catch (error) {
+      console.error("Failed to load MCP catalog:", error);
+    }
+  }, [setCatalogItems]);
+
   return {
     loadServers,
     handleAddServer,
@@ -200,5 +214,6 @@ export function useMcpActions(): {
     handleDeleteServer,
     handleSearch,
     handleInstallFromSearch,
+    handleLoadCatalog,
   };
 }

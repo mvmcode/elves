@@ -1,4 +1,4 @@
-/* Tests for McpManager — verifies card grid, toggle, add form, and empty state. */
+/* Tests for McpManager — verifies two-tab layout, card grid, toggle, add form, import feedback, and empty state. */
 
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -9,6 +9,8 @@ import type { McpServer } from "@/types/mcp";
 /* Mock MCP actions to prevent IPC calls */
 const mockToggle = vi.fn();
 const mockDelete = vi.fn();
+const mockImport = vi.fn().mockResolvedValue({ imported: 0, scanned: 2 });
+const mockLoadCatalog = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/hooks/useMcpActions", () => ({
   useMcpActions: () => ({
@@ -16,8 +18,11 @@ vi.mock("@/hooks/useMcpActions", () => ({
     handleAddServer: vi.fn(),
     handleToggleServer: mockToggle,
     handleHealthCheck: vi.fn().mockResolvedValue(true),
-    handleImportFromClaude: vi.fn().mockResolvedValue(0),
+    handleImportFromClaude: mockImport,
     handleDeleteServer: mockDelete,
+    handleSearch: vi.fn(),
+    handleInstallFromSearch: vi.fn(),
+    handleLoadCatalog: mockLoadCatalog,
   }),
 }));
 
@@ -40,11 +45,31 @@ describe("McpManager", () => {
     useMcpStore.setState({ servers: [], isLoading: false });
     mockToggle.mockClear();
     mockDelete.mockClear();
+    mockImport.mockClear();
+    mockImport.mockResolvedValue({ imported: 0, scanned: 2 });
   });
 
   it("renders the MCP manager container", () => {
     render(<McpManager />);
     expect(screen.getByTestId("mcp-manager")).toBeInTheDocument();
+  });
+
+  it("renders My Servers and Catalog tabs", () => {
+    render(<McpManager />);
+    expect(screen.getByTestId("mcp-tab-my-servers")).toBeInTheDocument();
+    expect(screen.getByTestId("mcp-tab-catalog")).toBeInTheDocument();
+  });
+
+  it("shows My Servers tab as active by default", () => {
+    render(<McpManager />);
+    const myServersTab = screen.getByTestId("mcp-tab-my-servers");
+    expect(myServersTab.className).toContain("bg-accent");
+  });
+
+  it("switches to Catalog tab when clicked", () => {
+    render(<McpManager />);
+    fireEvent.click(screen.getByTestId("mcp-tab-catalog"));
+    expect(screen.getByTestId("mcp-catalog")).toBeInTheDocument();
   });
 
   it("shows empty state when no servers configured", () => {
@@ -109,7 +134,7 @@ describe("McpManager", () => {
   it("shows delete button on cards", () => {
     useMcpStore.setState({ servers: [createTestServer()] });
     render(<McpManager />);
-    expect(screen.getByText("×")).toBeInTheDocument();
+    expect(screen.getByText("x")).toBeInTheDocument();
   });
 
   it("opens add form when + Add Server is clicked", () => {

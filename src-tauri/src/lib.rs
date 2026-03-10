@@ -209,6 +209,7 @@ pub fn run() {
             commands::mcp::health_check_mcp,
             commands::mcp::delete_mcp_server,
             commands::mcp::import_mcp_from_claude,
+            commands::mcp::load_mcp_catalog,
             commands::mcp::list_mcp_tools,
             commands::templates::list_templates,
             commands::templates::save_template,

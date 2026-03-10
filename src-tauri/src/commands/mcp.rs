@@ -89,34 +89,60 @@ pub fn delete_mcp_server(
         .map_err(|e| format!("Database error: {e}"))
 }
 
-/// Import MCP servers from Claude Code's settings files (~/.claude/settings.json
-/// and ~/.claude/settings.local.json). Reads the `mcpServers` key and inserts any
-/// servers not already present in the ELVES database. Returns count of servers imported.
+/// Result returned from MCP import so the frontend can show feedback.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportResult {
+    pub imported: usize,
+    pub scanned: usize,
+}
+
+/// Import MCP servers from all Claude Code settings files — global settings
+/// (~/.claude/settings.json, ~/.claude/settings.local.json) and project-level
+/// settings (~/.claude/projects/*/settings.json, ~/.claude/projects/*/settings.local.json).
+/// Deduplicates by server **name** only. Returns import count and files scanned.
 #[tauri::command]
 pub fn import_mcp_from_claude(
     db: State<'_, DbState>,
-) -> Result<usize, String> {
+) -> Result<ImportResult, String> {
     let home = dirs::home_dir().ok_or("Could not determine home directory")?;
-    let settings_paths = [
-        home.join(".claude").join("settings.json"),
-        home.join(".claude").join("settings.local.json"),
+    let claude_dir = home.join(".claude");
+
+    // Collect all settings paths: global + project-level
+    let mut settings_paths = vec![
+        claude_dir.join("settings.json"),
+        claude_dir.join("settings.local.json"),
     ];
+
+    // Scan ~/.claude/projects/*/settings.json and settings.local.json
+    let projects_dir = claude_dir.join("projects");
+    if let Ok(entries) = std::fs::read_dir(&projects_dir) {
+        for entry in entries.flatten() {
+            if entry.path().is_dir() {
+                settings_paths.push(entry.path().join("settings.json"));
+                settings_paths.push(entry.path().join("settings.local.json"));
+            }
+        }
+    }
 
     let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
 
-    // Collect existing server names to skip duplicates
+    // Collect existing server names to skip duplicates (name-only dedup)
     let existing = db::mcp::list_mcp_servers(&conn)
         .map_err(|e| format!("Database error: {e}"))?;
-    let existing_names: std::collections::HashSet<String> = existing.iter().map(|s| s.name.clone()).collect();
-    let existing_commands: std::collections::HashSet<String> = existing.iter().map(|s| s.command.clone()).collect();
+    let mut existing_names: std::collections::HashSet<String> =
+        existing.iter().map(|s| s.name.clone()).collect();
 
     let mut imported = 0usize;
+    let mut scanned = 0usize;
 
     for path in &settings_paths {
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
             Err(_) => continue,
         };
+        scanned += 1;
+
         let json: serde_json::Value = match serde_json::from_str(&content) {
             Ok(v) => v,
             Err(_) => continue,
@@ -131,7 +157,7 @@ pub fn import_mcp_from_claude(
                 continue;
             }
             let command = config.get("command").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            if command.is_empty() || existing_commands.contains(&command) {
+            if command.is_empty() {
                 continue;
             }
 
@@ -145,13 +171,237 @@ pub fn import_mcp_from_claude(
 
             let id = uuid::Uuid::new_v4().to_string();
             match db::mcp::insert_mcp_server(&conn, &id, name, &command, &args_json, &env_json, "global") {
-                Ok(_) => imported += 1,
+                Ok(_) => {
+                    imported += 1;
+                    existing_names.insert(name.clone());
+                }
                 Err(e) => log::warn!("Failed to import MCP server '{name}': {e}"),
             }
         }
     }
 
-    Ok(imported)
+    Ok(ImportResult { imported, scanned })
+}
+
+/// A curated MCP server entry for the built-in catalog.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct McpCatalogItem {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub category: String,
+    pub source_url: Option<String>,
+    pub env_keys: Vec<String>,
+}
+
+/// Return a curated catalog of popular MCP servers. No network dependency — hardcoded list.
+#[tauri::command]
+pub fn load_mcp_catalog() -> Vec<McpCatalogItem> {
+    vec![
+        McpCatalogItem {
+            id: "catalog-github".into(),
+            name: "GitHub".into(),
+            description: "Repository management, issues, PRs, and code search".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-github".into()],
+            category: "Developer Tools".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/github".into()),
+            env_keys: vec!["GITHUB_PERSONAL_ACCESS_TOKEN".into()],
+        },
+        McpCatalogItem {
+            id: "catalog-filesystem".into(),
+            name: "Filesystem".into(),
+            description: "Read, write, and manage local files and directories".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-filesystem".into()],
+            category: "Developer Tools".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem".into()),
+            env_keys: vec![],
+        },
+        McpCatalogItem {
+            id: "catalog-postgresql".into(),
+            name: "PostgreSQL".into(),
+            description: "Query and manage PostgreSQL databases".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-postgres".into()],
+            category: "Databases".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/postgres".into()),
+            env_keys: vec!["POSTGRES_CONNECTION_STRING".into()],
+        },
+        McpCatalogItem {
+            id: "catalog-sqlite".into(),
+            name: "SQLite".into(),
+            description: "Query and manage SQLite databases".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-sqlite".into()],
+            category: "Databases".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/sqlite".into()),
+            env_keys: vec![],
+        },
+        McpCatalogItem {
+            id: "catalog-brave-search".into(),
+            name: "Brave Search".into(),
+            description: "Web search powered by the Brave Search API".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-brave-search".into()],
+            category: "Search".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search".into()),
+            env_keys: vec!["BRAVE_API_KEY".into()],
+        },
+        McpCatalogItem {
+            id: "catalog-puppeteer".into(),
+            name: "Puppeteer".into(),
+            description: "Browser automation for web scraping and testing".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-puppeteer".into()],
+            category: "Browser".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/puppeteer".into()),
+            env_keys: vec![],
+        },
+        McpCatalogItem {
+            id: "catalog-slack".into(),
+            name: "Slack".into(),
+            description: "Send messages, manage channels, and search Slack workspace".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-slack".into()],
+            category: "Communication".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/slack".into()),
+            env_keys: vec!["SLACK_BOT_TOKEN".into()],
+        },
+        McpCatalogItem {
+            id: "catalog-google-drive".into(),
+            name: "Google Drive".into(),
+            description: "Access and manage files in Google Drive".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-gdrive".into()],
+            category: "Productivity".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/gdrive".into()),
+            env_keys: vec!["GOOGLE_CLIENT_ID".into(), "GOOGLE_CLIENT_SECRET".into()],
+        },
+        McpCatalogItem {
+            id: "catalog-google-maps".into(),
+            name: "Google Maps".into(),
+            description: "Geocoding, directions, and place search via Google Maps API".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-google-maps".into()],
+            category: "Search".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/google-maps".into()),
+            env_keys: vec!["GOOGLE_MAPS_API_KEY".into()],
+        },
+        McpCatalogItem {
+            id: "catalog-memory".into(),
+            name: "Memory".into(),
+            description: "Persistent key-value memory for AI conversations".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-memory".into()],
+            category: "AI Tools".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/memory".into()),
+            env_keys: vec![],
+        },
+        McpCatalogItem {
+            id: "catalog-sequential-thinking".into(),
+            name: "Sequential Thinking".into(),
+            description: "Step-by-step reasoning and thought chain management".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-sequential-thinking".into()],
+            category: "AI Tools".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/sequential-thinking".into()),
+            env_keys: vec![],
+        },
+        McpCatalogItem {
+            id: "catalog-fetch".into(),
+            name: "Fetch".into(),
+            description: "Make HTTP requests and fetch web content".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-fetch".into()],
+            category: "Developer Tools".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/fetch".into()),
+            env_keys: vec![],
+        },
+        McpCatalogItem {
+            id: "catalog-sentry".into(),
+            name: "Sentry".into(),
+            description: "Query error tracking data from Sentry".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-sentry".into()],
+            category: "Developer Tools".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/sentry".into()),
+            env_keys: vec!["SENTRY_AUTH_TOKEN".into()],
+        },
+        McpCatalogItem {
+            id: "catalog-linear".into(),
+            name: "Linear".into(),
+            description: "Manage issues, projects, and teams in Linear".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-linear".into()],
+            category: "Project Management".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/linear".into()),
+            env_keys: vec!["LINEAR_API_KEY".into()],
+        },
+        McpCatalogItem {
+            id: "catalog-notion".into(),
+            name: "Notion".into(),
+            description: "Read and manage Notion pages and databases".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-notion".into()],
+            category: "Productivity".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/notion".into()),
+            env_keys: vec!["NOTION_API_KEY".into()],
+        },
+        McpCatalogItem {
+            id: "catalog-supabase".into(),
+            name: "Supabase".into(),
+            description: "Manage Supabase projects, databases, and storage".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "supabase-mcp-server".into()],
+            category: "Databases".into(),
+            source_url: Some("https://github.com/supabase/mcp-server".into()),
+            env_keys: vec!["SUPABASE_ACCESS_TOKEN".into()],
+        },
+        McpCatalogItem {
+            id: "catalog-figma".into(),
+            name: "Figma".into(),
+            description: "Read design files, components, and styles from Figma".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "figma-mcp-server".into()],
+            category: "Design".into(),
+            source_url: Some("https://github.com/nichochar/figma-mcp-server".into()),
+            env_keys: vec!["FIGMA_ACCESS_TOKEN".into()],
+        },
+        McpCatalogItem {
+            id: "catalog-playwright".into(),
+            name: "Playwright".into(),
+            description: "Browser automation and end-to-end testing with Playwright".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@playwright/mcp@latest".into()],
+            category: "Browser".into(),
+            source_url: Some("https://github.com/nichochar/playwright-mcp-server".into()),
+            env_keys: vec![],
+        },
+        McpCatalogItem {
+            id: "catalog-redis".into(),
+            name: "Redis".into(),
+            description: "Manage keys, data structures, and queries in Redis".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "@modelcontextprotocol/server-redis".into()],
+            category: "Databases".into(),
+            source_url: Some("https://github.com/modelcontextprotocol/servers/tree/main/src/redis".into()),
+            env_keys: vec!["REDIS_URL".into()],
+        },
+        McpCatalogItem {
+            id: "catalog-exa".into(),
+            name: "Exa".into(),
+            description: "Neural search engine for high-quality web results".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "exa-mcp-server".into()],
+            category: "Search".into(),
+            source_url: Some("https://github.com/nichochar/exa-mcp-server".into()),
+            env_keys: vec!["EXA_API_KEY".into()],
+        },
+    ]
 }
 
 /// Spawn an MCP server, perform the JSON-RPC initialize + tools/list handshake,

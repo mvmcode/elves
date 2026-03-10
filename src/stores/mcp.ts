@@ -1,7 +1,7 @@
 /* MCP store — client-side state for MCP server management UI. */
 
 import { create } from "zustand";
-import type { McpServer } from "@/types/mcp";
+import type { McpServer, McpCatalogItem } from "@/types/mcp";
 import type { McpSearchResult } from "@/types/search";
 
 /** Search phases emitted by the Rust backend during a registry search. */
@@ -22,6 +22,12 @@ interface McpState {
   readonly searchPhase: SearchPhase;
   /** Error message from a failed search */
   readonly searchError: string | null;
+  /** Curated MCP catalog items loaded from the backend */
+  readonly catalogItems: readonly McpCatalogItem[];
+  /** Current search query for catalog filtering */
+  readonly catalogSearchQuery: string;
+  /** Active category filter for catalog view */
+  readonly catalogCategoryFilter: string | null;
 
   /** Replace the full server list */
   setServers: (servers: readonly McpServer[]) => void;
@@ -45,6 +51,12 @@ interface McpState {
   setSearchError: (error: string | null) => void;
   /** Reset all search state — query, results, error, phase */
   clearSearch: () => void;
+  /** Set catalog items from the backend */
+  setCatalogItems: (items: readonly McpCatalogItem[]) => void;
+  /** Set catalog search query for local filtering */
+  setCatalogSearchQuery: (query: string) => void;
+  /** Set or clear the active catalog category filter */
+  setCatalogCategoryFilter: (category: string | null) => void;
 }
 
 export const useMcpStore = create<McpState>((set) => ({
@@ -55,6 +67,9 @@ export const useMcpStore = create<McpState>((set) => ({
   isSearching: false,
   searchPhase: null,
   searchError: null,
+  catalogItems: [],
+  catalogSearchQuery: "",
+  catalogCategoryFilter: null,
 
   setServers: (servers: readonly McpServer[]) => set({ servers }),
 
@@ -85,4 +100,7 @@ export const useMcpStore = create<McpState>((set) => ({
       searchPhase: null,
       isSearching: false,
     }),
+  setCatalogItems: (catalogItems: readonly McpCatalogItem[]) => set({ catalogItems }),
+  setCatalogSearchQuery: (catalogSearchQuery: string) => set({ catalogSearchQuery }),
+  setCatalogCategoryFilter: (catalogCategoryFilter: string | null) => set({ catalogCategoryFilter }),
 }));
