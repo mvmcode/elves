@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { XTerminal } from "./XTerminal";
 import type { XTerminalHandle } from "./XTerminal";
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { PtyAgentDetector } from "@/lib/pty-agent-detector";
 import type { DetectedAgent } from "@/lib/pty-agent-detector";
@@ -23,15 +23,19 @@ interface SessionTerminalProps {
   readonly onPtyExit?: () => void;
   /** Called when Agent tool calls are detected in the PTY output stream. */
   readonly onAgentDetected?: (agent: DetectedAgent) => void;
+  /** Optional external ref for parent to access terminal methods (e.g. clear, search). */
+  readonly terminalRef?: React.RefObject<XTerminalHandle | null>;
 }
 
-/** Tauri IPC: spawn a new PTY process. Returns a unique pty_id. */
+/** Tauri IPC: spawn a new PTY process with a Channel for streaming output.
+ * Returns a unique pty_id. Output is streamed via the Channel (not events). */
 async function spawnPty(
   command: string,
   args: readonly string[],
   cwd: string,
+  onOutput: Channel<string>,
 ): Promise<string> {
-  return invoke<string>("spawn_pty", { command, args, cwd });
+  return invoke<string>("spawn_pty", { command, args, cwd, onOutput });
 }
 
 /** Tauri IPC: write data to PTY stdin. */
@@ -63,13 +67,17 @@ export function SessionTerminal({
   onClose,
   onPtyExit,
   onAgentDetected,
+  terminalRef,
 }: SessionTerminalProps): React.JSX.Element {
-  const terminalRef = useRef<XTerminalHandle>(null);
+  const localTerminalRef = useRef<XTerminalHandle>(null);
+  const effectiveTerminalRef = terminalRef ?? localTerminalRef;
   const ptyIdRef = useRef<string | null>(null);
   const detectorRef = useRef<PtyAgentDetector>(new PtyAgentDetector());
   const onAgentDetectedRef = useRef(onAgentDetected);
   onAgentDetectedRef.current = onAgentDetected;
   const [hasExited, setHasExited] = useState(false);
+  /** Stores the latest terminal dimensions so we can resize the PTY immediately after spawn. */
+  const termSizeRef = useRef<{ cols: number; rows: number }>({ cols: 80, rows: 24 });
 
   /** Forward user keystrokes to PTY stdin. */
   const handleData = useCallback((data: string): void => {
@@ -81,8 +89,9 @@ export function SessionTerminal({
     }
   }, []);
 
-  /** Forward terminal resize to PTY. */
+  /** Forward terminal resize to PTY. Always stores the latest size so post-spawn resize works. */
   const handleResize = useCallback((cols: number, rows: number): void => {
+    termSizeRef.current = { cols, rows };
     const ptyId = ptyIdRef.current;
     if (ptyId) {
       resizePty(ptyId, cols, rows).catch((error: unknown) => {
@@ -91,15 +100,28 @@ export function SessionTerminal({
     }
   }, []);
 
-  /** Spawn PTY and wire events on mount; kill PTY on unmount. */
+  /** Spawn PTY and wire Channel + exit event on mount; kill PTY on unmount. */
   useEffect(() => {
-    let unlistenData: (() => void) | null = null;
     let unlistenExit: (() => void) | null = null;
     let mounted = true;
 
     async function setup(): Promise<void> {
       try {
-        const ptyId = await spawnPty("claude", ["--resume", claudeSessionId], projectPath);
+        /* Create a Tauri v2 Channel for streaming PTY output.
+         * Channels provide ordered delivery and lower overhead than events. */
+        const onOutput = new Channel<string>();
+        onOutput.onmessage = (data: string): void => {
+          if (!mounted) return;
+          effectiveTerminalRef.current?.write(data);
+
+          /* Feed PTY output through agent detector to find Agent tool calls */
+          const { agents } = detectorRef.current.feed(data);
+          for (const agent of agents) {
+            onAgentDetectedRef.current?.(agent);
+          }
+        };
+
+        const ptyId = await spawnPty("claude", ["--resume", claudeSessionId], projectPath, onOutput);
         if (!mounted) {
           /* Component unmounted before spawn completed — clean up immediately */
           void killPty(ptyId);
@@ -107,29 +129,32 @@ export function SessionTerminal({
         }
         ptyIdRef.current = ptyId;
 
-        /* Listen for PTY stdout data → write to xterm display + scan for agent spawns */
-        unlistenData = await listen<string>(`pty:data:${ptyId}`, (event) => {
-          terminalRef.current?.write(event.payload);
+        /* Sync PTY to the terminal's actual dimensions.
+         * The initial onResize from XTerminal fires before the PTY exists,
+         * so its resize call is silently dropped. Send the stored size now. */
+        const { cols, rows } = termSizeRef.current;
+        if (cols !== 80 || rows !== 24) {
+          resizePty(ptyId, cols, rows).catch((error: unknown) => {
+            console.error("Failed initial PTY resize:", error);
+          });
+        }
 
-          /* Feed PTY output through agent detector to find Agent tool calls */
-          const { agents } = detectorRef.current.feed(event.payload);
-          for (const agent of agents) {
-            onAgentDetectedRef.current?.(agent);
-          }
-        });
-
-        /* Listen for PTY process exit → show message and notify parent */
-        unlistenExit = await listen<number>(`pty:exit:${ptyId}`, (event) => {
-          terminalRef.current?.writeln("");
-          terminalRef.current?.writeln(
+        /* Listen for PTY process exit → show message and notify parent.
+         * Exit is a one-shot signal, so it stays as a regular Tauri event. */
+        const exitUnsub = await listen<number>(`pty:exit:${ptyId}`, (event) => {
+          if (!mounted) return;
+          effectiveTerminalRef.current?.writeln("");
+          effectiveTerminalRef.current?.writeln(
             `\x1b[33m--- Session ended (exit code: ${event.payload}) ---\x1b[0m`,
           );
           setHasExited(true);
           onPtyExit?.();
         });
+        if (!mounted) { exitUnsub(); return; }
+        unlistenExit = exitUnsub;
       } catch (error) {
         console.error("Failed to spawn PTY:", error);
-        terminalRef.current?.writeln(
+        effectiveTerminalRef.current?.writeln(
           `\x1b[31mFailed to start terminal: ${error instanceof Error ? error.message : String(error)}\x1b[0m`,
         );
         setHasExited(true);
@@ -140,7 +165,6 @@ export function SessionTerminal({
 
     return () => {
       mounted = false;
-      unlistenData?.();
       unlistenExit?.();
       const ptyId = ptyIdRef.current;
       if (ptyId) {
@@ -178,7 +202,7 @@ export function SessionTerminal({
 
       {/* Terminal viewport */}
       <div className="flex-1 overflow-hidden p-1">
-        <XTerminal ref={terminalRef} onData={handleData} onResize={handleResize} />
+        <XTerminal ref={effectiveTerminalRef} onData={handleData} onResize={handleResize} />
       </div>
 
       {/* Exited footer */}

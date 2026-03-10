@@ -1,4 +1,4 @@
-/* Tests for BottomTerminalPanel — verifies rendering, terminal mode selection, and resize handle. */
+/* Tests for BottomTerminalPanel — verifies rendering, PTY-only mode, toolbar, and resize handle. */
 
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -15,19 +15,9 @@ vi.mock("./SessionTerminal", () => ({
   ),
 }));
 
-/* Mock LiveEventTerminal to avoid xterm in unit tests */
-vi.mock("./LiveEventTerminal", () => ({
-  LiveEventTerminal: ({ onClose }: { onClose: () => void }) => (
-    <div data-testid="live-event-terminal-mock">
-      <button data-testid="mock-live-close" onClick={onClose}>close</button>
-    </div>
-  ),
-}));
-
-/* Mock the Tauri IPC wrapper */
-const mockTransition = vi.fn().mockResolvedValue(true);
-vi.mock("@/lib/tauri", () => ({
-  transitionToInteractive: (...args: unknown[]) => mockTransition(...args),
+/* Mock TerminalToolbar to isolate BottomTerminalPanel tests */
+vi.mock("./TerminalToolbar", () => ({
+  TerminalToolbar: () => <div data-testid="terminal-toolbar-mock" />,
 }));
 
 /* Mock project store */
@@ -37,6 +27,20 @@ vi.mock("@/stores/project", () => ({
       projects: [{ id: "proj-1", path: "/tmp/project" }],
       activeProjectId: "proj-1",
     }),
+}));
+
+/* Mock stall detection hook */
+vi.mock("@/hooks/useStallDetection", () => ({
+  useStallDetection: () => false,
+}));
+
+/* Mock elf-names and sounds */
+vi.mock("@/lib/elf-names", () => ({
+  generateElf: () => ({ name: "Spark", avatar: "chef", color: "#FFD93D", quirk: "test" }),
+  getStatusMessage: () => "doing stuff",
+}));
+vi.mock("@/lib/sounds", () => ({
+  playSound: vi.fn(),
 }));
 
 function resetStores(): void {
@@ -50,7 +54,6 @@ function resetStores(): void {
 describe("BottomTerminalPanel", () => {
   beforeEach(() => {
     resetStores();
-    mockTransition.mockClear();
   });
 
   it("shows 'No active session' when there is no session", () => {
@@ -67,13 +70,23 @@ describe("BottomTerminalPanel", () => {
     expect(screen.getByTestId("bottom-terminal-panel")).toBeInTheDocument();
   });
 
-  it("shows LiveEventTerminal for active session in print mode", () => {
+  it("shows waiting message when no claude session id", () => {
     useSessionStore.getState().startSession({
       id: "s1", projectId: "proj-1", task: "Fix bug", runtime: "claude-code",
     });
 
     render(<BottomTerminalPanel />);
-    expect(screen.getByTestId("live-event-terminal-mock")).toBeInTheDocument();
+    expect(screen.getByText("Waiting for Claude session ID...")).toBeInTheDocument();
+  });
+
+  it("renders SessionTerminal when claude session id is available", () => {
+    useSessionStore.getState().startSession({
+      id: "s1", projectId: "proj-1", task: "Fix bug", runtime: "claude-code",
+    });
+    useSessionStore.getState().setClaudeSessionId("claude-sess-123");
+
+    render(<BottomTerminalPanel />);
+    expect(screen.getByTestId("session-terminal")).toBeInTheDocument();
   });
 
   it("has a resize handle", () => {

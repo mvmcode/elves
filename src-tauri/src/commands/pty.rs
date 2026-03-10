@@ -8,9 +8,13 @@ use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Mutex;
+use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::agents::runtime::ensure_full_path;
+
+/// Coalescing pause to batch rapid PTY writes. Half a 60fps frame.
+const COALESCE_DELAY_MS: u64 = 8;
 
 /// Holds the writable master handle and child process for a single PTY session.
 struct PtyInstance {
@@ -27,17 +31,18 @@ impl PtyManager {
         Self(Mutex::new(HashMap::new()))
     }
 
-    /// Spawn a new PTY process programmatically (from another Tauri command).
+    /// Spawn a new PTY process. Starts a background reader thread that emits
+    /// `pty:data:{id}` and `pty:exit:{id}` events. Returns the unique pty_id.
     ///
-    /// Same as the `spawn_pty` command but callable directly with an AppHandle reference.
-    /// Starts a background reader thread that emits `pty:data:{id}` and `pty:exit:{id}` events.
-    /// Returns the unique pty_id string.
+    /// Callable both from Tauri commands and directly from other Rust code
+    /// via an AppHandle reference.
     pub fn spawn_with_app(
         &self,
         command: &str,
         args: &[String],
         cwd: &str,
         app: &AppHandle,
+        output_channel: Option<Channel<String>>,
     ) -> Result<String, String> {
         // Ensure full PATH is available (macOS .app bundles get minimal PATH)
         ensure_full_path();
@@ -51,7 +56,8 @@ impl PtyManager {
             })
             .map_err(|e| format!("Failed to open PTY: {e}"))?;
 
-        let mut cmd = CommandBuilder::new(command);
+        let resolved = resolve_command(command);
+        let mut cmd = CommandBuilder::new(&resolved);
         for arg in args {
             cmd.arg(arg);
         }
@@ -80,7 +86,7 @@ impl PtyManager {
             .take_writer()
             .map_err(|e| format!("Failed to take PTY writer: {e}"))?;
 
-        let mut reader = pair
+        let reader = pair
             .master
             .try_clone_reader()
             .map_err(|e| format!("Failed to clone PTY reader: {e}"))?;
@@ -98,18 +104,7 @@ impl PtyManager {
         let pty_id_clone = pty_id.clone();
         let app_clone = app.clone();
         std::thread::spawn(move || {
-            let mut buf = [0u8; 4096];
-            loop {
-                match reader.read(&mut buf) {
-                    Ok(0) => break,
-                    Ok(n) => {
-                        let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                        let _ = app_clone.emit(&format!("pty:data:{}", pty_id_clone), data);
-                    }
-                    Err(_) => break,
-                }
-            }
-            let _ = app_clone.emit(&format!("pty:exit:{}", pty_id_clone), 0i32);
+            pty_reader_loop(reader, &app_clone, &pty_id_clone, output_channel);
         });
 
         log::info!("Spawned PTY {pty_id}: {command} {}", args.join(" "));
@@ -117,95 +112,158 @@ impl PtyManager {
     }
 }
 
+/// Resolve a command name to its full path via `which`, falling back to the
+/// original name if lookup fails (lets the OS handle it at spawn time).
+fn resolve_command(cmd: &str) -> String {
+    which::which(cmd)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| cmd.to_string())
+}
+
+/// Shared reader loop for PTY output with coalescing.
+///
+/// Reads from the PTY master in chunks with a brief pause between reads to let
+/// the kernel PTY buffer accumulate data. This naturally batches rapid sequential
+/// writes (compilation output, large file dumps) into fewer, larger IPC events,
+/// reducing frontend jitter.
+///
+/// The 8ms pause is below human perception (~30ms threshold) but long enough for
+/// high-throughput processes to fill the kernel buffer. The subsequent `read()`
+/// returns immediately with all accumulated data, achieving natural coalescing
+/// without non-blocking fd tricks.
+///
+/// UTF-8 safety: tracks incomplete multi-byte sequences at chunk boundaries to
+/// prevent corruption from `from_utf8_lossy` replacing partial codepoints.
+fn pty_reader_loop(
+    mut reader: Box<dyn Read + Send>,
+    app: &AppHandle,
+    pty_id: &str,
+    channel: Option<Channel<String>>,
+) {
+    let mut buf = [0u8; 8192];
+    // Tracks incomplete UTF-8 trailing bytes across iterations
+    let mut pending: Vec<u8> = Vec::new();
+    let event_name = format!("pty:data:{}", pty_id);
+    let exit_event = format!("pty:exit:{}", pty_id);
+
+    loop {
+        match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                // Prepend any pending incomplete UTF-8 bytes from the previous chunk
+                let chunk = if pending.is_empty() {
+                    &buf[..n]
+                } else {
+                    pending.extend_from_slice(&buf[..n]);
+                    pending.as_slice()
+                };
+
+                // Find the last valid UTF-8 boundary to avoid corrupting multi-byte chars
+                let valid_len = find_utf8_boundary(chunk);
+                if valid_len > 0 {
+                    let data = String::from_utf8_lossy(&chunk[..valid_len]).to_string();
+                    if let Some(ref ch) = channel {
+                        let _ = ch.send(data);
+                    } else {
+                        let _ = app.emit(&event_name, data);
+                    }
+                }
+
+                // Save any incomplete trailing bytes for the next iteration
+                let remainder = chunk[valid_len..].to_vec();
+                pending.clear();
+                if !remainder.is_empty() {
+                    pending.extend_from_slice(&remainder);
+                }
+
+                // Only coalesce when reading bulk output (compilation, file dumps).
+                // Small reads (<= 256 bytes) are typically interactive keystrokes —
+                // adding latency there degrades typing responsiveness.
+                if n > 256 {
+                    std::thread::sleep(std::time::Duration::from_millis(COALESCE_DELAY_MS));
+                }
+            }
+            Err(_) => break,
+        }
+    }
+
+    // Flush any remaining pending bytes (lossy is fine at EOF)
+    if !pending.is_empty() {
+        let data = String::from_utf8_lossy(&pending).to_string();
+        if let Some(ref ch) = channel {
+            let _ = ch.send(data);
+        } else {
+            let _ = app.emit(&event_name, data);
+        }
+    }
+    let _ = app.emit(&exit_event, 0i32);
+}
+
+/// Find the last valid UTF-8 boundary in a byte slice.
+/// Returns the number of bytes that form complete UTF-8 sequences.
+/// Any trailing incomplete multi-byte sequence is excluded.
+fn find_utf8_boundary(bytes: &[u8]) -> usize {
+    if bytes.is_empty() {
+        return 0;
+    }
+
+    // Check from the end for incomplete multi-byte sequences.
+    // UTF-8 continuation bytes start with 10xxxxxx (0x80..0xBF).
+    // A leading byte tells us how many continuation bytes to expect:
+    //   110xxxxx = 2-byte (1 continuation)
+    //   1110xxxx = 3-byte (2 continuations)
+    //   11110xxx = 4-byte (3 continuations)
+    let len = bytes.len();
+
+    // Walk backward up to 3 bytes from the end to find a potential leading byte
+    let check_start = if len >= 4 { len - 4 } else { 0 };
+    for i in (check_start..len).rev() {
+        let b = bytes[i];
+        if b & 0x80 == 0 {
+            // ASCII byte — everything up to and including this is valid
+            return len;
+        }
+        if b & 0xC0 == 0xC0 {
+            // This is a leading byte. Check if the sequence is complete.
+            let expected_len = if b & 0xF8 == 0xF0 {
+                4
+            } else if b & 0xF0 == 0xE0 {
+                3
+            } else if b & 0xE0 == 0xC0 {
+                2
+            } else {
+                // Invalid leading byte — treat as boundary
+                return len;
+            };
+            let available = len - i;
+            if available >= expected_len {
+                // Sequence is complete — all bytes are valid
+                return len;
+            } else {
+                // Incomplete sequence — exclude it
+                return i;
+            }
+        }
+        // Continuation byte (10xxxxxx) — keep walking backward
+    }
+
+    // All trailing bytes are continuations with no leading byte — corrupted, emit as-is
+    len
+}
+
 /// Spawn a new PTY process. Returns a unique pty_id string.
-/// Starts a background thread that reads PTY output and emits `pty:data:{pty_id}` events.
-/// When the reader gets EOF (process exited), it emits `pty:exit:{pty_id}`.
+/// Thin Tauri command wrapper around `PtyManager::spawn_with_app`.
+/// Accepts a Channel for streaming output directly to the frontend caller.
 #[tauri::command]
 pub fn spawn_pty(
     command: String,
     args: Vec<String>,
     cwd: String,
-    app: AppHandle,
+    on_output: Channel<String>,
+    _app: AppHandle,
     state: State<'_, PtyManager>,
 ) -> Result<String, String> {
-    let pty_system = native_pty_system();
-    let pair = pty_system
-        .openpty(PtySize {
-            rows: 24,
-            cols: 80,
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .map_err(|e| format!("Failed to open PTY: {e}"))?;
-
-    let mut cmd = CommandBuilder::new(&command);
-    for arg in &args {
-        cmd.arg(arg);
-    }
-    cmd.cwd(&cwd);
-    // Clear Claude Code env vars so the child process doesn't detect nested execution.
-    cmd.env_remove("CLAUDECODE");
-    cmd.env_remove("CLAUDE_CODE_ENTRYPOINT");
-    cmd.env_remove("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS");
-    // Ensure TERM is set for proper TUI rendering in the PTY
-    if std::env::var("TERM").is_err() {
-        cmd.env("TERM", "xterm-256color");
-    }
-
-    let child = pair
-        .slave
-        .spawn_command(cmd)
-        .map_err(|e| format!("Failed to spawn command: {e}"))?;
-
-    // Drop the slave handle — the child process owns it now
-    drop(pair.slave);
-
-    let pty_id = uuid::Uuid::new_v4().to_string();
-    let writer = pair
-        .master
-        .take_writer()
-        .map_err(|e| format!("Failed to take PTY writer: {e}"))?;
-
-    // Clone a reader from the master for background reading
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .map_err(|e| format!("Failed to clone PTY reader: {e}"))?;
-
-    // Store the instance for write/resize/kill operations
-    let instance = PtyInstance {
-        writer,
-        master: pair.master,
-        child,
-    };
-    state
-        .0
-        .lock()
-        .map_err(|e| format!("Failed to lock PTY state: {e}"))?
-        .insert(pty_id.clone(), instance);
-
-    // Spawn a background thread to read PTY output and emit events.
-    // When the read loop ends (EOF = process exited), emit exit event.
-    let pty_id_clone = pty_id.clone();
-    std::thread::spawn(move || {
-        let mut buf = [0u8; 4096];
-        loop {
-            match reader.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
-                    let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                    let _ = app.emit(&format!("pty:data:{}", pty_id_clone), data);
-                }
-                Err(_) => break,
-            }
-        }
-        // Process exited — emit exit event with code 0 (we can't easily get the real code
-        // without blocking on child.wait(), and the child is behind a Mutex in PtyManager)
-        let _ = app.emit(&format!("pty:exit:{}", pty_id_clone), 0i32);
-    });
-
-    log::info!("Spawned PTY {pty_id}: {command} {}", args.join(" "));
-    Ok(pty_id)
+    state.spawn_with_app(&command, &args, &cwd, &_app, Some(on_output))
 }
 
 /// Write data to a PTY's stdin.

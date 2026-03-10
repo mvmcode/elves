@@ -1,11 +1,11 @@
 /* BottomTerminalPanel — VS Code-style terminal panel that slides up from the bottom.
- * During active sessions: shows a read-only live event stream (LiveEventTerminal).
- * During completed/interactive sessions: spawns a PTY with `claude --resume` (SessionTerminal).
- * Does NOT auto-kill the --print process when opened. */
+ * Always renders a PTY-based SessionTerminal with a TerminalToolbar for controls.
+ * The dual-mode live/interactive split has been unified into PTY-only mode. */
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SessionTerminal } from "./SessionTerminal";
-import { LiveEventTerminal } from "./LiveEventTerminal";
+import { TerminalToolbar } from "./TerminalToolbar";
+import type { XTerminalHandle } from "./XTerminal";
 import { useSessionStore } from "@/stores/session";
 import { useUiStore } from "@/stores/ui";
 import { useProjectStore } from "@/stores/project";
@@ -21,16 +21,11 @@ const MIN_HEIGHT = 150;
 const MAX_HEIGHT_FRACTION = 0.8;
 
 /**
- * Bottom terminal panel with resize drag handle and close button.
- *
- * Mode selection:
- * - Active --print session → LiveEventTerminal (read-only, shows live events)
- * - Interactive mode (user explicitly transitioned) → SessionTerminal (PTY)
- * - Completed session → SessionTerminal (--resume PTY for follow-up)
+ * Bottom terminal panel with resize drag handle, toolbar, and PTY terminal.
+ * Always uses SessionTerminal (PTY mode) — no more dual live/interactive split.
  */
 export function BottomTerminalPanel(): React.JSX.Element | null {
   const activeSession = useSessionStore((s) => s.activeSession);
-  const isInteractiveMode = useSessionStore((s) => s.isInteractiveMode);
   const terminalPanelHeight = useUiStore((s) => s.terminalPanelHeight);
   const setTerminalPanelHeight = useUiStore((s) => s.setTerminalPanelHeight);
   const toggleTerminalPanel = useUiStore((s) => s.toggleTerminalPanel);
@@ -38,27 +33,38 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
 
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const terminalRef = useRef<XTerminalHandle>(null);
 
   const sessionId = activeSession?.id;
   const claudeSessionId = activeSession?.claudeSessionId;
   const isSessionActive = activeSession?.status === "active";
   const isSessionCompleted = activeSession?.status === "completed";
   const lastEventAt = useSessionStore((s) => s.lastEventAt);
-  const isStalled = useStallDetection(lastEventAt, isSessionActive === true && !isInteractiveMode);
+  const isStalled = useStallDetection(lastEventAt, isSessionActive === true);
   const projectPath = projects.find((p) => p.id === activeProjectId)?.path ?? "";
   const taskLabel = activeSession?.task ?? "";
 
-  /* Determine which terminal mode to use:
-   * - "live": Active --print session, show read-only event stream
-   * - "interactive": PTY mode (user transitioned or session completed) */
-  const terminalMode = isSessionActive && !isInteractiveMode ? "live" : "interactive";
+  /* Toolbar state */
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [hasExited, setHasExited] = useState(false);
 
-  /* Complete session when PTY exits in interactive mode */
+  /* Reset hasExited when the active session changes (new task started) */
+  useEffect(() => {
+    setHasExited(false);
+  }, [sessionId]);
+
+  /* Derive toolbar status from session state */
+  const toolbarStatus = hasExited || isSessionCompleted
+    ? "exited" as const
+    : isSessionActive
+      ? "live" as const
+      : "idle" as const;
+
+  /* Complete session when PTY exits */
   const handlePtyExit = useCallback((): void => {
-    if (isInteractiveMode || isSessionCompleted) {
-      useSessionStore.getState().endSession("completed");
-    }
-  }, [isInteractiveMode, isSessionCompleted]);
+    setHasExited(true);
+    useSessionStore.getState().endSession("completed");
+  }, []);
 
   /* Track used elf names to avoid duplicates when creating elves from PTY agent detection */
   const usedNamesRef = useRef<string[]>([]);
@@ -131,7 +137,7 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
       const handleDragMove = (moveEvent: MouseEvent): void => {
         if (!dragRef.current) return;
         const delta = dragRef.current.startY - moveEvent.clientY;
-        const maxHeight = window.innerHeight * MAX_HEIGHT_FRACTION;
+        const maxHeight = document.documentElement.clientHeight * MAX_HEIGHT_FRACTION;
         const newHeight = Math.min(maxHeight, Math.max(MIN_HEIGHT, dragRef.current.startHeight + delta));
         setTerminalPanelHeight(newHeight);
       };
@@ -147,6 +153,40 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
     },
     [terminalPanelHeight, setTerminalPanelHeight],
   );
+
+  /* Toolbar callbacks */
+  const handleClear = useCallback((): void => {
+    terminalRef.current?.clear();
+  }, []);
+
+  const handleKill = useCallback((): void => {
+    /* SessionTerminal manages PTY lifecycle — closing the panel triggers unmount which kills PTY */
+    toggleTerminalPanel();
+  }, [toggleTerminalPanel]);
+
+  const handleSearch = useCallback((query: string): void => {
+    terminalRef.current?.search(query);
+  }, []);
+
+  const handleClearSearch = useCallback((): void => {
+    terminalRef.current?.clearSearch();
+  }, []);
+
+  const handleFontSizeChange = useCallback((_delta: number): void => {
+    /* Font size changes require recreating the xterm instance or using xterm's options API.
+     * This is a placeholder — will be wired when XTerminal exposes setFontSize(). */
+  }, []);
+
+  const handleCopy = useCallback((): void => {
+    const selection = terminalRef.current?.getSelection() ?? "";
+    if (selection.length > 0) {
+      void navigator.clipboard.writeText(selection);
+    }
+  }, []);
+
+  const handleToggleSearch = useCallback((): void => {
+    setIsSearchOpen((prev) => !prev);
+  }, []);
 
   /* No terminal content if there's no session at all */
   if (!sessionId) {
@@ -193,18 +233,36 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
         data-testid="terminal-resize-handle"
       />
 
-      {/* Terminal content — live stream or interactive PTY */}
+      {/* Terminal content — always PTY mode */}
       <div className="flex h-[calc(100%-6px)] flex-col">
-        {terminalMode === "live" ? (
-          <LiveEventTerminal
-            sessionId={sessionId}
-            claudeSessionId={claudeSessionId ?? ""}
-            projectPath={projectPath}
-            taskLabel={taskLabel}
-            onClose={toggleTerminalPanel}
-            isStalled={isStalled}
-          />
-        ) : claudeSessionId ? (
+        {/* Toolbar between drag handle and terminal */}
+        <TerminalToolbar
+          status={toolbarStatus}
+          startTime={activeSession?.startedAt ?? null}
+          onClear={handleClear}
+          onKill={handleKill}
+          onSearch={handleSearch}
+          onClearSearch={handleClearSearch}
+          onFontSizeChange={handleFontSizeChange}
+          onCopy={handleCopy}
+          isSearchOpen={isSearchOpen}
+          onToggleSearch={handleToggleSearch}
+        />
+
+        {/* Stall detection banner — still useful for detecting when Claude is waiting */}
+        {isStalled && (
+          <div
+            className="flex w-full items-center gap-3 border-b-[3px] border-border bg-[#FF8B3D] px-4 py-2.5"
+            data-testid="stall-warning-banner"
+          >
+            <span className="text-lg">&#9888;</span>
+            <span className="flex-1 font-display text-xs font-bold uppercase tracking-wider text-black">
+              Claude appears to be waiting for input — type in the terminal below
+            </span>
+          </div>
+        )}
+
+        {claudeSessionId ? (
           <SessionTerminal
             sessionId={sessionId}
             claudeSessionId={claudeSessionId}
@@ -213,6 +271,7 @@ export function BottomTerminalPanel(): React.JSX.Element | null {
             onClose={toggleTerminalPanel}
             onPtyExit={handlePtyExit}
             onAgentDetected={handleAgentDetected}
+            terminalRef={terminalRef}
           />
         ) : (
           <div className="flex h-full flex-col border-token-normal border-border bg-[#1A1A2E]">
