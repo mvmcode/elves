@@ -180,8 +180,8 @@ export function McpManager(): React.JSX.Element {
     return (
       <div className="flex flex-1 items-center justify-center p-8" data-testid="mcp-manager-unsupported">
         <EmptyState
-          message="MCP servers are not available for Codex"
-          submessage="MCP is a Claude Code feature. Switch to Claude Code to manage MCP server connections."
+          message="MCP for Codex — Coming Soon"
+          submessage="Codex now supports MCP servers, and ELVES integration is on the way. Switch to Claude Code to use MCP now."
         />
       </div>
     );

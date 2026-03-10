@@ -3,7 +3,7 @@
 import { create } from "zustand";
 
 /** Top-level views the shell can render in the main content area. */
-export type AppView = "workspace" | "files" | "memory" | "skills" | "mcp" | "history" | "settings" | "comparison";
+export type AppView = "workspace" | "files" | "memory" | "skills" | "mcp" | "history" | "insights" | "settings" | "comparison";
 
 /** Split pane mode when in files view — which panels are visible. */
 export type SplitPaneMode = "split" | "files-only" | "workspace-only";

@@ -1,4 +1,4 @@
-/* Tests for MemoryExplorer — verifies list rendering, empty state, filters, search, and add form. */
+/* Tests for MemoryExplorer — verifies dashboard integration, list rendering, empty state, filters, search, and add form. */
 
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -47,9 +47,9 @@ describe("MemoryExplorer", () => {
     expect(screen.getByTestId("memory-explorer")).toBeInTheDocument();
   });
 
-  it("renders the Memory Explorer heading", () => {
+  it("renders the Memory heading", () => {
     render(<MemoryExplorer />);
-    expect(screen.getByText("Memory Explorer")).toBeInTheDocument();
+    expect(screen.getByText("Memory")).toBeInTheDocument();
   });
 
   it("renders the search input", () => {
@@ -205,5 +205,44 @@ describe("MemoryExplorer", () => {
   it("shows the add memory button", () => {
     render(<MemoryExplorer />);
     expect(screen.getByTestId("add-memory-button")).toBeInTheDocument();
+  });
+
+  /* --- Dashboard integration tests --- */
+
+  it("renders the MemoryDashboard within the explorer", () => {
+    render(<MemoryExplorer />);
+    expect(screen.getByTestId("memory-dashboard")).toBeInTheDocument();
+  });
+
+  it("renders dashboard stats reflecting store data", () => {
+    useMemoryStore.setState({
+      memories: [
+        createTestMemory({ id: 1, relevanceScore: 0.9, source: "pinned" }),
+        createTestMemory({ id: 2, relevanceScore: 0.1, category: "decision" }),
+        createTestMemory({ id: 3, relevanceScore: 0.5, category: "learning" }),
+      ],
+    });
+
+    render(<MemoryExplorer />);
+
+    expect(screen.getByTestId("stat-total-value")).toHaveTextContent("3");
+    expect(screen.getByTestId("stat-pinned-value")).toHaveTextContent("1");
+    expect(screen.getByTestId("stat-fading-value")).toHaveTextContent("1");
+  });
+
+  it("opens add form with pre-selected category from dashboard insight action", () => {
+    useMemoryStore.setState({
+      memories: [createTestMemory({ id: 1, category: "context" })],
+    });
+
+    render(<MemoryExplorer />);
+
+    /* Click "Add Decision" from the insight */
+    const addDecisionBtn = screen.getByTestId("insight-action-no-decisions");
+    fireEvent.click(addDecisionBtn);
+
+    expect(screen.getByTestId("add-memory-form")).toBeInTheDocument();
+    const categorySelect = screen.getByTestId("add-memory-category") as HTMLSelectElement;
+    expect(categorySelect.value).toBe("decision");
   });
 });

@@ -11,6 +11,7 @@ import { SettingsView } from "@/components/settings/SettingsView";
 import { SkillManager } from "@/components/skills/SkillManager";
 import { McpManager } from "@/components/editors/McpManager";
 import { SessionHistory } from "@/components/project/SessionHistory";
+import { InsightsView } from "@/components/insights/InsightsView";
 import { SessionComparison } from "@/components/project/SessionComparison";
 import { ShortcutOverlay } from "@/components/shared/ShortcutOverlay";
 import { ToastContainer } from "@/components/shared/Toast";
@@ -197,6 +198,8 @@ export function Shell(): React.JSX.Element {
           <div className="flex flex-1 flex-col overflow-y-auto">
             <SessionHistory />
           </div>
+        ) : activeView === "insights" ? (
+          <InsightsView />
         ) : activeView === "comparison" ? (
           <div className="flex flex-1 overflow-hidden">
             <SessionComparison />

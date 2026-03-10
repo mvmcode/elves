@@ -42,8 +42,8 @@ export function SkillManager(): React.JSX.Element {
     return (
       <div className="flex h-full items-center justify-center" data-testid="skill-editor-unsupported">
         <EmptyState
-          message="Skills are not available for Codex"
-          submessage="Skills are a Claude Code feature. Switch to Claude Code to manage custom skills."
+          message="Skills for Codex — Coming Soon"
+          submessage="Codex now supports skills, and ELVES integration is on the way. Switch to Claude Code to use skills now."
         />
       </div>
     );
