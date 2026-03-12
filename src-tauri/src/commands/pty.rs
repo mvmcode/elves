@@ -9,9 +9,12 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Mutex;
 use tauri::ipc::Channel;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::agents::runtime::{ensure_full_path, resolve_binary};
+use crate::agents::memory_extractor;
+use crate::commands::memory::{store_terminal_output_as_events, strip_ansi};
+use crate::commands::projects::DbState;
 
 /// Resolve a command name to an absolute path, falling back to the bare name.
 /// Uses `runtime::resolve_binary` for consistent resolution across the codebase.
@@ -40,6 +43,18 @@ struct PtyInstance {
     writer: Box<dyn Write + Send>,
     master: Box<dyn portable_pty::MasterPty + Send>,
     child: Box<dyn portable_pty::Child + Send + Sync>,
+}
+
+/// Maps pty_id → session_id for PTY sessions that need memory extraction on exit.
+/// Populated by `start_task_pty` after spawning. Read by `pty_reader_loop` on exit.
+static PTY_SESSION_MAP: std::sync::LazyLock<Mutex<HashMap<String, String>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Register a pty_id → session_id mapping so the PTY reader can store output on exit.
+pub fn register_pty_session(pty_id: &str, session_id: &str) {
+    if let Ok(mut map) = PTY_SESSION_MAP.lock() {
+        map.insert(pty_id.to_string(), session_id.to_string());
+    }
 }
 
 /// Shared state tracking all active PTY instances by their unique ID.
@@ -145,6 +160,10 @@ impl PtyManager {
 ///
 /// UTF-8 safety: tracks incomplete multi-byte sequences at chunk boundaries to
 /// prevent corruption from `from_utf8_lossy` replacing partial codepoints.
+/// Maximum accumulated output size (200KB). Prevents unbounded memory growth
+/// for long-running sessions while retaining enough for meaningful extraction.
+const MAX_ACCUMULATED_OUTPUT: usize = 200 * 1024;
+
 fn pty_reader_loop(
     mut reader: Box<dyn Read + Send>,
     app: &AppHandle,
@@ -156,6 +175,8 @@ fn pty_reader_loop(
     let mut pending: Vec<u8> = Vec::new();
     let event_name = format!("pty:data:{}", pty_id);
     let exit_event = format!("pty:exit:{}", pty_id);
+    // Accumulate output for memory extraction (Rust-side, no race condition)
+    let mut accumulated_output = String::new();
 
     loop {
         match reader.read(&mut buf) {
@@ -173,6 +194,15 @@ fn pty_reader_loop(
                 let valid_len = find_utf8_boundary(chunk);
                 if valid_len > 0 {
                     let data = String::from_utf8_lossy(&chunk[..valid_len]).to_string();
+                    // Accumulate for memory extraction (with cap)
+                    if accumulated_output.len() < MAX_ACCUMULATED_OUTPUT {
+                        let remaining = MAX_ACCUMULATED_OUTPUT - accumulated_output.len();
+                        if data.len() <= remaining {
+                            accumulated_output.push_str(&data);
+                        } else {
+                            accumulated_output.push_str(&data[..remaining]);
+                        }
+                    }
                     if let Some(ref ch) = channel {
                         let _ = ch.send(data);
                     } else {
@@ -201,13 +231,88 @@ fn pty_reader_loop(
     // Flush any remaining pending bytes (lossy is fine at EOF)
     if !pending.is_empty() {
         let data = String::from_utf8_lossy(&pending).to_string();
+        if accumulated_output.len() < MAX_ACCUMULATED_OUTPUT {
+            let remaining = MAX_ACCUMULATED_OUTPUT - accumulated_output.len();
+            if data.len() <= remaining {
+                accumulated_output.push_str(&data);
+            } else {
+                accumulated_output.push_str(&data[..remaining]);
+            }
+        }
         if let Some(ref ch) = channel {
             let _ = ch.send(data);
         } else {
             let _ = app.emit(&event_name, data);
         }
     }
+
+    // Store accumulated output and extract memories (Rust-side, eliminates race condition)
+    store_and_extract_memories(app, pty_id, &accumulated_output);
+
     let _ = app.emit(&exit_event, 0i32);
+}
+
+/// Store accumulated PTY output as DB events and run memory extraction.
+///
+/// Called when the PTY reader loop exits. Looks up the session_id from PTY_SESSION_MAP,
+/// strips ANSI codes, stores output chunks, and runs the heuristic memory extractor.
+/// Emits `pty:memories-extracted:{pty_id}` so the frontend can refresh its memory store.
+fn store_and_extract_memories(app: &AppHandle, pty_id: &str, raw_output: &str) {
+    // Look up session_id for this PTY
+    let session_id = match PTY_SESSION_MAP.lock() {
+        Ok(mut map) => map.remove(pty_id),
+        Err(_) => None,
+    };
+
+    let session_id = match session_id {
+        Some(id) => id,
+        None => {
+            // No session_id registered — this is an interactive terminal, not a task PTY
+            log::debug!("No session mapping for PTY {pty_id}, skipping memory extraction");
+            return;
+        }
+    };
+
+    // Get DB connection via AppHandle
+    let db_state: tauri::State<'_, DbState> = app.state();
+    let conn = match db_state.0.lock() {
+        Ok(conn) => conn,
+        Err(e) => {
+            log::warn!("Failed to lock DB for memory extraction (session {session_id}): {e}");
+            return;
+        }
+    };
+
+    // Strip ANSI codes and store as chunked events
+    let stripped = strip_ansi(raw_output);
+    match store_terminal_output_as_events(&conn, &session_id, &stripped) {
+        Ok(count) => log::info!(
+            "[session {session_id}] Rust-side: stored {count} output chunks from PTY {pty_id}"
+        ),
+        Err(e) => log::warn!(
+            "[session {session_id}] Failed to store PTY output: {e}"
+        ),
+    }
+
+    // Run memory extraction
+    match memory_extractor::extract_memories(&conn, &session_id) {
+        Ok(result) => {
+            let count = result.memories.len();
+            if count > 0 {
+                log::info!(
+                    "[session {session_id}] Extracted {count} memories from PTY session"
+                );
+                // Notify frontend to refresh memory store
+                let _ = app.emit(
+                    &format!("pty:memories-extracted:{pty_id}"),
+                    serde_json::json!({ "sessionId": session_id, "count": count }),
+                );
+            }
+        }
+        Err(e) => log::warn!(
+            "[session {session_id}] Memory extraction failed: {e}"
+        ),
+    }
 }
 
 /// Find the last valid UTF-8 boundary in a byte slice.
@@ -275,6 +380,15 @@ pub fn spawn_pty(
     state: State<'_, PtyManager>,
 ) -> Result<String, String> {
     state.spawn_with_app(&command, &args, &cwd, &_app, Some(on_output))
+}
+
+/// Register a pty_id → session_id mapping so the Rust-side PTY reader stores
+/// output and extracts memories on exit. Called by the frontend for auto-spawned
+/// PTYs (task PTYs are registered automatically by `start_task_pty`).
+#[tauri::command]
+pub fn register_pty_for_memory(pty_id: String, session_id: String) {
+    register_pty_session(&pty_id, &session_id);
+    log::debug!("Registered PTY {pty_id} → session {session_id} for memory extraction");
 }
 
 /// Write data to a PTY's stdin.

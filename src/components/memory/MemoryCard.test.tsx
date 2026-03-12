@@ -145,7 +145,7 @@ describe("MemoryCard", () => {
     expect(onPin).toHaveBeenCalledWith(memory);
   });
 
-  it("fires onEdit callback when edit button is clicked", () => {
+  it("opens inline editor when edit button is clicked", () => {
     const onEdit = vi.fn();
     const memory = createTestMemory();
     render(
@@ -153,8 +153,24 @@ describe("MemoryCard", () => {
     );
 
     fireEvent.click(screen.getByTestId("memory-edit"));
+    expect(screen.getByTestId("memory-edit-inline")).toBeInTheDocument();
+    /* onEdit is not called until save — clicking Edit just opens the editor */
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+
+  it("fires onEdit callback with new content when save is clicked", () => {
+    const onEdit = vi.fn();
+    const memory = createTestMemory({ content: "Original content" });
+    render(
+      <MemoryCard memory={memory} onEdit={onEdit} onPin={vi.fn()} onDelete={vi.fn()} />,
+    );
+
+    fireEvent.click(screen.getByTestId("memory-edit"));
+    const textarea = screen.getByRole("textbox");
+    fireEvent.change(textarea, { target: { value: "Updated content" } });
+    fireEvent.click(screen.getByText("Save"));
     expect(onEdit).toHaveBeenCalledOnce();
-    expect(onEdit).toHaveBeenCalledWith(memory);
+    expect(onEdit).toHaveBeenCalledWith(memory, "Updated content");
   });
 
   it("shows delete confirmation when delete is clicked", () => {

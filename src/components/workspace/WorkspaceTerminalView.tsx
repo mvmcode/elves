@@ -16,8 +16,10 @@ import { PtyAgentDetector } from "@/lib/pty-agent-detector";
 import type { DetectedAgent, DetectedPermission } from "@/lib/pty-agent-detector";
 import { generateElf } from "@/lib/elf-names";
 import { playSound } from "@/lib/sounds";
-import { removeWorkspace as invokeRemoveWorkspace, completeSession, updateClaudeSessionId, getLastWorkspaceSession, createSession } from "@/lib/tauri";
+import { removeWorkspace as invokeRemoveWorkspace, completeSession, updateClaudeSessionId, getLastWorkspaceSession, createSession, registerPtyForMemory, listMemories } from "@/lib/tauri";
 import { useToastStore } from "@/stores/toast";
+import { useSettingsStore } from "@/stores/settings";
+import { useMemoryStore } from "@/stores/memory";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { WorkspaceInfo } from "@/types/workspace";
@@ -67,6 +69,9 @@ export function WorkspaceTerminalView({ workspace, isActiveTab }: WorkspaceTermi
   const autoSpawnAttempted = useRef(false);
   /** Whether the current spawn is resuming a previous session. */
   const [isResuming, setIsResuming] = useState(false);
+  /** DB session ID for the current PTY — used by exit handler for session completion.
+   * Set by auto-spawn or looked up from floor session. Avoids dependency on floor status. */
+  const ptySessionIdRef = useRef<string | null>(null);
 
   /** When this tab becomes visible, force a repaint and focus the terminal.
    * The 16ms delay ensures the display:flex layout has painted before measuring. */
@@ -177,6 +182,15 @@ export function WorkspaceTerminalView({ workspace, isActiveTab }: WorkspaceTermi
         });
         hasChannelRef.current = true;
         setIsResuming(false);
+        ptySessionIdRef.current = dbSessionId;
+        /* Register PTY for Rust-side memory extraction on exit.
+         * This eliminates the race condition where the frontend listener
+         * misses output because the PTY exits too fast. */
+        if (dbSessionId) {
+          registerPtyForMemory(newPtyId, dbSessionId).catch((error: unknown) => {
+            console.error("Failed to register PTY for memory:", error);
+          });
+        }
         useWorkspaceStore.getState().setPtyId(workspace.slug, newPtyId);
         useWorkspaceStore.getState().updateWorkspaceStatus(workspace.slug, "active");
       } catch (error: unknown) {
@@ -213,6 +227,19 @@ export function WorkspaceTerminalView({ workspace, isActiveTab }: WorkspaceTermi
       detectorRef.current.reset();
     }
     setHasExited(false);
+
+    /* For deployed tasks (non-Channel PTYs), capture the DB session ID from the floor.
+     * Auto-spawned PTYs set ptySessionIdRef in the auto-spawn effect instead. */
+    if (!hasChannelRef.current) {
+      const sessionState = useSessionStore.getState();
+      const floorId = sessionState.activeFloorId;
+      if (floorId) {
+        const floor = sessionState.floors[floorId];
+        if (floor?.session?.id) {
+          ptySessionIdRef.current = floor.session.id;
+        }
+      }
+    }
 
     async function setup(): Promise<void> {
       try {
@@ -272,18 +299,43 @@ export function WorkspaceTerminalView({ workspace, isActiveTab }: WorkspaceTermi
             if (floor?.session?.status === "active") {
               sessionState.updateAllElfStatusOnFloor(floorId, "done");
               sessionState.endSessionOnFloor(floorId, "completed");
+            }
+          }
 
-              /* Persist session completion to DB so History view shows correct status. */
-              const dbSessionId = floor.session.id;
-              if (dbSessionId) {
-                const exitCode = event.payload;
-                const status = exitCode === 0 ? "completed" : "failed";
-                completeSession(dbSessionId, status).catch((error: unknown) => {
-                  console.error("Failed to persist session completion to DB:", error);
-                });
+          /* Resolve the DB session ID for completion + memory extraction.
+           * Priority: 1) floor session (deployed tasks), 2) ptySessionIdRef (auto-spawn). */
+          const floorSessionId = floorId
+            ? sessionState.floors[floorId]?.session?.id ?? null
+            : null;
+          const dbSessionId = floorSessionId ?? ptySessionIdRef.current;
+
+          if (dbSessionId) {
+            const exitCode = event.payload;
+            const status = exitCode === 0 ? "completed" : "failed";
+            completeSession(dbSessionId, status).catch((error: unknown) => {
+              console.error("Failed to persist session completion to DB:", error);
+            });
+
+            /* Memory extraction is handled Rust-side in pty_reader_loop.
+             * The Rust reader accumulates output, stores it as events, and runs
+             * the heuristic extractor — all before emitting pty:exit. By the time
+             * this handler fires, memories are already in the DB. Just refresh
+             * the frontend memory store so the Memory tab shows new entries. */
+            const autoLearn = useSettingsStore.getState().autoLearn;
+            if (autoLearn) {
+              const projectId = useProjectStore.getState().activeProjectId;
+              if (projectId) {
+                listMemories(projectId).then((memories) => {
+                  if (memories.length > 0) {
+                    useMemoryStore.getState().setMemories(memories);
+                  }
+                }).catch(() => { /* best-effort refresh */ });
               }
             }
           }
+
+          /* Reset for next session */
+          ptySessionIdRef.current = null;
         });
         if (!mounted) { exitUnsub(); return; }
         unlistenExit = exitUnsub;

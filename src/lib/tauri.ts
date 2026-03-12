@@ -281,6 +281,20 @@ export async function extractSessionMemories(sessionId: string): Promise<Extract
   return invoke<ExtractionResult>("extract_session_memories", { sessionId });
 }
 
+/** Store terminal output from a PTY session as events for memory extraction.
+ *  Strips ANSI codes, splits into chunks, and stores as "output" events.
+ *  Returns the number of chunks stored. */
+export async function storePtySessionOutput(sessionId: string, output: string): Promise<number> {
+  return invoke<number>("store_pty_session_output", { sessionId, output });
+}
+
+/** Register a PTY for Rust-side memory extraction on exit.
+ *  Called by the frontend for auto-spawned PTYs. Task PTYs are registered
+ *  automatically by start_task_pty on the Rust side. */
+export async function registerPtyForMemory(ptyId: string, sessionId: string): Promise<void> {
+  return invoke<void>("register_pty_for_memory", { ptyId, sessionId });
+}
+
 /** Get memory count for a project. */
 export async function getMemoryCount(projectId: string): Promise<number> {
   return invoke<number>("get_memory_count", { projectId });

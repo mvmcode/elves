@@ -93,6 +93,42 @@ pub fn extract_memories(
     // Deduplicate by normalized content
     deduplicate(&mut extracted);
 
+    // If heuristic extraction produced nothing, create a fallback context memory
+    // from the session task description so every session leaves at least one trace.
+    if extracted.is_empty() {
+        let task_description: Option<String> = conn
+            .query_row(
+                "SELECT task FROM sessions WHERE id = ?1",
+                rusqlite::params![session_id],
+                |row| row.get(0),
+            )
+            .ok();
+
+        if let Some(task) = task_description {
+            if !task.is_empty() {
+                extracted.push(ExtractedEntry {
+                    category: "context".to_string(),
+                    content: format!("Session task: {}", truncate_content(&task, 400)),
+                    tags: vec!["auto-extracted".to_string(), "session-task".to_string()],
+                });
+            }
+        }
+
+        // Also grab the longest event as context if any events exist
+        if let Some(longest) = session_events.iter()
+            .filter(|e| e.event_type == "output" || e.event_type == "assistant" || e.event_type == "text")
+            .max_by_key(|e| e.payload.len())
+        {
+            if longest.payload.len() > 50 {
+                extracted.push(ExtractedEntry {
+                    category: "context".to_string(),
+                    content: truncate_content(&longest.payload, 500),
+                    tags: vec!["auto-extracted".to_string()],
+                });
+            }
+        }
+    }
+
     // Insert memories into the database
     let source = format!("session:{session_id}");
     let mut created_memories: Vec<MemoryRow> = Vec::new();
@@ -505,26 +541,31 @@ mod tests {
     }
 
     #[test]
-    fn short_output_events_are_skipped() {
+    fn short_output_events_produce_fallback_memory() {
         let conn = test_conn();
         seed_session(&conn, "proj-1", "sess-1");
 
-        // Short output (<= 100 chars, no keywords) should not produce a memory
+        // Short output (<= 100 chars, no keywords) doesn't match heuristics,
+        // but fallback creates a memory from the task description.
         events::insert_event(&conn, "sess-1", None, "output", "ok", None).unwrap();
 
         let result = extract_memories(&conn, "sess-1").expect("Should extract");
-        assert!(result.memories.is_empty());
+        // Fallback produces task context memory
+        assert!(!result.memories.is_empty());
+        assert!(result.memories[0].content.contains("Session task:"));
     }
 
     #[test]
-    fn unknown_event_types_are_skipped() {
+    fn unknown_event_types_produce_fallback_memory() {
         let conn = test_conn();
         seed_session(&conn, "proj-1", "sess-1");
 
         events::insert_event(&conn, "sess-1", None, "heartbeat", "{}", None).unwrap();
 
         let result = extract_memories(&conn, "sess-1").expect("Should extract");
-        assert!(result.memories.is_empty());
+        // Fallback produces task context memory
+        assert!(!result.memories.is_empty());
+        assert!(result.memories[0].content.contains("Session task:"));
     }
 
     #[test]
