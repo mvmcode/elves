@@ -244,6 +244,22 @@ pub async fn start_task_pty(
                 "elfId": &elf_id,
             }),
         );
+
+        // Store initial task event so memory extractor has at least the task description
+        {
+            let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+            let task_event_payload = format!("Task started: {task}");
+            if let Err(e) = db::events::insert_event(
+                &conn,
+                &session_id,
+                None,
+                "output",
+                &task_event_payload,
+                None,
+            ) {
+                log::warn!("Failed to store initial task event: {e}");
+            }
+        }
     }
 
     // 3. Resolve working directory
@@ -336,6 +352,10 @@ pub async fn start_task_pty(
     // 6. Spawn via PtyManager — reuses existing PTY infrastructure
     let pty_id = pty_mgr.spawn_with_app(&binary, &args, &working_dir, &app, None)
         .map_err(|e| format!("Failed to spawn PTY: {e}"))?;
+
+    // Register pty_id → session_id so the Rust-side PTY reader can store output
+    // and extract memories on exit (eliminates frontend race condition)
+    crate::commands::pty::register_pty_session(&pty_id, &session_id);
 
     log::info!(
         "[session {session_id}] Started PTY-first task (resume={}): pty_id={pty_id}, working_dir={working_dir}",

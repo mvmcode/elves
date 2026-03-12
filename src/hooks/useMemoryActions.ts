@@ -26,7 +26,7 @@ import type { MemoryEntry, MemoryCategory } from "@/types/memory";
 export function useMemoryActions(): {
   loadMemories: () => Promise<void>;
   handleCreateMemory: (category: MemoryCategory, content: string) => void;
-  handleEditMemory: (memory: MemoryEntry) => void;
+  handleEditMemory: (memory: MemoryEntry, newContent: string) => void;
   handlePinMemory: (memory: MemoryEntry) => void;
   handleDeleteMemory: (memory: MemoryEntry) => void;
   handleSearch: (query: string) => void;
@@ -80,11 +80,10 @@ export function useMemoryActions(): {
     [activeProjectId, addMemory],
   );
 
-  /** Edit a memory's content. Opens a prompt for simplicity — production would use inline editing. */
+  /** Edit a memory's content via inline editing in MemoryCard. */
   const handleEditMemory = useCallback(
-    (memory: MemoryEntry): void => {
-      const newContent = window.prompt("Edit memory content:", memory.content);
-      if (newContent === null || newContent.trim() === "") return;
+    (memory: MemoryEntry, newContent: string): void => {
+      if (newContent.trim() === "" || newContent.trim() === memory.content) return;
       void (async () => {
         try {
           await invokeUpdateMemory(memory.id, newContent.trim());

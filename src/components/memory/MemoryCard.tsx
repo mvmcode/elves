@@ -13,7 +13,7 @@ const FADING_THRESHOLD = 0.3;
 
 interface MemoryCardProps {
   readonly memory: MemoryEntry;
-  readonly onEdit: (memory: MemoryEntry) => void;
+  readonly onEdit: (memory: MemoryEntry, newContent: string) => void;
   readonly onPin: (memory: MemoryEntry) => void;
   readonly onDelete: (memory: MemoryEntry) => void;
 }
@@ -76,6 +76,8 @@ export function MemoryCard({
 }: MemoryCardProps): React.JSX.Element {
   const [isDeleteConfirm, setIsDeleteConfirm] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(memory.content);
   const categoryStyle = CATEGORY_STYLES[memory.category];
   const isPinned = memory.source === "pinned";
   const isFading = memory.relevanceScore < FADING_THRESHOLD;
@@ -99,6 +101,24 @@ export function MemoryCard({
   const handleCancelDelete = useCallback((): void => {
     setIsDeleteConfirm(false);
   }, []);
+
+  const handleStartEdit = useCallback((): void => {
+    setEditContent(memory.content);
+    setIsEditing(true);
+  }, [memory.content]);
+
+  const handleSaveEdit = useCallback((): void => {
+    const trimmed = editContent.trim();
+    if (trimmed.length > 0 && trimmed !== memory.content) {
+      onEdit(memory, trimmed);
+    }
+    setIsEditing(false);
+  }, [editContent, memory, onEdit]);
+
+  const handleCancelEdit = useCallback((): void => {
+    setIsEditing(false);
+    setEditContent(memory.content);
+  }, [memory.content]);
 
   return (
     <div
@@ -128,21 +148,54 @@ export function MemoryCard({
         </span>
       </div>
 
-      {/* Content with truncation */}
-      <p
-        className="mt-3 font-body text-sm leading-relaxed text-text-light"
-        data-testid="memory-content"
-      >
-        {displayedContent}
-      </p>
-      {isLongContent && (
-        <button
-          onClick={() => setIsExpanded((prev) => !prev)}
-          className="mt-1 cursor-pointer font-body text-xs font-bold text-info hover:underline"
-          data-testid="content-toggle"
-        >
-          {isExpanded ? "Show less" : "Show more"}
-        </button>
+      {/* Content — inline editor or display with truncation */}
+      {isEditing ? (
+        <div className="mt-3" data-testid="memory-edit-inline">
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            className="w-full border-token-normal border-border bg-surface rounded-token-sm p-3 font-body text-sm leading-relaxed text-text-light outline-none focus:shadow-brutal-sm focus:shadow-accent"
+            rows={4}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSaveEdit();
+              if (e.key === "Escape") handleCancelEdit();
+            }}
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              onClick={handleSaveEdit}
+              className="cursor-pointer border-token-thin border-border bg-success rounded-token-sm px-3 py-1 font-body text-xs font-bold text-white transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px]"
+            >
+              Save
+            </button>
+            <button
+              onClick={handleCancelEdit}
+              className="cursor-pointer border-token-thin border-border bg-surface-elevated rounded-token-sm px-3 py-1 font-body text-xs font-bold text-text-light transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px]"
+            >
+              Cancel
+            </button>
+            <span className="font-mono text-[10px] text-text-muted-light">Cmd+Enter to save</span>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p
+            className="mt-3 font-body text-sm leading-relaxed text-text-light"
+            data-testid="memory-content"
+          >
+            {displayedContent}
+          </p>
+          {isLongContent && (
+            <button
+              onClick={() => setIsExpanded((prev) => !prev)}
+              className="mt-1 cursor-pointer font-body text-xs font-bold text-info hover:underline"
+              data-testid="content-toggle"
+            >
+              {isExpanded ? "Show less" : "Show more"}
+            </button>
+          )}
+        </>
       )}
 
       {/* Tag badges */}
@@ -223,7 +276,7 @@ export function MemoryCard({
         ) : (
           <>
             <button
-              onClick={() => onEdit(memory)}
+              onClick={handleStartEdit}
               className="cursor-pointer border-token-thin border-border bg-surface-elevated rounded-token-sm px-3 py-1 font-body text-xs text-label text-text-light shadow-brutal-sm transition-all duration-100 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
               data-testid="memory-edit"
             >

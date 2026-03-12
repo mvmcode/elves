@@ -187,3 +187,141 @@ pub fn read_text_from_file(
     std::fs::read_to_string(&file_path)
         .map_err(|e| format!("Failed to read file {file_path}: {e}"))
 }
+
+/// Strip ANSI escape codes from a string.
+pub(crate) fn strip_ansi(input: &str) -> String {
+    // Matches: ESC[ ... final_byte, ESC] ... ST, and other CSI/OSC sequences
+    let mut result = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\x1b' {
+            // ESC[ (CSI) sequences: consume until final byte [A-Za-z]
+            if chars.peek() == Some(&'[') {
+                chars.next(); // consume '['
+                while let Some(&c) = chars.peek() {
+                    chars.next();
+                    if c.is_ascii_alphabetic() || c == '~' {
+                        break;
+                    }
+                }
+            }
+            // ESC] (OSC) sequences: consume until BEL or ST
+            else if chars.peek() == Some(&']') {
+                chars.next();
+                while let Some(&c) = chars.peek() {
+                    chars.next();
+                    if c == '\x07' {
+                        break;
+                    }
+                    // String Terminator: ESC backslash
+                    if c == '\x1b' && chars.peek() == Some(&'\\') {
+                        chars.next();
+                        break;
+                    }
+                }
+            }
+            // ESC followed by single character (e.g. ESC(B): skip one more
+            else {
+                chars.next();
+            }
+        }
+        // Skip other control characters except newline, tab, carriage return
+        else if ch.is_ascii_control() && ch != '\n' && ch != '\t' && ch != '\r' {
+            continue;
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
+}
+
+/// Store already-stripped terminal output as chunked "output" events in the DB.
+///
+/// Consolidates lines into ~500-char chunks and inserts them as events.
+/// Called both from the Tauri command and from the Rust-side PTY exit handler.
+/// Returns the number of chunks stored.
+pub(crate) fn store_terminal_output_as_events(
+    conn: &rusqlite::Connection,
+    session_id: &str,
+    stripped: &str,
+) -> Result<usize, String> {
+    if stripped.trim().is_empty() {
+        return Ok(0);
+    }
+
+    // Consolidate terminal lines into meaningful chunks (~500 chars each).
+    // Terminal output uses single newlines, not paragraphs, so we accumulate
+    // lines into fixed-size chunks that the memory extractor can analyze.
+    let lines: Vec<&str> = stripped.lines().collect();
+    let mut chunks: Vec<String> = Vec::new();
+    let mut current_chunk = String::new();
+
+    for line in &lines {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            // Blank line acts as a soft break — flush if chunk is large enough
+            if current_chunk.len() > 200 {
+                chunks.push(std::mem::take(&mut current_chunk));
+            }
+            continue;
+        }
+        if !current_chunk.is_empty() {
+            current_chunk.push('\n');
+        }
+        current_chunk.push_str(trimmed);
+
+        // Flush at ~500 chars to keep chunks digestible
+        if current_chunk.len() >= 500 {
+            chunks.push(std::mem::take(&mut current_chunk));
+        }
+    }
+    // Flush remainder
+    if current_chunk.len() > 50 {
+        chunks.push(current_chunk);
+    }
+
+    let mut stored = 0;
+    // Cap at 50 chunks to avoid flooding the DB with a huge session
+    for chunk in chunks.iter().take(50) {
+        if let Err(e) = db::events::insert_event(
+            conn,
+            session_id,
+            None,
+            "output",
+            chunk,
+            None,
+        ) {
+            log::warn!("Failed to store PTY output chunk for session {session_id}: {e}");
+        } else {
+            stored += 1;
+        }
+    }
+
+    log::info!(
+        "[session {session_id}] Stored {stored} output chunks from PTY terminal ({} chars stripped)",
+        stripped.len()
+    );
+
+    Ok(stored)
+}
+
+/// Store terminal output from a PTY session as events for memory extraction.
+///
+/// PTY-mode sessions stream raw terminal data (with ANSI codes) that bypasses
+/// the structured event pipeline. This command bridges the gap by accepting
+/// accumulated terminal text, stripping ANSI escape codes, splitting into
+/// meaningful chunks, and storing them as "output" events in the events table.
+///
+/// Called by the frontend just before memory extraction on PTY session exit.
+#[tauri::command]
+pub fn store_pty_session_output(
+    db: State<'_, DbState>,
+    session_id: String,
+    output: String,
+) -> Result<usize, String> {
+    let conn = db.0.lock().map_err(|e| format!("Lock error: {e}"))?;
+    let stripped = strip_ansi(&output);
+    store_terminal_output_as_events(&conn, &session_id, &stripped)
+}

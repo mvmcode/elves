@@ -11,7 +11,7 @@ interface MemoryExplorerProps {
   /** Called when a memory should be created via IPC */
   readonly onCreateMemory?: (category: MemoryCategory, content: string) => void;
   /** Called when a memory should be edited via IPC */
-  readonly onEditMemory?: (memory: MemoryEntry) => void;
+  readonly onEditMemory?: (memory: MemoryEntry, newContent: string) => void;
   /** Called when a memory should be pinned/unpinned via IPC */
   readonly onPinMemory?: (memory: MemoryEntry) => void;
   /** Called when a memory should be deleted via IPC */
@@ -182,7 +182,7 @@ export function MemoryExplorer({
             <MemoryCard
               key={memory.id}
               memory={memory}
-              onEdit={(m) => onEditMemory?.(m)}
+              onEdit={(m, newContent) => onEditMemory?.(m, newContent)}
               onPin={(m) => onPinMemory?.(m)}
               onDelete={(m) => onDeleteMemory?.(m)}
             />
