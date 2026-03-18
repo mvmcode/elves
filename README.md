@@ -178,15 +178,22 @@ Download the latest `.dmg` from [GitHub Releases](https://github.com/mvmcode/elv
 > xattr -cr /Applications/ELVES.app
 > ```
 
-### Windows — Installer
+### Windows — Installer (recommended)
 
-Download the latest `.msi` or `.exe` installer from [GitHub Releases](https://github.com/mvmcode/elves/releases). WebView2 is auto-installed if not present.
+Download from [GitHub Releases](https://github.com/mvmcode/elves/releases):
+
+| Artifact | Description | Size |
+|---|---|---|
+| `ELVES_1.2.0_x64-setup.exe` | NSIS installer (standard) | ~5 MB |
+| `ELVES_1.2.0_x64_en-US.msi` | MSI installer (enterprise/silent) | ~7 MB |
+
+Both auto-install the WebView2 runtime if not present. The MSI supports silent install: `msiexec /i ELVES_1.2.0_x64_en-US.msi /quiet`.
 
 > **SmartScreen note:** Windows Defender SmartScreen may show "Windows protected your PC" since the binary is not code-signed. Click **More info** → **Run anyway**.
 
 ### Windows — Portable
 
-Download the `.zip` from [GitHub Releases](https://github.com/mvmcode/elves/releases), extract, and run `ELVES.exe`.
+Download `elves.exe` (~18 MB) from [GitHub Releases](https://github.com/mvmcode/elves/releases). No install needed — just run it. Requires WebView2 runtime (pre-installed on Windows 11, [download for Windows 10](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)).
 
 ---
 
@@ -216,7 +223,17 @@ codesign --force --deep --sign - src-tauri/target/release/bundle/macos/ELVES.app
 hdiutil create -volname "ELVES" -srcfolder src-tauri/target/release/bundle/macos/ELVES.app -ov -format UDZO ELVES.dmg
 ```
 
-**Windows** — produces an `.msi` installer in `src-tauri/target/release/bundle/msi/` and a portable `.exe` in `src-tauri/target/release/bundle/nsis/`.
+**Windows** — produces three artifacts:
+
+```
+src-tauri/target/release/bundle/
+├── msi/ELVES_1.2.0_x64_en-US.msi      # MSI installer (7.1 MB)
+├── nsis/ELVES_1.2.0_x64-setup.exe      # NSIS installer (5.1 MB)
+src-tauri/target/release/
+└── elves.exe                            # Portable executable (18 MB)
+```
+
+> **Windows build prerequisites:** [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the "Desktop development with C++" workload installed. Install via: `winget install Microsoft.VisualStudio.2022.BuildTools`
 
 ---
 
