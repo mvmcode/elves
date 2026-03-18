@@ -87,9 +87,18 @@ impl PtyManager {
         cmd.env_remove("CLAUDECODE");
         cmd.env_remove("CLAUDE_CODE_ENTRYPOINT");
         cmd.env_remove("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS");
-        // Ensure TERM is set for proper TUI rendering in the PTY
+        // Ensure TERM is set for proper TUI rendering in the PTY.
+        // On Windows with ConPTY, TERM is not typically set — set it for tools that check.
         if std::env::var("TERM").is_err() {
             cmd.env("TERM", "xterm-256color");
+        }
+        // On Windows, ensure the ConPTY virtual terminal processing is enabled
+        // by setting COLORTERM (some CLI tools check this for color support).
+        #[cfg(target_os = "windows")]
+        {
+            if std::env::var("COLORTERM").is_err() {
+                cmd.env("COLORTERM", "truecolor");
+            }
         }
 
         let child = pair

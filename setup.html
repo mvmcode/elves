@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ELVES Setup Guide</title>
+<style>
+  /* Neo-brutalist design tokens */
+  :root {
+    --bg: #FFFDF7;
+    --text: #000;
+    --primary: #FFD93D;
+    --accent-red: #FF6B6B;
+    --accent-green: #6BCB77;
+    --accent-blue: #4D96FF;
+    --accent-orange: #FF8B3D;
+    --border: #000;
+    --shadow: 6px 6px 0px 0px #000;
+    --shadow-sm: 4px 4px 0px 0px #000;
+    --font-display: 'Space Grotesk', 'DM Sans', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    padding: 48px 24px 32px;
+    border-bottom: 3px solid var(--border);
+  }
+  header h1 {
+    font-family: var(--font-display);
+    font-size: 48px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+  }
+  header p {
+    font-size: 18px;
+    margin-top: 8px;
+    max-width: 600px;
+    margin-inline: auto;
+  }
+
+  /* Platform selector */
+  .platform-bar {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px;
+    border-bottom: 3px solid var(--border);
+    background: #FFF;
+  }
+  .platform-btn {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 12px 32px;
+    border: 3px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    background: #FFF;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .platform-btn:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0px 0px #000;
+  }
+  .platform-btn.active {
+    background: var(--primary);
+    transform: translate(4px, 4px);
+    box-shadow: 0px 0px 0px 0px #000;
+  }
+
+  /* Main content */
+  main {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+  }
+
+  /* Step cards */
+  .step {
+    border: 3px solid var(--border);
+    box-shadow: var(--shadow);
+    margin-bottom: 24px;
+    background: #FFF;
+  }
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    border-bottom: 3px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+  .step-header:hover { background: #FAFAF5; }
+  .step-num {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 900;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid var(--border);
+    flex-shrink: 0;
+  }
+  .step-num.done { background: var(--accent-green); color: #FFF; }
+  .step-title {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 700;
+    flex: 1;
+  }
+  .step-toggle {
+    font-size: 20px;
+    font-weight: 700;
+    transition: transform 0.2s;
+  }
+  .step.open .step-toggle { transform: rotate(90deg); }
+  .step-body {
+    padding: 20px;
+    display: none;
+  }
+  .step.open .step-body { display: block; }
+
+  /* Code blocks */
+  pre {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    background: #1A1A2E;
+    color: #FFFDF7;
+    padding: 16px 20px;
+    border: 3px solid var(--border);
+    overflow-x: auto;
+    position: relative;
+    margin: 12px 0;
+  }
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border: 2px solid #FFFDF7;
+    background: transparent;
+    color: #FFFDF7;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  .copy-btn:hover { background: rgba(255,255,255,0.15); }
+  .copy-btn.copied { background: var(--accent-green); color: #000; border-color: var(--accent-green); }
+
+  /* Check items */
+  .check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 2px solid #EEE;
+  }
+  .check-item:last-child { border-bottom: none; }
+  .check-box {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--border);
+    flex-shrink: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 900;
+    transition: background 0.1s;
+  }
+  .check-box.checked { background: var(--accent-green); color: #FFF; }
+  .check-label { flex: 1; }
+  .check-label strong { font-weight: 700; }
+  .check-detail {
+    font-size: 14px;
+    color: #444;
+    margin-top: 4px;
+  }
+
+  /* Status badge */
+  .badge {
+    display: inline-block;
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 10px;
+    border: 2px solid var(--border);
+  }
+  .badge-required { background: var(--accent-red); color: #FFF; }
+  .badge-optional { background: var(--accent-blue); color: #FFF; }
+  .badge-recommended { background: var(--primary); }
+
+  /* Verify button */
+  .verify-btn {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 10px 24px;
+    border: 3px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    background: var(--primary);
+    margin-top: 16px;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .verify-btn:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0px 0px #000;
+  }
+
+  /* Notes */
+  .note {
+    border: 3px solid var(--accent-orange);
+    background: #FFF8EE;
+    padding: 12px 16px;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  .note strong { color: var(--accent-orange); }
+
+  /* Progress bar */
+  .progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 4px;
+    background: var(--accent-green);
+    transition: width 0.3s ease-out;
+    z-index: 100;
+  }
+
+  /* Platform-specific visibility */
+  .macos-only, .windows-only, .linux-only { display: none; }
+  body.platform-macos .macos-only { display: block; }
+  body.platform-windows .windows-only { display: block; }
+  body.platform-linux .linux-only { display: block; }
+
+  /* Link styling */
+  a { color: var(--accent-blue); font-weight: 600; }
+  a:hover { text-decoration: none; }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    header h1 { font-size: 32px; }
+    .platform-btn { padding: 10px 20px; font-size: 14px; }
+    main { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="progress-bar" id="progressBar" style="width: 0%"></div>
+
+<header>
+  <h1>ELVES Setup Guide</h1>
+  <p>Get your AI agent orchestration environment running in minutes. This guide detects your platform and walks you through each step.</p>
+</header>
+
+<div class="platform-bar">
+  <button class="platform-btn" data-platform="macos" onclick="setPlatform('macos')">macOS</button>
+  <button class="platform-btn" data-platform="windows" onclick="setPlatform('windows')">Windows</button>
+  <button class="platform-btn" data-platform="linux" onclick="setPlatform('linux')">Linux</button>
+</div>
+
+<main>
+  <!-- STEP 1: System Requirements -->
+  <div class="step open" data-step="1">
+    <div class="step-header" onclick="toggleStep(this)">
+      <div class="step-num" id="step1-num">1</div>
+      <div class="step-title">System Requirements</div>
+      <div class="step-toggle">&#9654;</div>
+    </div>
+    <div class="step-body">
+      <div class="macos-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>macOS 13+ (Ventura)</strong> <span class="badge badge-required">Required</span>
+            <div class="check-detail">System Preferences &rarr; General &rarr; About. Tauri v2 requires macOS 13 or later.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Xcode Command Line Tools</strong> <span class="badge badge-required">Required</span>
+            <div class="check-detail">Provides git, clang, and system headers needed for Rust compilation.</div>
+            <pre><code>xcode-select --install</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="windows-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Windows 10 version 1809+</strong> <span class="badge badge-required">Required</span>
+            <div class="check-detail">Settings &rarr; System &rarr; About. Requires build 17763 or later for WebView2 support.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>WebView2 Runtime</strong> <span class="badge badge-required">Required</span>
+            <div class="check-detail">Pre-installed on Windows 11. On Windows 10, the ELVES installer auto-downloads it. Or install manually from <a href="https://developer.microsoft.com/en-us/microsoft-edge/webview2/" target="_blank">Microsoft</a>.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Visual Studio Build Tools</strong> <span class="badge badge-required">Required for source builds</span>
+            <div class="check-detail">Install "Desktop development with C++" workload. Required for Rust compilation on Windows.</div>
+            <pre><code>winget install Microsoft.VisualStudio.2022.BuildTools</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Windows Terminal</strong> <span class="badge badge-recommended">Recommended</span>
+            <div class="check-detail">ELVES uses Windows Terminal for external terminal launches. Falls back to cmd.exe if not installed.</div>
+            <pre><code>winget install Microsoft.WindowsTerminal</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="linux-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>System libraries</strong> <span class="badge badge-required">Required</span>
+            <div class="check-detail">Tauri v2 requires webkit2gtk, libappindicator, and build essentials.</div>
+            <pre><code>sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: Git -->
+  <div class="step" data-step="2">
+    <div class="step-header" onclick="toggleStep(this)">
+      <div class="step-num" id="step2-num">2</div>
+      <div class="step-title">Install Git</div>
+      <div class="step-toggle">&#9654;</div>
+    </div>
+    <div class="step-body">
+      <p style="margin-bottom:12px">Git is required for worktree-based workspaces &mdash; ELVES creates isolated branches for every task.</p>
+
+      <div class="macos-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Git (pre-installed with Xcode CLT)</strong>
+            <div class="check-detail">Already installed if you ran <code>xcode-select --install</code>. Verify:</div>
+            <pre><code>git --version</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="windows-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Git for Windows</strong> <span class="badge badge-required">Required</span>
+            <div class="check-detail">Download from <a href="https://git-scm.com/download/win" target="_blank">git-scm.com</a> or install via winget:</div>
+            <pre><code>winget install Git.Git</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+            <div class="note">
+              <strong>Tip:</strong> During Git install, select "Git from the command line and also from 3rd-party software" to ensure it's on your PATH. ELVES auto-configures <code>core.autocrlf</code> and <code>core.longpaths</code> for worktrees.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="linux-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Git</strong>
+            <pre><code>sudo apt install git</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: Node.js -->
+  <div class="step" data-step="3">
+    <div class="step-header" onclick="toggleStep(this)">
+      <div class="step-num" id="step3-num">3</div>
+      <div class="step-title">Install Node.js 18+</div>
+      <div class="step-toggle">&#9654;</div>
+    </div>
+    <div class="step-body">
+      <p style="margin-bottom:12px">Node.js provides npm, which is used to install Claude Code and Codex CLI runtimes (and for building ELVES from source).</p>
+
+      <div class="macos-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Via Homebrew</strong>
+            <pre><code>brew install node</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+            <div class="check-detail">Or use a version manager like <a href="https://github.com/nvm-sh/nvm" target="_blank">nvm</a>, <a href="https://github.com/Schniz/fnm" target="_blank">fnm</a>, or <a href="https://volta.sh" target="_blank">Volta</a>.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="windows-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Via winget or direct download</strong>
+            <pre><code>winget install OpenJS.NodeJS.LTS</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+            <div class="check-detail">Or download from <a href="https://nodejs.org" target="_blank">nodejs.org</a>. ELVES scans npm global, Scoop, fnm, nvm-windows, and Volta install paths automatically.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="linux-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Via NodeSource or nvm</strong>
+            <pre><code>curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+sudo apt install -y nodejs</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+      </div>
+
+      <p style="margin-top:12px">Verify installation:</p>
+      <pre><code>node --version && npm --version</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+    </div>
+  </div>
+
+  <!-- STEP 4: AI Runtimes -->
+  <div class="step" data-step="4">
+    <div class="step-header" onclick="toggleStep(this)">
+      <div class="step-num" id="step4-num">4</div>
+      <div class="step-title">Install AI Runtimes</div>
+      <div class="step-toggle">&#9654;</div>
+    </div>
+    <div class="step-body">
+      <p style="margin-bottom:12px">Install at least one. Both can coexist &mdash; ELVES lets you pick per-project.</p>
+
+      <div class="check-item">
+        <div class="check-box" onclick="toggleCheck(this)"></div>
+        <div class="check-label">
+          <strong>Claude Code CLI</strong> <span class="badge badge-recommended">Recommended</span>
+          <div class="check-detail">Anthropic's AI coding agent. Requires an <a href="https://console.anthropic.com" target="_blank">Anthropic API key</a> or a Claude Pro/Team/Enterprise subscription.</div>
+          <pre><code>npm install -g @anthropic-ai/claude-code</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          <p style="margin-top:8px;font-size:14px">Verify: <code>claude --version</code></p>
+        </div>
+      </div>
+
+      <div class="check-item">
+        <div class="check-box" onclick="toggleCheck(this)"></div>
+        <div class="check-label">
+          <strong>Codex CLI</strong> <span class="badge badge-optional">Optional</span>
+          <div class="check-detail">OpenAI's coding agent. Requires an <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI API key</a>.</div>
+          <pre><code>npm install -g @openai/codex</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          <p style="margin-top:8px;font-size:14px">Verify: <code>codex --version</code></p>
+        </div>
+      </div>
+
+      <div class="windows-only">
+        <div class="note">
+          <strong>Windows note:</strong> npm global installs create <code>.cmd</code> wrapper scripts. ELVES handles this automatically &mdash; it searches for both <code>claude</code> and <code>claude.cmd</code> when resolving binaries.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 5: Rust (source builds only) -->
+  <div class="step" data-step="5">
+    <div class="step-header" onclick="toggleStep(this)">
+      <div class="step-num" id="step5-num">5</div>
+      <div class="step-title">Install Rust (source builds only)</div>
+      <div class="step-toggle">&#9654;</div>
+    </div>
+    <div class="step-body">
+      <div class="note">
+        <strong>Skip this step</strong> if you're installing ELVES from a pre-built release (Homebrew, MSI, DMG). Rust is only needed to compile from source.
+      </div>
+
+      <div class="check-item" style="margin-top:12px">
+        <div class="check-box" onclick="toggleCheck(this)"></div>
+        <div class="check-label">
+          <strong>Rust via rustup</strong>
+          <div class="macos-only">
+            <pre><code>curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+          <div class="windows-only">
+            <pre><code>winget install Rustlang.Rustup</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+            <div class="check-detail">Or download from <a href="https://rustup.rs" target="_blank">rustup.rs</a>. Requires VS Build Tools (Step 1).</div>
+          </div>
+          <div class="linux-only">
+            <pre><code>curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+          <p style="margin-top:8px;font-size:14px">Verify: <code>rustc --version && cargo --version</code></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 6: Install ELVES -->
+  <div class="step" data-step="6">
+    <div class="step-header" onclick="toggleStep(this)">
+      <div class="step-num" id="step6-num">6</div>
+      <div class="step-title">Install ELVES</div>
+      <div class="step-toggle">&#9654;</div>
+    </div>
+    <div class="step-body">
+      <p style="margin-bottom: 16px; font-weight: 700;">Choose your installation method:</p>
+
+      <div class="macos-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Option A: Homebrew (recommended)</strong>
+            <pre><code>brew install --no-quarantine --cask mvmcode/tap/elves</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Option B: Direct download</strong>
+            <div class="check-detail">Download the <code>.dmg</code> from <a href="https://github.com/mvmcode/elves/releases/latest" target="_blank">GitHub Releases</a>.</div>
+            <div class="note">
+              <strong>Gatekeeper:</strong> Right-click ELVES.app &rarr; Open &rarr; Open in dialog. Or run: <code>xattr -cr /Applications/ELVES.app</code>
+            </div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Option C: Build from source</strong>
+            <pre><code>git clone https://github.com/mvmcode/elves.git
+cd elves && npm install && npm run tauri dev</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="windows-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Option A: MSI Installer (recommended)</strong>
+            <div class="check-detail">Download the <code>.msi</code> from <a href="https://github.com/mvmcode/elves/releases/latest" target="_blank">GitHub Releases</a>. Auto-installs WebView2 if needed.</div>
+            <div class="note">
+              <strong>SmartScreen:</strong> Click "More info" &rarr; "Run anyway" (binary is not code-signed).
+            </div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Option B: Portable .zip</strong>
+            <div class="check-detail">Download the <code>.zip</code> from <a href="https://github.com/mvmcode/elves/releases/latest" target="_blank">GitHub Releases</a>, extract, and run <code>ELVES.exe</code>.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Option C: Build from source</strong>
+            <pre><code>git clone https://github.com/mvmcode/elves.git
+cd elves &amp;&amp; npm install &amp;&amp; npm run tauri dev</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="linux-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Build from source</strong>
+            <pre><code>git clone https://github.com/mvmcode/elves.git
+cd elves && npm install && npm run tauri dev</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 7: First Launch -->
+  <div class="step" data-step="7">
+    <div class="step-header" onclick="toggleStep(this)">
+      <div class="step-num" id="step7-num">7</div>
+      <div class="step-title">First Launch Checklist</div>
+      <div class="step-toggle">&#9654;</div>
+    </div>
+    <div class="step-body">
+      <p style="margin-bottom:12px">When ELVES starts for the first time, it will:</p>
+
+      <div class="check-item">
+        <div class="check-box" onclick="toggleCheck(this)"></div>
+        <div class="check-label">
+          <strong>Detect runtimes</strong>
+          <div class="check-detail">ELVES scans your PATH for <code>claude</code> and <code>codex</code> binaries. The status bar shows green/red indicators. If both are missing, you'll see the First-Run Wizard with install hints and a re-scan button.</div>
+        </div>
+      </div>
+
+      <div class="check-item">
+        <div class="check-box" onclick="toggleCheck(this)"></div>
+        <div class="check-label">
+          <strong>Create your first project</strong>
+          <div class="check-detail">Point ELVES at a git repository on your machine. Each project gets its own workspace, memory, and configuration.</div>
+        </div>
+      </div>
+
+      <div class="check-item">
+        <div class="check-box" onclick="toggleCheck(this)"></div>
+        <div class="check-label">
+          <strong>Run your first task</strong>
+          <div class="check-detail">Type a task in the task bar (or press <span class="macos-only" style="display:inline"><kbd>Cmd+K</kbd></span><span class="windows-only" style="display:inline"><kbd>Ctrl+K</kbd></span><span class="linux-only" style="display:inline"><kbd>Ctrl+K</kbd></span>), then click "Summon". ELVES creates a worktree, spawns the agent in a live terminal, and you can watch it work in real time.</div>
+        </div>
+      </div>
+
+      <div class="check-item">
+        <div class="check-box" onclick="toggleCheck(this)"></div>
+        <div class="check-label">
+          <strong>Ship or discard</strong>
+          <div class="check-detail">When the agent finishes, click "Ship It" to push, merge, and clean up &mdash; or "Remove" to discard the worktree.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 8: Keyboard Shortcuts -->
+  <div class="step" data-step="8">
+    <div class="step-header" onclick="toggleStep(this)">
+      <div class="step-num" id="step8-num">8</div>
+      <div class="step-title">Keyboard Shortcuts</div>
+      <div class="step-toggle">&#9654;</div>
+    </div>
+    <div class="step-body">
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <thead>
+          <tr style="border-bottom:3px solid var(--border);text-align:left">
+            <th style="padding:8px 12px;font-family:var(--font-display)">Shortcut</th>
+            <th style="padding:8px 12px;font-family:var(--font-display)">Action</th>
+          </tr>
+        </thead>
+        <tbody id="shortcutTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- STEP 9: Troubleshooting -->
+  <div class="step" data-step="9">
+    <div class="step-header" onclick="toggleStep(this)">
+      <div class="step-num" id="step9-num">9</div>
+      <div class="step-title">Troubleshooting</div>
+      <div class="step-toggle">&#9654;</div>
+    </div>
+    <div class="step-body">
+      <div class="macos-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>"ELVES.app is damaged" / Gatekeeper block</strong>
+            <pre><code>xattr -cr /Applications/ELVES.app</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Runtime not detected (installed via nvm/Homebrew)</strong>
+            <div class="check-detail">ELVES resolves your login shell PATH at startup. If binaries are still not found, ensure they're accessible from a new Terminal window: <code>which claude</code></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="windows-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>SmartScreen blocks ELVES</strong>
+            <div class="check-detail">Click "More info" &rarr; "Run anyway". The binary is not code-signed (open-source project).</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Runtime not detected</strong>
+            <div class="check-detail">ELVES scans npm global (<code>%APPDATA%\npm</code>), Scoop, Cargo, Volta, and fnm paths. Ensure <code>claude</code> or <code>codex</code> is accessible from a new cmd window:</div>
+            <pre><code>where claude</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Long path errors in worktrees</strong>
+            <div class="check-detail">ELVES auto-sets <code>core.longpaths=true</code> per worktree. If you still hit issues, enable it globally:</div>
+            <pre><code>git config --global core.longpaths true</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Mixed line endings in diffs</strong>
+            <div class="check-detail">ELVES configures <code>core.autocrlf=true</code> per worktree. For global consistency:</div>
+            <pre><code>git config --global core.autocrlf true</code><button class="copy-btn" onclick="copyCode(this)">Copy</button></pre>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>WebView2 missing</strong>
+            <div class="check-detail">The MSI installer auto-downloads WebView2. If using the portable version, install from <a href="https://developer.microsoft.com/en-us/microsoft-edge/webview2/" target="_blank">Microsoft</a>.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>"--version timed out" in runtime detection</strong>
+            <div class="check-detail">ELVES gives each binary 5 seconds to respond to <code>--version</code>. If it times out, the install may be broken. Reinstall the CLI: <code>npm install -g @anthropic-ai/claude-code</code></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="linux-only">
+        <div class="check-item">
+          <div class="check-box" onclick="toggleCheck(this)"></div>
+          <div class="check-label">
+            <strong>Missing webkit2gtk</strong>
+            <div class="check-detail">See Step 1 for the full package list. The exact packages vary by distro.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// Platform detection
+function detectPlatform() {
+  const ua = navigator.userAgent || navigator.platform || '';
+  if (/Win/.test(ua)) return 'windows';
+  if (/Mac/.test(ua)) return 'macos';
+  return 'linux';
+}
+
+function setPlatform(platform) {
+  document.body.className = 'platform-' + platform;
+  document.querySelectorAll('.platform-btn').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.platform === platform);
+  });
+  populateShortcuts(platform);
+  localStorage.setItem('elves-setup-platform', platform);
+}
+
+// Step toggle
+function toggleStep(header) {
+  header.parentElement.classList.toggle('open');
+}
+
+// Checkbox toggle
+function toggleCheck(box) {
+  box.classList.toggle('checked');
+  box.textContent = box.classList.contains('checked') ? '\u2713' : '';
+  updateProgress();
+  saveState();
+}
+
+// Copy code
+function copyCode(btn) {
+  var code = btn.parentElement.querySelector('code').textContent;
+  navigator.clipboard.writeText(code).then(function() {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(function() {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 1500);
+  });
+}
+
+// Progress bar
+function updateProgress() {
+  // Only count visible checkboxes
+  var platform = document.body.className.replace('platform-', '');
+  var allBoxes = document.querySelectorAll('.check-box');
+  var visible = [];
+  allBoxes.forEach(function(box) {
+    var parent = box.closest('.macos-only, .windows-only, .linux-only');
+    if (!parent || parent.classList.contains(platform + '-only')) {
+      visible.push(box);
+    }
+  });
+  var checked = visible.filter(function(b) { return b.classList.contains('checked'); });
+  var pct = visible.length > 0 ? (checked.length / visible.length * 100) : 0;
+  document.getElementById('progressBar').style.width = pct + '%';
+
+  // Update step numbers
+  for (var i = 1; i <= 9; i++) {
+    var stepEl = document.querySelector('[data-step="' + i + '"]');
+    var numEl = document.getElementById('step' + i + '-num');
+    if (stepEl && numEl) {
+      var boxes = stepEl.querySelectorAll('.check-box');
+      var visibleBoxes = [];
+      boxes.forEach(function(box) {
+        var p = box.closest('.macos-only, .windows-only, .linux-only');
+        if (!p || p.classList.contains(platform + '-only')) {
+          visibleBoxes.push(box);
+        }
+      });
+      var allChecked = visibleBoxes.length > 0 && visibleBoxes.every(function(b) { return b.classList.contains('checked'); });
+      numEl.classList.toggle('done', allChecked);
+      if (allChecked) numEl.textContent = '\u2713';
+      else numEl.textContent = i;
+    }
+  }
+}
+
+// Keyboard shortcuts table
+function populateShortcuts(platform) {
+  var mod = platform === 'macos' ? '\u2318' : 'Ctrl';
+  var shortcuts = [
+    [mod + ' K', 'Focus task bar'],
+    [mod + ' N', 'New project'],
+    [mod + ' T', 'New floor'],
+    [mod + ' W', 'Close active floor'],
+    [mod + ' \u21e7 ]', 'Next floor'],
+    [mod + ' \u21e7 [', 'Previous floor'],
+    [mod + ' 1\u20139', 'Switch project by index'],
+    [mod + ' .', 'Cancel current task'],
+    [mod + ' `', 'Toggle terminal panel'],
+    [mod + ' M', 'Toggle memory view'],
+    [mod + ' ,', 'Toggle settings'],
+    [mod + ' /', 'Toggle shortcut help'],
+    [mod + ' B', 'Toggle activity feed'],
+    [mod + ' R', 'Toggle runtime'],
+    [mod + ' \u21e7 F', 'Toggle focus mode'],
+    [mod + ' S', 'Save open file'],
+    ['Space', 'Toggle workshop / card view'],
+    ['Escape', 'Close panel / unfocus'],
+  ];
+  var tbody = document.getElementById('shortcutTable');
+  tbody.innerHTML = '';
+  shortcuts.forEach(function(s) {
+    var tr = document.createElement('tr');
+    tr.style.borderBottom = '2px solid #EEE';
+    tr.innerHTML = '<td style="padding:8px 12px;font-family:var(--font-mono);font-weight:700;white-space:nowrap">' + s[0] +
+      '</td><td style="padding:8px 12px">' + s[1] + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+// Persist state
+function saveState() {
+  var state = [];
+  document.querySelectorAll('.check-box').forEach(function(box, i) {
+    state.push(box.classList.contains('checked'));
+  });
+  localStorage.setItem('elves-setup-state', JSON.stringify(state));
+}
+
+function restoreState() {
+  try {
+    var state = JSON.parse(localStorage.getItem('elves-setup-state'));
+    if (state) {
+      document.querySelectorAll('.check-box').forEach(function(box, i) {
+        if (state[i]) {
+          box.classList.add('checked');
+          box.textContent = '\u2713';
+        }
+      });
+    }
+  } catch(e) {}
+}
+
+// Init
+var savedPlatform = localStorage.getItem('elves-setup-platform') || detectPlatform();
+setPlatform(savedPlatform);
+restoreState();
+updateProgress();
+</script>
+</body>
+</html>

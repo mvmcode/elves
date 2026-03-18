@@ -298,7 +298,8 @@ export async function readTextFromFile(filePath: string): Promise<string> {
 
 /* ── Terminal commands ────────────────────────────────────────── */
 
-/** Open Terminal.app cd'd into the given project directory (macOS).
+/** Open an external terminal cd'd into the given project directory.
+ * Uses Terminal.app on macOS, Windows Terminal (or cmd) on Windows.
  * When claudeSessionId is provided, runs `claude --resume <id>` in the terminal. */
 export async function openProjectTerminal(path: string, claudeSessionId?: string): Promise<void> {
   await invoke<void>("open_project_terminal", { path, claudeSessionId: claudeSessionId ?? null });
