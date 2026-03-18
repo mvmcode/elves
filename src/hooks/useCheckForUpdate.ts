@@ -1,4 +1,5 @@
-// Non-blocking Homebrew update check — runs once on mount, shows toast if newer version exists.
+// Non-blocking update check — runs once on mount, shows toast if newer version exists.
+// Uses the Homebrew tap formula on macOS, GitHub releases on Windows/Linux.
 
 import { useEffect } from "react";
 import { getVersion } from "@tauri-apps/api/app";
@@ -16,7 +17,12 @@ function isNewerVersion(local: string, remote: string): boolean {
   return rPatch > lPatch;
 }
 
-/** Check Homebrew tap for updates on mount. Shows a persistent toast if a newer version exists. */
+/** Detect platform from navigator (best-effort). */
+function isMacOS(): boolean {
+  return typeof navigator !== "undefined" && navigator.platform?.startsWith("Mac");
+}
+
+/** Check for updates on mount. Shows a persistent toast if a newer version exists. */
 export function useCheckForUpdate(): void {
   useEffect(() => {
     let cancelled = false;
@@ -30,16 +36,28 @@ export function useCheckForUpdate(): void {
       if (cancelled || !remoteVersion) return;
       if (!isNewerVersion(localVersion, remoteVersion)) return;
 
+      const updateAction = isMacOS()
+        ? {
+            label: "COPY COMMAND",
+            onClick: () => {
+              void navigator.clipboard.writeText("brew upgrade --cask elves");
+            },
+          }
+        : {
+            label: "DOWNLOAD",
+            onClick: () => {
+              void window.open(
+                "https://github.com/mvmcode/elves/releases/latest",
+                "_blank",
+              );
+            },
+          };
+
       useToastStore.getState().addToast({
         message: `ELVES ${remoteVersion} is available`,
         variant: "info",
         duration: 0,
-        action: {
-          label: "COPY COMMAND",
-          onClick: () => {
-            void navigator.clipboard.writeText("brew upgrade --cask elves");
-          },
-        },
+        action: updateAction,
       });
     }
 

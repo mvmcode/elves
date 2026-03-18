@@ -11,24 +11,30 @@ export interface ShortcutDef {
   readonly description: string;
 }
 
+/** Modifier key label — ⌘ on macOS, Ctrl on Windows/Linux. */
+const MOD =
+  typeof navigator !== "undefined" && navigator.platform?.startsWith("Mac")
+    ? "⌘"
+    : "Ctrl";
+
 /** All registered shortcuts, for rendering in the ShortcutOverlay. */
 export const SHORTCUT_DEFINITIONS: readonly ShortcutDef[] = [
-  { keys: "⌘ K", description: "Focus task bar" },
-  { keys: "⌘ N", description: "New project" },
-  { keys: "⌘ T", description: "New floor" },
-  { keys: "⌘ W", description: "Close active floor" },
-  { keys: "⌘ ⇧ ]", description: "Next floor" },
-  { keys: "⌘ ⇧ [", description: "Previous floor" },
-  { keys: "⌘ 1-9", description: "Switch project by index" },
-  { keys: "⌘ .", description: "Cancel current task" },
-  { keys: "⌘ `", description: "Toggle terminal panel" },
-  { keys: "⌘ M", description: "Toggle memory view" },
-  { keys: "⌘ ,", description: "Toggle settings view" },
-  { keys: "⌘ /", description: "Toggle shortcut help" },
-  { keys: "⌘ B", description: "Toggle activity feed" },
-  { keys: "⌘ R", description: "Toggle runtime" },
-  { keys: "⌘ ⇧ F", description: "Toggle focus mode" },
-  { keys: "⌘ S", description: "Save open file" },
+  { keys: `${MOD} K`, description: "Focus task bar" },
+  { keys: `${MOD} N`, description: "New project" },
+  { keys: `${MOD} T`, description: "New floor" },
+  { keys: `${MOD} W`, description: "Close active floor" },
+  { keys: `${MOD} ⇧ ]`, description: "Next floor" },
+  { keys: `${MOD} ⇧ [`, description: "Previous floor" },
+  { keys: `${MOD} 1-9`, description: "Switch project by index" },
+  { keys: `${MOD} .`, description: "Cancel current task" },
+  { keys: `${MOD} \``, description: "Toggle terminal panel" },
+  { keys: `${MOD} M`, description: "Toggle memory view" },
+  { keys: `${MOD} ,`, description: "Toggle settings view" },
+  { keys: `${MOD} /`, description: "Toggle shortcut help" },
+  { keys: `${MOD} B`, description: "Toggle activity feed" },
+  { keys: `${MOD} R`, description: "Toggle runtime" },
+  { keys: `${MOD} ⇧ F`, description: "Toggle focus mode" },
+  { keys: `${MOD} S`, description: "Save open file" },
   { keys: "Space", description: "Toggle workshop / card view" },
   { keys: "Escape", description: "Close panel / unfocus" },
 ] as const;
@@ -42,7 +48,7 @@ interface UseKeyboardShortcutsOptions {
 
 /**
  * Registers global keyboard shortcuts on the window.
- * Shortcuts use Cmd (Meta) key on macOS.
+ * Shortcuts use Cmd (Meta) on macOS, Ctrl on Windows/Linux.
  * Returns the shortcutOverlayOpen state and toggle function for the overlay.
  */
 export function useKeyboardShortcuts(

@@ -12,6 +12,7 @@ Type a task. Get an isolated git worktree with a live embedded terminal. Ship th
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-FFD93D.svg" alt="License: MIT" /></a>
   <a href="https://github.com/mvmcode/elves"><img src="https://img.shields.io/badge/macOS-13%2B-000000.svg" alt="macOS" /></a>
+  <a href="https://github.com/mvmcode/elves"><img src="https://img.shields.io/badge/Windows-10%2B-0078D4.svg" alt="Windows" /></a>
   <a href="https://tauri.app"><img src="https://img.shields.io/badge/Built%20with-Tauri%20v2-24C8DB.svg" alt="Built with Tauri" /></a>
   <a href="https://github.com/mvmcode/elves/actions/workflows/ci.yml"><img src="https://github.com/mvmcode/elves/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
@@ -20,7 +21,7 @@ Type a task. Get an isolated git worktree with a live embedded terminal. Ship th
 
 ## What is ELVES?
 
-ELVES is a Tauri v2 desktop app (macOS) that orchestrates [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [OpenAI Codex](https://openai.com/index/codex/) in isolated git worktrees with embedded terminals. You type a task, ELVES creates a worktree, spawns the agent in a live PTY, and gives you a terminal view to watch it work. When it's done, you ship the branch or discard the worktree.
+ELVES is a Tauri v2 desktop app (macOS, Windows) that orchestrates [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and [OpenAI Codex](https://openai.com/index/codex/) in isolated git worktrees with embedded terminals. You type a task, ELVES creates a worktree, spawns the agent in a live PTY, and gives you a terminal view to watch it work. When it's done, you ship the branch or discard the worktree.
 
 Not just for coding. Research, analysis, writing, planning, data processing — if Claude Code or Codex can do it, ELVES can manage it with full workspace isolation.
 
@@ -123,7 +124,7 @@ Three-step onboarding for new users: runtime detection with install hints and re
 StatusBar shows a live health indicator for each runtime with version info. Clickable popover shows detailed status. Periodic 5-minute re-checks keep status current. If the default runtime is missing, ELVES auto-switches to the available one. Summon button is disabled with an explanation when no runtimes are detected.
 
 ### Auto-Update
-Non-blocking Homebrew update check on launch. If a newer version is available, shows a toast with a one-click copy command for `brew upgrade --cask elves`.
+Non-blocking update check on launch. On macOS, shows a toast with a one-click copy command for `brew upgrade --cask elves`. On Windows, links directly to the GitHub Releases page for download.
 
 ### Neo-Brutalist UI
 Thick black borders. Hard drop shadows (no blur). Saturated colors. Oversized typography. Snappy 100-200ms animations. Dark mode with full design token support. This isn't another gray SaaS dashboard — it looks like a bold poster that happens to orchestrate AI agents.
@@ -144,18 +145,23 @@ Every session records a full event log with cost tracking and duration. Step thr
 
 ## Prerequisites
 
-- **macOS 13+** (Ventura or later)
-- **Node.js 18+**
-- **Rust** (for building from source — install via [rustup](https://rustup.rs))
-- At least one AI runtime:
-  - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) — `npm install -g @anthropic-ai/claude-code`
-  - [Codex CLI](https://github.com/openai/codex) — `npm install -g @openai/codex`
+| Requirement | macOS | Windows | Notes |
+|---|---|---|---|
+| **OS** | macOS 13+ (Ventura) | Windows 10+ (1809+) | WebView2 required on Windows (auto-installed) |
+| **Node.js** | 18+ | 18+ | For npm-installed AI runtimes |
+| **Rust** | via [rustup](https://rustup.rs) | via [rustup](https://rustup.rs) | Only for building from source |
+| **Git** | Pre-installed | [git-scm.com](https://git-scm.com) | Required for worktree workspaces |
+| **AI Runtime** | At least one: | At least one: | |
+| — Claude Code | `npm i -g @anthropic-ai/claude-code` | `npm i -g @anthropic-ai/claude-code` | |
+| — Codex CLI | `npm i -g @openai/codex` | `npm i -g @openai/codex` | |
+
+> **Interactive setup guide:** Open [`setup.html`](setup.html) in your browser for a step-by-step walkthrough with platform detection.
 
 ---
 
 ## Quick Start
 
-### Install via Homebrew (recommended)
+### macOS — Homebrew (recommended)
 
 ```bash
 brew install --no-quarantine --cask mvmcode/tap/elves
@@ -163,20 +169,37 @@ brew install --no-quarantine --cask mvmcode/tap/elves
 
 The `--no-quarantine` flag prevents macOS Gatekeeper from blocking the app (ELVES is not notarized — it's an open-source project without an Apple Developer account).
 
-### Or Download Directly
+### macOS — Direct Download
 
 Download the latest `.dmg` from [GitHub Releases](https://github.com/mvmcode/elves/releases).
 
-> **Gatekeeper note:** Since ELVES is not notarized, macOS may say the app is "damaged" or "can't be verified." To fix this, right-click `ELVES.app` → **Open** → click **Open** in the dialog. Or run:
+> **Gatekeeper note:** macOS may say the app is "damaged" or "can't be verified." Right-click `ELVES.app` → **Open** → click **Open** in the dialog. Or run:
 > ```bash
 > xattr -cr /Applications/ELVES.app
 > ```
+
+### Windows — Installer (recommended)
+
+Download from [GitHub Releases](https://github.com/mvmcode/elves/releases):
+
+| Artifact | Description | Size |
+|---|---|---|
+| `ELVES_1.2.0_x64-setup.exe` | NSIS installer (standard) | ~5 MB |
+| `ELVES_1.2.0_x64_en-US.msi` | MSI installer (enterprise/silent) | ~7 MB |
+
+Both auto-install the WebView2 runtime if not present. The MSI supports silent install: `msiexec /i ELVES_1.2.0_x64_en-US.msi /quiet`.
+
+> **SmartScreen note:** Windows Defender SmartScreen may show "Windows protected your PC" since the binary is not code-signed. Click **More info** → **Run anyway**.
+
+### Windows — Portable
+
+Download `elves.exe` (~18 MB) from [GitHub Releases](https://github.com/mvmcode/elves/releases). No install needed — just run it. Requires WebView2 runtime (pre-installed on Windows 11, [download for Windows 10](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)).
 
 ---
 
 ## Getting Started
 
-### Install from Source
+### Build from Source
 
 ```bash
 git clone https://github.com/mvmcode/elves.git
@@ -193,12 +216,24 @@ On first launch, ELVES scans your PATH for `claude` and `codex` binaries, detect
 npm run tauri build
 ```
 
-This produces a `.app` bundle in `src-tauri/target/release/bundle/macos/`. To create a distributable DMG with proper code signing:
+**macOS** — produces a `.app` bundle in `src-tauri/target/release/bundle/macos/`:
 
 ```bash
 codesign --force --deep --sign - src-tauri/target/release/bundle/macos/ELVES.app
 hdiutil create -volname "ELVES" -srcfolder src-tauri/target/release/bundle/macos/ELVES.app -ov -format UDZO ELVES.dmg
 ```
+
+**Windows** — produces three artifacts:
+
+```
+src-tauri/target/release/bundle/
+├── msi/ELVES_1.2.0_x64_en-US.msi      # MSI installer (7.1 MB)
+├── nsis/ELVES_1.2.0_x64-setup.exe      # NSIS installer (5.1 MB)
+src-tauri/target/release/
+└── elves.exe                            # Portable executable (18 MB)
+```
+
+> **Windows build prerequisites:** [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the "Desktop development with C++" workload installed. Install via: `winget install Microsoft.VisualStudio.2022.BuildTools`
 
 ---
 
@@ -385,9 +420,10 @@ elves/
 - **Unified agent protocol**: Claude Code and Codex events are normalized into a single typed stream. The interop layer formats context per runtime. Frontend never touches runtime-specific types.
 - **Embedded terminal**: PTY via `portable-pty` with xterm.js frontend. Full terminal fidelity including colors, cursor movement, and interactive prompts. Split terminal view for team sessions.
 - **Permission popup overlay**: When the PTY agent requests permission, a popup renders over the terminal for inline approve/deny without leaving the view.
-- **Global keyboard shortcuts**: Centralized in `useKeyboardShortcuts` hook — Cmd+K (task bar), Cmd+1-9 (projects), Cmd+M (memory)
+- **Global keyboard shortcuts**: Centralized in `useKeyboardShortcuts` hook — Cmd/Ctrl+K (task bar), Cmd/Ctrl+1-9 (projects), Cmd/Ctrl+M (memory). Modifier key adapts to platform automatically.
 - **Claude discovery**: Filesystem scan of `~/.claude/` surfaces agents, models, permission modes, and slash commands — no subprocess needed
-- **macOS .app PATH resolution**: Shell PATH is resolved at startup via interactive login shell, with fallback to well-known binary directories. PTY binary names are resolved to absolute paths via `which` before spawning.
+- **Cross-platform PATH resolution**: On macOS, shell PATH is resolved at startup via interactive login shell. On Windows, well-known install directories (npm global, Scoop, Cargo, Volta, fnm) are appended. Binary resolution handles `.cmd` wrappers from npm global installs. PTY binary names are resolved to absolute paths via `which` before spawning.
+- **Windows-specific hardening**: Git worktrees auto-configure `core.autocrlf=true` (prevents mixed line endings from AI agent output) and `core.longpaths=true` (handles deep `node_modules` trees). ConPTY color support via `COLORTERM` env var. Windows Terminal (`wt`) preferred with `cmd.exe` fallback for external terminal launches.
 
 ---
 
@@ -406,6 +442,7 @@ All core phases are complete. Post-release work focuses on stability, runtime ha
 - [x] **Phase 9: Workspace Redesign** — Worktree-first workspaces, Ship It completion flow, project-scoped config, branch management, DiffViewer, merge strategy picker
 - [x] **Post-release** — macOS .app PATH resolution, multi-repo support, floor system, skill catalog, file attachments, stall detection, auto-update checks, race condition fixes, PTY/xterm hardening
 - [x] **v1.1** — Insights dashboard overhaul (real Claude Code telemetry, model usage, project summaries, AI report), terminal revamp (Channel IPC, WebGL, toolbar, persistence, auto-resume), memory dashboard, split pane layout
+- [x] **v1.2** — Windows platform support (PATH resolution, .cmd binary detection, Windows Terminal integration, ConPTY color, git worktree line-ending/long-path config, cross-platform keyboard shortcuts, platform-aware update checks, WebView2 bootstrapper, MSI/NSIS bundle targets)
 
 ---
 

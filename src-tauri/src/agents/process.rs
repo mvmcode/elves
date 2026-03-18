@@ -183,11 +183,7 @@ mod tests {
     #[test]
     fn register_and_is_running() {
         let pm = ProcessManager::new();
-        let child = Command::new("echo")
-            .arg("test")
-            .stdout(std::process::Stdio::null())
-            .spawn()
-            .expect("Failed to spawn echo");
+        let child = spawn_short_lived();
 
         pm.register("sess-1", child);
         assert!(pm.is_running("sess-1"));
@@ -201,11 +197,7 @@ mod tests {
     #[test]
     fn kill_removes_process_and_returns_true() {
         let pm = ProcessManager::new();
-        let child = Command::new("sleep")
-            .arg("10")
-            .stdout(std::process::Stdio::null())
-            .spawn()
-            .expect("Failed to spawn sleep");
+        let child = spawn_long_lived();
 
         pm.register("sess-1", child);
         assert!(pm.is_running("sess-1"));
@@ -227,16 +219,8 @@ mod tests {
     fn kill_all_clears_everything() {
         let pm = ProcessManager::new();
 
-        let child1 = Command::new("sleep")
-            .arg("10")
-            .stdout(std::process::Stdio::null())
-            .spawn()
-            .expect("Failed to spawn sleep");
-        let child2 = Command::new("sleep")
-            .arg("10")
-            .stdout(std::process::Stdio::null())
-            .spawn()
-            .expect("Failed to spawn sleep");
+        let child1 = spawn_long_lived();
+        let child2 = spawn_long_lived();
 
         pm.register("sess-1", child1);
         pm.register("sess-2", child2);
@@ -260,16 +244,8 @@ mod tests {
     fn register_replaces_existing_entry() {
         let pm = ProcessManager::new();
 
-        let child1 = Command::new("echo")
-            .arg("first")
-            .stdout(std::process::Stdio::null())
-            .spawn()
-            .expect("Failed to spawn");
-        let child2 = Command::new("echo")
-            .arg("second")
-            .stdout(std::process::Stdio::null())
-            .spawn()
-            .expect("Failed to spawn");
+        let child1 = spawn_short_lived();
+        let child2 = spawn_short_lived();
 
         pm.register("sess-1", child1);
         pm.register("sess-1", child2);
@@ -279,14 +255,50 @@ mod tests {
         pm.kill("sess-1");
     }
 
+    /// Spawn a short-lived process (cross-platform).
+    fn spawn_short_lived() -> Child {
+        #[cfg(target_os = "windows")]
+        {
+            Command::new("cmd")
+                .args(["/C", "echo", "test"])
+                .stdout(std::process::Stdio::null())
+                .spawn()
+                .expect("Failed to spawn cmd")
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            Command::new("echo")
+                .arg("test")
+                .stdout(std::process::Stdio::null())
+                .spawn()
+                .expect("Failed to spawn echo")
+        }
+    }
+
+    /// Spawn a long-lived process that blocks until killed (cross-platform).
+    fn spawn_long_lived() -> Child {
+        #[cfg(target_os = "windows")]
+        {
+            Command::new("cmd")
+                .args(["/C", "ping", "-n", "100", "127.0.0.1"])
+                .stdout(std::process::Stdio::null())
+                .spawn()
+                .expect("Failed to spawn ping")
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            Command::new("sleep")
+                .arg("100")
+                .stdout(std::process::Stdio::null())
+                .spawn()
+                .expect("Failed to spawn sleep")
+        }
+    }
+
     // --- Team session tests ---
 
     fn spawn_sleep() -> Child {
-        Command::new("sleep")
-            .arg("10")
-            .stdout(std::process::Stdio::null())
-            .spawn()
-            .expect("Failed to spawn sleep")
+        spawn_long_lived()
     }
 
     #[test]
@@ -326,10 +338,10 @@ mod tests {
     fn active_count_includes_both_single_and_team() {
         let pm = ProcessManager::new();
 
-        let single = spawn_sleep();
+        let single = spawn_long_lived();
         pm.register("solo-1", single);
 
-        let team = vec![spawn_sleep(), spawn_sleep()];
+        let team = vec![spawn_long_lived(), spawn_long_lived()];
         pm.register_team("team-1", team);
 
         assert_eq!(pm.active_count(), 3);
@@ -343,10 +355,10 @@ mod tests {
     fn kill_all_clears_both_single_and_team() {
         let pm = ProcessManager::new();
 
-        let single = spawn_sleep();
+        let single = spawn_long_lived();
         pm.register("solo-1", single);
 
-        let team = vec![spawn_sleep(), spawn_sleep()];
+        let team = vec![spawn_long_lived(), spawn_long_lived()];
         pm.register_team("team-1", team);
 
         let count = pm.kill_all();
@@ -361,7 +373,7 @@ mod tests {
         let pm = ProcessManager::new();
         assert!(!pm.is_running("team-x"));
 
-        let team = vec![spawn_sleep()];
+        let team = vec![spawn_long_lived()];
         pm.register_team("team-x", team);
         assert!(pm.is_running("team-x"));
 

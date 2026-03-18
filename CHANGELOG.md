@@ -4,6 +4,29 @@ All notable changes to ELVES are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] - 2026-03-19 — Windows Platform Support
+
+### Added
+- **Windows platform support** — ELVES now builds and runs on Windows 10+ alongside macOS. All platform-specific code uses `#[cfg(target_os)]` conditional compilation.
+- **Windows PATH resolution** — appends well-known Windows install directories (npm global, Scoop, Cargo, Volta, fnm, nvm-windows, Go, Python) to the process PATH for reliable CLI binary discovery.
+- **Windows `.cmd` binary detection** — `resolve_binary()` now tries `<name>.cmd` as a fallback, since npm global installs create `.cmd` wrapper scripts on Windows.
+- **Windows Terminal integration** — `open_project_terminal` launches Windows Terminal (`wt`) with fallback to `cmd.exe` for external terminal sessions.
+- **ConPTY color support** — sets `COLORTERM=truecolor` on Windows when not already set, enabling color output in CLI tools running inside the embedded PTY.
+- **Git worktree Windows hardening** — new worktrees auto-configure `core.autocrlf=true` (prevents mixed line endings from AI agent LF output) and `core.longpaths=true` (handles deep `node_modules` trees beyond MAX_PATH).
+- **Cross-platform keyboard shortcuts** — shortcut overlay dynamically shows `Ctrl` on Windows/Linux and `⌘` on macOS instead of hardcoded `⌘`.
+- **Platform-aware update checks** — macOS shows "Copy brew command" toast action; Windows/Linux links to GitHub Releases download page.
+- **WebView2 bootstrapper** — Windows MSI/NSIS installers auto-download WebView2 runtime if not present.
+- **Bundle targets expanded** — `tauri.conf.json` targets changed from `["app"]` to `"all"`, producing MSI and NSIS installers on Windows alongside macOS `.app` bundles.
+- **Interactive setup guide** — new `setup.html` with platform auto-detection, step-by-step walkthrough, progress tracking, copy-to-clipboard code blocks, and platform-specific troubleshooting.
+- **Cross-platform test helpers** — `process.rs` tests use `spawn_short_lived()` / `spawn_long_lived()` helpers that use `cmd.exe` on Windows and `echo`/`sleep` on Unix.
+- **Binary detection timeout** — `detect_binary()` now uses a 5-second timeout for `--version` checks to avoid hanging on broken CLI installations.
+
+### Changed
+- **README updated for cross-platform** — prerequisites table, install sections (MSI/portable/.zip), troubleshooting, keyboard shortcuts, and roadmap all updated to cover Windows.
+- **Version bumped to 1.2.0** across `package.json`, `Cargo.toml`, and `tauri.conf.json`.
+- **Conditional macOS imports in `lib.rs`** — `AtomicBool`, `Ordering`, and `Arc` now only imported on macOS where they're used.
+- **PATH separator constant** — new `PATH_SEP` constant (`;` on Windows, `:` on Unix) replaces hardcoded `:` in PATH merging.
+
 ## [1.1] - 2026-03-09 — Insights Overhaul, Terminal Revamp & Memory Dashboard
 
 ### Added

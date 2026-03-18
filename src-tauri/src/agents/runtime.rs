@@ -1,6 +1,9 @@
 // Runtime detection — scans PATH for Claude Code and Codex CLI binaries.
-// macOS .app bundles get a minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin), so we
-// resolve the user's login shell PATH before searching for binaries.
+//
+// Platform-specific PATH resolution:
+// - macOS: .app bundles get a minimal PATH, so we resolve the user's login shell PATH.
+// - Windows: PATH is already fully available system-wide; we just append known install dirs.
+// - Linux: Same approach as macOS (login shell PATH resolution).
 
 use serde::Serialize;
 use std::path::PathBuf;
@@ -24,20 +27,31 @@ pub struct RuntimeInfo {
 
 static FIX_PATH: Once = Once::new();
 
-/// Augment the process PATH with the user's login shell PATH.
-/// macOS .app bundles launched from Finder/Dock get a minimal PATH that doesn't
-/// include /opt/homebrew/bin, nvm paths, cargo bin, etc. This function runs the
-/// user's default shell as an interactive login shell to resolve the real PATH
-/// (sourcing .zshenv, .zprofile, AND .zshrc), then appends well-known fallback
-/// directories as a safety net.
+/// Platform PATH separator — semicolon on Windows, colon on Unix.
+#[cfg(target_os = "windows")]
+const PATH_SEP: &str = ";";
+#[cfg(not(target_os = "windows"))]
+const PATH_SEP: &str = ":";
+
+/// Augment the process PATH with additional directories where CLI tools may be installed.
+///
+/// On macOS/Linux: runs the user's login shell to resolve the real PATH, then appends
+/// well-known fallback directories.
+/// On Windows: PATH is already globally available, so we only append well-known
+/// installation directories (npm global, cargo, scoop, etc.) as a safety net.
+///
 /// Called once before runtime detection or PTY spawning.
 pub fn ensure_full_path() {
     FIX_PATH.call_once(|| {
         let current = std::env::var("PATH").unwrap_or_default();
+
+        #[cfg(not(target_os = "windows"))]
         let shell_path = resolve_shell_path();
+        #[cfg(target_os = "windows")]
+        let shell_path: Option<String> = None; // Windows PATH is already complete
+
         let fallback_dirs = resolve_fallback_dirs();
 
-        // Merge: shell PATH first, then current, then fallbacks
         let mut parts: Vec<&str> = Vec::new();
         if let Some(ref sp) = shell_path {
             parts.push(sp);
@@ -49,7 +63,7 @@ pub fn ensure_full_path() {
             parts.push(&fallback_dirs);
         }
 
-        let merged = parts.join(":");
+        let merged = parts.join(PATH_SEP);
         if merged != current {
             // SAFETY: called once at startup via `Once`, before any multithreaded work
             #[allow(deprecated)]
@@ -62,19 +76,17 @@ pub fn ensure_full_path() {
 /// Run the user's login shell interactively to capture their real PATH.
 /// Uses `-ilc` so that .zshrc is sourced (not just .zprofile/.zshenv).
 /// Redirects stderr to suppress motd/warnings that would contaminate stdout.
+///
+/// Only compiled on Unix — Windows does not need shell PATH resolution.
+#[cfg(not(target_os = "windows"))]
 fn resolve_shell_path() -> Option<String> {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
 
-    // Detect shell type from the path (e.g. /bin/zsh, /usr/local/bin/fish)
     let shell_name = std::path::Path::new(&shell)
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("");
 
-    // Build the appropriate command based on shell type:
-    // - fish: does not support -i with -c, use -lc and fish's $PATH variable directly
-    // - bash/zsh: use -ilc so .zshrc/.bashrc are sourced (not just .zprofile/.bash_profile)
-    // - unknown: skip shell resolution entirely, rely on fallback dirs
     let output = match shell_name {
         "fish" => Command::new(&shell)
             .args(["-lc", "printf '%s' $PATH"])
@@ -93,8 +105,6 @@ fn resolve_shell_path() -> Option<String> {
     match output {
         Ok(out) if out.status.success() => {
             let path = String::from_utf8_lossy(&out.stdout).to_string();
-            // If the output contains newlines, the shell printed extra output (motd, etc.)
-            // — take only the last line which is the actual PATH
             let path = path.lines().last().unwrap_or("").to_string();
             if path.is_empty() {
                 log::warn!("Shell PATH resolution returned empty output");
@@ -117,31 +127,74 @@ fn resolve_shell_path() -> Option<String> {
     }
 }
 
-/// Build a colon-separated string of well-known binary directories that exist on disk.
-/// Acts as a safety net when the shell PATH resolution fails or misses directories.
+/// Build a separated string of well-known binary directories that exist on disk.
+/// Acts as a safety net when shell PATH resolution fails or misses directories.
+///
+/// Returns platform-appropriate paths joined by the platform's PATH separator.
 fn resolve_fallback_dirs() -> String {
+    #[cfg(target_os = "windows")]
+    let candidates = resolve_fallback_dirs_windows();
+
+    #[cfg(not(target_os = "windows"))]
+    let candidates = resolve_fallback_dirs_unix();
+
+    candidates
+        .into_iter()
+        .filter(|dir| std::path::Path::new(dir).is_dir())
+        .collect::<Vec<_>>()
+        .join(PATH_SEP)
+}
+
+/// Windows-specific fallback directories for CLI tool discovery.
+#[cfg(target_os = "windows")]
+fn resolve_fallback_dirs_windows() -> Vec<String> {
+    let userprofile = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\Users\\unknown".to_string());
+    let appdata = std::env::var("APPDATA").unwrap_or_else(|_| format!("{userprofile}\\AppData\\Roaming"));
+    let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| format!("{userprofile}\\AppData\\Local"));
+    let programfiles = std::env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
+
+    vec![
+        // npm global installs
+        format!("{appdata}\\npm"),
+        // Cargo (Rust) binaries
+        format!("{userprofile}\\.cargo\\bin"),
+        // Scoop installs
+        format!("{userprofile}\\scoop\\shims"),
+        // Node.js (default install location)
+        format!("{programfiles}\\nodejs"),
+        // fnm (Fast Node Manager)
+        format!("{localappdata}\\fnm_multishells"),
+        // nvm-windows
+        format!("{appdata}\\nvm"),
+        // Volta (Node version manager)
+        format!("{localappdata}\\Volta\\bin"),
+        // Go binaries
+        format!("{userprofile}\\go\\bin"),
+        // Python scripts
+        format!("{localappdata}\\Programs\\Python\\Python312\\Scripts"),
+        format!("{localappdata}\\Programs\\Python\\Python311\\Scripts"),
+        // GitHub CLI (winget/msi default)
+        format!("{programfiles}\\GitHub CLI"),
+    ]
+}
+
+/// Unix-specific fallback directories for CLI tool discovery.
+#[cfg(not(target_os = "windows"))]
+fn resolve_fallback_dirs_unix() -> Vec<String> {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/Users/unknown".to_string());
-    let candidates = [
+    vec![
         "/opt/homebrew/bin".to_string(),
         "/opt/homebrew/sbin".to_string(),
         "/usr/local/bin".to_string(),
         format!("{home}/.cargo/bin"),
         format!("{home}/.npm/bin"),
         format!("{home}/.nvm/current/bin"),
-        // n (node version manager) installs to /usr/local/n/versions/node/<ver>/bin
-        // but /usr/local/bin is already covered above — n symlinks there
         format!("{home}/.local/bin"),
         format!("{home}/go/bin"),
         format!("{home}/.nix-profile/bin"),
         format!("{home}/.asdf/shims"),
         format!("{home}/.local/share/mise/shims"),
-    ];
-
-    candidates
-        .into_iter()
-        .filter(|dir| std::path::Path::new(dir).is_dir())
-        .collect::<Vec<_>>()
-        .join(":")
+    ]
 }
 
 /// Resolve a CLI binary to its absolute path, ensuring PATH is fully populated first.
@@ -150,11 +203,28 @@ fn resolve_fallback_dirs() -> String {
 /// resolved against the user's real PATH — not the minimal PATH that macOS .app
 /// bundles receive from Finder/Dock.
 ///
+/// On Windows, also tries `<name>.cmd` and `<name>.exe` variants since npm global
+/// installs create `.cmd` wrapper scripts on Windows.
+///
 /// Returns the absolute PathBuf on success, or a user-friendly error message
 /// with installation hints for known binaries (claude, codex).
 pub fn resolve_binary(name: &str) -> Result<PathBuf, String> {
     ensure_full_path();
-    which::which(name).map_err(|_| {
+
+    // On Windows, npm global installs create .cmd wrappers (e.g. claude.cmd).
+    // Try the bare name first (which crate handles PATHEXT on Windows), then
+    // explicit .cmd variant as a fallback.
+    which::which(name).or_else(|_| {
+        #[cfg(target_os = "windows")]
+        {
+            let cmd_name = format!("{name}.cmd");
+            which::which(&cmd_name)
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            Err(which::Error::CannotFindBinaryPath)
+        }
+    }).map_err(|_| {
         let install_hint = match name {
             "claude" => " Install it with: npm install -g @anthropic-ai/claude-code",
             "codex" => " Install it with: npm install -g @openai/codex",
@@ -164,25 +234,55 @@ pub fn resolve_binary(name: &str) -> Result<PathBuf, String> {
     })
 }
 
-/// Detect a runtime binary by name. Looks up the binary in PATH using `which`,
-/// then runs `<binary> --version` to extract the version string.
+/// Detect a runtime binary by name. Looks up the binary in PATH using
+/// `resolve_binary` (which handles Windows .cmd variants), then runs
+/// `<binary> --version` to extract the version string.
+///
+/// Uses a 5-second timeout for the --version check to avoid hanging on
+/// broken installations.
 fn detect_binary(name: &str) -> Option<RuntimeVersion> {
-    let binary_path = which::which(name).ok()?;
+    let binary_path = resolve_binary(name).ok()?;
     let path_str = binary_path.to_string_lossy().to_string();
 
-    let output = Command::new(&binary_path)
+    // Spawn with a timeout to handle broken installs that hang
+    let mut child = Command::new(&binary_path)
         .arg("--version")
-        .output()
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
         .ok()?;
 
-    if !output.status.success() {
-        // Binary exists but --version failed — still report it with unknown version
-        return Some(RuntimeVersion {
-            version: "unknown".to_string(),
-            path: path_str,
-        });
+    // Wait up to 5 seconds for --version to complete
+    let timeout = std::time::Duration::from_secs(5);
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() {
+                    return Some(RuntimeVersion {
+                        version: "unknown".to_string(),
+                        path: path_str,
+                    });
+                }
+                break;
+            }
+            Ok(None) => {
+                if start.elapsed() > timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    log::warn!("'{name}' --version timed out after 5s — binary may be broken");
+                    return Some(RuntimeVersion {
+                        version: "unresponsive".to_string(),
+                        path: path_str,
+                    });
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Err(_) => return None,
+        }
     }
 
+    let output = child.wait_with_output().ok()?;
     let version_output = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
     // Extract just the version number from output like "claude 2.1.32" or "codex 1.4.2"
@@ -232,10 +332,23 @@ mod tests {
 
     #[test]
     fn detect_existing_binary_returns_some() {
-        // `ls` exists on all Unix systems — use it to verify the detection logic works
-        let result = detect_binary("ls");
+        // Use a binary that exists on both Unix and Windows
+        #[cfg(target_os = "windows")]
+        let binary_name = "cmd";
+        #[cfg(not(target_os = "windows"))]
+        let binary_name = "ls";
+
+        let result = detect_binary(binary_name);
         assert!(result.is_some());
         let version = result.unwrap();
         assert!(!version.path.is_empty());
+    }
+
+    #[test]
+    fn path_separator_is_correct() {
+        #[cfg(target_os = "windows")]
+        assert_eq!(PATH_SEP, ";");
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(PATH_SEP, ":");
     }
 }

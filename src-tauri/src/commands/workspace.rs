@@ -460,6 +460,19 @@ pub fn create_workspace(
 
     run_git(&project_path, &args)?;
 
+    // On Windows, configure git settings for the worktree to prevent line ending
+    // issues and long path failures.
+    #[cfg(target_os = "windows")]
+    {
+        let wt_path = worktree_dir(&project_path, &slug);
+        // Convert LF→CRLF on checkout, CRLF→LF on commit. Prevents mixed line endings
+        // when AI agents (which output LF) edit files on Windows.
+        let _ = run_git(&wt_path, &["config", "core.autocrlf", "true"]);
+        // Enable long paths — Windows default MAX_PATH of 260 chars is too short for
+        // deep node_modules trees and worktree paths under .claude/worktrees/.
+        let _ = run_git(&wt_path, &["config", "core.longpaths", "true"]);
+    }
+
     // Ensure .elves/ directory exists in the project root
     let elves_dir = Path::new(&project_path).join(".elves");
     if !elves_dir.exists() {

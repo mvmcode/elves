@@ -9,12 +9,15 @@ mod registry;
 use agents::process::ProcessManager;
 use commands::projects::DbState;
 use commands::pty::PtyManager;
+#[cfg(target_os = "macos")]
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+#[cfg(target_os = "macos")]
+use std::sync::Arc;
+use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::Emitter;
 
-/// Build the native macOS/desktop menu bar with File, Edit, View, and Help menus.
+/// Build the native desktop menu bar with File, Edit, View, and Help menus.
 /// Menu item clicks emit `menu:<id>` events to the frontend for dispatch.
 fn build_app_menu(app: &tauri::AppHandle) -> Result<Menu<tauri::Wry>, tauri::Error> {
     // File menu
@@ -83,7 +86,8 @@ pub fn run() {
         .format_timestamp_secs()
         .init();
 
-    // Resolve full user PATH for macOS .app bundles (Finder/Dock get minimal PATH)
+    // Resolve full user PATH (macOS .app bundles get minimal PATH; on Windows this
+    // appends well-known install directories as a safety net)
     agents::runtime::ensure_full_path();
 
     let db_path = db::default_db_path();
